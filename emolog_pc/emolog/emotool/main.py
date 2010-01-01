@@ -780,7 +780,8 @@ def main(cmdline=None):
     else:
         loop = get_event_loop()
         def exception_handler(loop, context):
-            print(f"Exception caught: {context}")
+            print(f"Async Exception caught: {context}")
+            raise SystemExit
         loop.set_exception_handler(exception_handler)
         client = start_callback(args, loop)
         do_post_process(args, client)
