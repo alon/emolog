@@ -1,0 +1,198 @@
+#include <assert.h>
+#include <string.h>
+
+#ifdef DEBUG
+#include <stdio.h>
+#endif
+
+#include "cmwpp.h"
+
+#ifdef DEBUG
+#define debug printf
+#else
+#define debug(...)
+#endif
+
+static uint16_t s_seq = 0;
+
+/**
+ * TODO: store the crc table in flash instead of ram by putting it in a global?
+ */
+
+#define POLYNOMIAL 0xD8  /* 11011 followed by 0's */
+
+typedef uint8_t crc;
+static crc  crcTable[256];
+#define WIDTH  (8 * sizeof(crc))
+#define TOPBIT (1 << (WIDTH - 1))
+
+
+void
+crc_init(void)
+{
+    crc  remainder;
+    uint8_t bit;
+    static uint8_t crc_inited = 0;
+    int dividend;
+
+    if (crc_inited != 0) {
+        return;
+    }
+
+    /*
+     * Compute the remainder of each possible dividend.
+     */
+    for (dividend = 0; dividend < 256; ++dividend)
+    {
+        /*
+         * Start with the dividend followed by zeros.
+         */
+        remainder = dividend << (WIDTH - 8);
+
+        /*
+         * Perform modulo-2 division, a bit at a time.
+         */
+        for (bit = 8; bit > 0; --bit)
+        {
+            /*
+             * Try to divide the current data bit.
+             */
+            if (remainder & TOPBIT)
+            {
+                remainder = (remainder << 1) ^ POLYNOMIAL;
+            }
+            else
+            {
+                remainder = (remainder << 1);
+            }
+        }
+
+        /*
+         * Store the result into the table.
+         */
+        crcTable[dividend] = remainder;
+    }
+
+    crc_inited = 1;
+
+}   /* crc_init() */
+
+
+crc
+crc8(uint8_t const message[], int nBytes)
+{
+    uint8_t data;
+    crc remainder = 0;
+    int byte;
+
+    crc_init();
+
+    /*
+     * Divide the message by the polynomial, a byte at a time.
+     */
+    for (byte = 0; byte < nBytes; ++byte)
+    {
+        data = message[byte] ^ (remainder >> (WIDTH - 8));
+        remainder = crcTable[data] ^ (remainder << 8);
+    }
+
+    /*
+     * The final remainder is the CRC.
+     */
+    return (remainder);
+
+}   /* crc8() */
+
+
+void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t *payload)
+{
+    wpp_header *dest = (wpp_header *)dest_u8;
+
+    dest->start[0] = 'C';
+    dest->start[1] = 'M';
+    dest->start[2] = 'P';
+    dest->seq = s_seq++;
+    dest->type = type;
+    dest->length = length;
+    dest->payload_crc = crc8(payload, length);
+    dest->header_crc = crc8((uint8_t *)dest, WPP_HEADER_NO_CRC_SIZE);
+}
+
+
+void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *payload)
+{
+    write_header(dest, type, length, payload);
+    memcpy(dest + sizeof(wpp_header), payload, length);
+}
+
+
+int header_check_start(const wpp_header *header)
+{
+    return header->start[0] == 'C' && header->start[1] == 'M' &&
+           header->start[2] == 'P';
+}
+
+
+uint16_t wpp_encode_version(uint8_t *dest)
+{
+    wpp_version_payload payload = {CMWPP_PROTOCOL_VERSION, 0};
+
+    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
+    return sizeof(wpp_version);
+}
+
+
+int16_t wpp_decode(const uint8_t *src, uint16_t size)
+{
+    const wpp_header *hdr;
+    const uint8_t *payload;
+    crc header_crc;
+    crc payload_crc;
+    int16_t ret;
+
+    if (size < sizeof(wpp_header)) {
+        ret = sizeof(wpp_header) - size;
+        assert(ret > 0);
+        return ret;
+    }
+    hdr = (const wpp_header *)src;
+
+    /* check header integrity, if fail skip a byte */
+    header_crc = crc8(src, WPP_HEADER_NO_CRC_SIZE);
+    if (header_crc != hdr->header_crc) {
+        debug("header crc failed %d expected, %d got\n", header_crc, hdr->header_crc);
+        return -1;
+    }
+
+    /* if we missed the header skip a byte, check again */
+    if (!header_check_start(hdr)) {
+        debug("header check failed\n");
+        return -1;
+    }
+
+    /* check enough bytes for payload */
+    if (hdr->length > size - sizeof(wpp_header)) {
+        ret = hdr->length + sizeof(wpp_header) - size;
+        assert(ret > 0);
+        return ret;
+    }
+    debug("about to check crc: expected len %lu >= got len %u (header len %lu)\n",
+          hdr->length + sizeof(wpp_header), size, sizeof(wpp_header));
+
+
+    /* check crc for payload */
+    payload = src + sizeof(wpp_header);
+    payload_crc = crc8(payload, hdr->length);
+    if (payload_crc != hdr->payload_crc) {
+        /* we know the length is correct, since the header passed crc, so
+         * skip the whole message (including payload) */
+        debug("payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
+        ret = -sizeof(wpp_header) - hdr->length;
+        assert(ret < 0);
+        return ret;
+    }
+
+    /* home free, a valid message */
+    return 0;
+}
+
