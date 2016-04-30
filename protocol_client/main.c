@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -16,6 +17,16 @@
 
 #include <cmwpp.h>
 
+
+
+/* Water Pump Protocol */
+
+unsigned char buf[1024];
+
+volatile bool message_available = false;
+volatile uint32_t buf_pos = 0;
+
+
 /* UART */
 
 uint32_t g_ui32SysClock;
@@ -28,10 +39,14 @@ __error__(char *pcFilename, uint32_t ui32Line)
 }
 #endif
 
+
 void
 UARTIntHandler(void)
 {
     uint32_t ui32Status;
+    int32_t new_char;
+    int16_t needed;
+    uint16_t n;
 
     //
     // Get the interrrupt status.
@@ -51,28 +66,34 @@ UARTIntHandler(void)
         //
         // Read the next character from the UART and write it back to the UART.
         //
-        ROM_UARTCharPutNonBlocking(UART0_BASE,
-                                   ROM_UARTCharGetNonBlocking(UART0_BASE));
+        new_char = ROM_UARTCharGetNonBlocking(UART0_BASE);
+        if (buf_pos >= sizeof(buf)) {
+            continue; // buffer overflow
+        }
+        if (message_available) {
+            continue; // not our turn
+        }
 
-        ROM_UARTCharPutNonBlocking(UART0_BASE,
-                                   '*');
-
-        //
-        // Blink the LED to show a character transfer is occuring.
-        //
-        GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, GPIO_PIN_0);
-
-        //
-        // Delay for 1 millisecond.  Each SysCtlDelay is about 3 clocks.
-        //
-        SysCtlDelay(g_ui32SysClock / (1000 * 3));
-
-        //
-        // Turn off the LED
-        //
-        GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0);
+        buf[buf_pos++] = new_char;
     }
+
+    needed = -1;
+    while (needed < 0) {
+        needed = wpp_decode(buf, buf_pos);
+
+        if (needed == 0) {
+            message_available = true;
+            break;
+        } else if (needed < 0) {
+            n = -needed;
+            memcpy(buf, buf + n, buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
+            // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
+            buf_pos -= n;
+        }
+    }
+    assert(needed > 0); // missing bytes, will wait for next call to the interrupt
 }
+
 
 void
 UARTSend(const uint8_t *pui8Buffer, uint32_t ui32Count)
@@ -94,6 +115,11 @@ UARTSend(const uint8_t *pui8Buffer, uint32_t ui32Count)
 
 void setup(void)
 {
+    // initialize globals
+    message_available = false;
+
+    // initialize hardware
+
     g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
                                              SYSCTL_OSC_MAIN |
                                              SYSCTL_USE_PLL |
@@ -121,26 +147,29 @@ void setup(void)
 }
 
 
-uint16_t g_foo;
+void handle_message(void)
+{
+    uint8_t buf_out[32];
+    uint16_t encoded_len;
 
+    wpp_header *header = (wpp_header *)buf;
 
-int g_buz(void) {
-	return g_foo + 10 * g_foo;
+    if (header->type == WPP_MESSAGE_TYPE_VERSION) {
+        encoded_len = wpp_encode_version(buf_out);
+        UARTSend(buf_out, encoded_len);
+    }
 }
 
 
 void main(void)
 {
-	unsigned char buf[1024];
-	unsigned int encoded_len;
-	int16_t needed;
+    setup();
 
-	setup();
-
-	g_foo = 10;
-    encoded_len = wpp_encode_version(buf);
-    needed = wpp_decode(buf, encoded_len);
     while (1) {
-    	SysCtlDelay(100);
+        if (message_available) {
+            handle_message();
+        } else {
+            SysCtlDelay(100);
+        }
     }
 }

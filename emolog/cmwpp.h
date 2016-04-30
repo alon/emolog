@@ -25,6 +25,7 @@
 // protocol version - ever increasing
 #define CMWPP_PROTOCOL_VERSION 1
 
+
 typedef struct wpp_header {
     uint8_t  start[3];    // "CMP"
     uint8_t  type;        // message type, one of WPP_MESSAGE_TYPE
@@ -34,7 +35,9 @@ typedef struct wpp_header {
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
 } __attribute__((packed)) wpp_header;
 
+
 #define WPP_HEADER_NO_CRC_SIZE (sizeof(wpp_header) - sizeof(((wpp_header*)0)->header_crc))
+
 
 typedef enum {
     WPP_MESSAGE_TYPE_VERSION = 1,
@@ -46,10 +49,12 @@ typedef struct wpp_version_payload {
     uint16_t   reserved;
 } __attribute__((packed)) wpp_version_payload;
 
+
 typedef struct wpp_version {
     wpp_header h;
     wpp_version_payload p;
 } __attribute__((packed)) wpp_version;
+
 
 /*
  * All wpp_encode functions return the number of encoded bytes
