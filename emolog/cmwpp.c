@@ -7,6 +7,8 @@
 
 #include "cmwpp.h"
 
+
+// TODO: write vararg function to prepend "CMWPP: " instead of manually inserting it every debug call
 #ifdef DEBUG
 #define debug printf
 #else
@@ -25,6 +27,20 @@ typedef uint8_t crc;
 static crc  crcTable[256];
 #define WIDTH  (8 * sizeof(crc))
 #define TOPBIT (1 << (WIDTH - 1))
+
+
+uint8_t*
+getCrcTable(void)
+{
+	return crcTable;
+}
+
+
+uint16_t
+get_seq(void)
+{
+	return s_seq;
+}
 
 
 void
@@ -104,14 +120,17 @@ crc8(uint8_t const message[], int nBytes)
 }   /* crc8() */
 
 
-void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t *payload)
+/**
+ * seq: if -1 ignored, otherwise used instead of the static s_seq, which is also not incremented.
+ */
+void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t *payload, int32_t seq)
 {
     wpp_header *dest = (wpp_header *)dest_u8;
 
     dest->start[0] = 'C';
     dest->start[1] = 'M';
     dest->start[2] = 'P';
-    dest->seq = s_seq++;
+    dest->seq = seq >= 0 ? seq : s_seq++;
     dest->type = type;
     dest->length = length;
     dest->payload_crc = crc8(payload, length);
@@ -119,9 +138,9 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
 }
 
 
-void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *payload)
+void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *payload, int32_t seq)
 {
-    write_header(dest, type, length, payload);
+    write_header(dest, type, length, payload, seq);
     memcpy(dest + sizeof(wpp_header), payload, length);
 }
 
@@ -133,11 +152,11 @@ int header_check_start(const wpp_header *header)
 }
 
 
-uint16_t wpp_encode_version(uint8_t *dest)
+uint16_t wpp_encode_version(uint8_t *dest, int32_t reply_to_seq)
 {
     wpp_version_payload payload = {CMWPP_PROTOCOL_VERSION, 0};
 
-    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
+    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload, reply_to_seq);
     return sizeof(wpp_version);
 }
 
@@ -160,13 +179,13 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
     /* check header integrity, if fail skip a byte */
     header_crc = crc8(src, WPP_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
-        debug("header crc failed %d expected, %d got\n", header_crc, hdr->header_crc);
+        debug("CMWPP: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;
     }
 
     /* if we missed the header skip a byte, check again */
     if (!header_check_start(hdr)) {
-        debug("header check failed\n");
+        debug("CMWPP: header check failed.\n");
         return -1;
     }
 
@@ -176,7 +195,7 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
         assert(ret > 0);
         return ret;
     }
-    debug("about to check crc: expected len %lu >= got len %u (header len %lu)\n",
+    debug("CMWPP: about to check crc: expected len %lu >= got len %u (header len %lu)\n",
           hdr->length + sizeof(wpp_header), size, sizeof(wpp_header));
 
 
@@ -186,7 +205,7 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
     if (payload_crc != hdr->payload_crc) {
         /* we know the length is correct, since the header passed crc, so
          * skip the whole message (including payload) */
-        debug("payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
+        debug("CMWPP: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
         ret = -sizeof(wpp_header) - hdr->length;
         assert(ret < 0);
         return ret;

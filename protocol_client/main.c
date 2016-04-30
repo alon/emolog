@@ -91,7 +91,7 @@ UARTIntHandler(void)
             buf_pos -= n;
         }
     }
-    assert(needed > 0); // missing bytes, will wait for next call to the interrupt
+    assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
 }
 
 
@@ -155,9 +155,11 @@ void handle_message(void)
     wpp_header *header = (wpp_header *)buf;
 
     if (header->type == WPP_MESSAGE_TYPE_VERSION) {
-        encoded_len = wpp_encode_version(buf_out);
+        encoded_len = wpp_encode_version(buf_out, header->seq);
         UARTSend(buf_out, encoded_len);
     }
+    buf_pos = 0;
+    message_available = false;
 }
 
 

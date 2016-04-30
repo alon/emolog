@@ -3,15 +3,6 @@ import os
 import ctypes
 
 
-LIBRARY_PATH = 'libcmwpp.so'
-
-def build_library():
-    os.system("make {}".format(LIBRARY_PATH))
-    assert os.path.exists('
-    lib = ctypes.CDLL(LIBRARY_PATH)
-    return lib
-
-
 def test_decode_sane():
 
 

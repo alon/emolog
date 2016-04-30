@@ -58,8 +58,11 @@ typedef struct wpp_version {
 
 /*
  * All wpp_encode functions return the number of encoded bytes
+ *
+ * reply_to_seq: -1 if not replying, otherwise the sequence number
+ * of the version message being replied.
  */
-uint16_t wpp_encode_version(uint8_t *dest);
+uint16_t wpp_encode_version(uint8_t *dest, int32_t reply_to_seq);
 
 
 /**

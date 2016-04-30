@@ -1,1 +1,4 @@
 .metadata
+*.pyc
+emolog/Release
+emolog/Debug

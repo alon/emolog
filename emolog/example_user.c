@@ -15,7 +15,7 @@ int serialize_version_test(void)
   wpp_header *decoded = NULL;
 
   for (i = 0 ; i < 2 ; ++i) {
-    encoded_len = wpp_encode_version(buf);
+    encoded_len = wpp_encode_version(buf, -1);
     needed = wpp_decode(buf, encoded_len);
     if (needed != 0) {
         printf("return from wpp_decode is not 0: %d\n", needed);
