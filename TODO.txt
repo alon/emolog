@@ -1,0 +1,21 @@
+protocol_client
+===============
+
+ - sampler
+ - sending non blocking
+  - DMA: not yet. Use a sendComplete Interrupt
+ - use CRC hardware (twice, header and payload)
+
+Later
+
+ - DMA to serial
+ - test CRC hardware performance vs on cpu
+
+
+Misc Notes
+==========
+
+Client Architecture
+
+Reading: do everything in interrupt, nak/ack
+
