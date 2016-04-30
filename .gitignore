@@ -5,3 +5,9 @@ emolog/Debug
 *.sw?
 emolog/libcmwpp.so
 emolog/example_user
+RemoteSystemsTempFiles
+tags
+project
+hello_world
+protocol_client/Debug
+uart_echo
