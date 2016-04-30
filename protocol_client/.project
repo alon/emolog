@@ -24,4 +24,10 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<variableList>
+		<variable>
+			<name>SW_ROOT</name>
+			<value>file:/home/alon/ti/SW-TM4C-2.1.2.111</value>
+		</variable>
+	</variableList>
 </projectDescription>
