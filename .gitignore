@@ -11,3 +11,6 @@ project
 hello_world
 protocol_client/Debug
 uart_echo
+*~
+.launches
+*/.launches
