@@ -1,20 +1,20 @@
-import sys
-import os
-import ctypes
+import unittest
+
+import emolog
 
 
-def test_decode_sane():
+class TestEmolog(unittest.TestCase):
 
+    def test_decode_sane(self):
+        parser = emolog.ClientParser()
+        encoded = emolog.encode_version()
+        msg = parser.incoming(encoded)
+        self.assertIsInstance(msg, emolog.Version)
 
-
-def run_tests():
-    test_decode_sane()
 
 
 def main():
-    global lib
-    lib = build_library()
-    run_tests()
+    test_decode_sane()
 
 
 if __name__ == '__main__':
