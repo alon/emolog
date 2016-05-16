@@ -33,7 +33,7 @@ def emolog():
     if not os.path.exists(LIBRARY_PATH):
         build_library()
     assert os.path.exists(LIBRARY_PATH)
-    lib = ctypes.CDLL(LIBRARY_PATH)
+    lib = ctypes.CDLL(os.path.join('.', LIBRARY_PATH))
     return lib
 
 
