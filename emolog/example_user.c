@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "cmwpp.h"
+#include "emolog.h"
 
 int serialize_version_test(void)
 {

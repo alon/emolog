@@ -1,17 +1,17 @@
 CFLAGS=-I. -DDEBUG -ggdb -Wall
 
-all: libcmwpp.so example_user
+all: libemolog.so example_user
 
-libcmwpp.so: cmwpp.h cmwpp.c
-	gcc $(CFLAGS) -shared -fPIC -o libcmwpp.so cmwpp.c
+libemolog.so: emolog.h emolog.c
+	gcc $(CFLAGS) -shared -fPIC -o libemolog.so emolog.c
 
-example_user: example_user.c libcmwpp.so
-	gcc $(CFLAGS) -o example_user -L. -lcmwpp example_user.c
+example_user: example_user.c libemolog.so
+	gcc $(CFLAGS) -o example_user -L. -lemolog example_user.c
 
 .PHONY: clean run
 
 clean:
-	rm libcmwpp.so example_user
+	rm libemolog.so example_user
 
 run: example_user
 	LD_LIBRARY_PATH=. ./example_user

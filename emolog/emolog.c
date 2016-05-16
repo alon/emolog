@@ -5,7 +5,7 @@
 #include <stdio.h>
 #endif
 
-#include "cmwpp.h"
+#include "emolog.h"
 
 
 // TODO: write vararg function to prepend "CMWPP: " instead of manually inserting it every debug call

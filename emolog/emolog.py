@@ -14,7 +14,7 @@ __all__ = ['WPP_MESSAGE_TYPE_VERSION',
            'write_version']
 
 
-LIBRARY_PATH = './libcmwpp.so'
+LIBRARY_PATH = './libemolog.so'
 
 
 def build_library():

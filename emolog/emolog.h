@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 softtabstop=4 shiftwidth=4 expandtab : */
 
 /*
- * cmwpp.h
+ * emolog.h
  *
  * Main include for Comet-ME Water Pump Protocol.
  *
@@ -11,8 +11,8 @@
  *
  */
 
-#ifndef CMWPP_H_
-#define CMWPP_H_
+#ifndef EMOLOG_H_
+#define EMOLOG_H_
 
 
 #include <stdint.h>
@@ -105,4 +105,4 @@ uint16_t wpp_encode_version(uint8_t *dest, int32_t reply_to_seq);
 int16_t wpp_decode(const uint8_t *src, uint16_t size);
 
 
-#endif /* CMWPP_H_ */
+#endif /* EMOLOG_H_ */
