@@ -11,17 +11,17 @@ int serialize_version_test(void)
   int16_t needed;
   int i;
 
-  wpp_version *version = (wpp_version *)buf;
-  wpp_header *decoded = NULL;
+  emo_version *version = (emo_version *)buf;
+  emo_header *decoded = NULL;
 
   for (i = 0 ; i < 2 ; ++i) {
-    encoded_len = wpp_encode_version(buf, -1);
-    needed = wpp_decode(buf, encoded_len);
+    encoded_len = emo_encode_version(buf, -1);
+    needed = emo_decode(buf, encoded_len);
     if (needed != 0) {
-        printf("return from wpp_decode is not 0: %d\n", needed);
+        printf("return from emo_decode is not 0: %d\n", needed);
         return 1;
     }
-    decoded = (wpp_header *)buf;
+    decoded = (emo_header *)buf;
     printf("start:   %c%c%c\n", decoded->start[0], decoded->start[1], decoded->start[2]);
     printf("type:    %d\n", decoded->type);
     printf("length:  %d\n", decoded->length);

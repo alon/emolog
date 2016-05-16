@@ -10,7 +10,7 @@ import sys
 
 
 __all__ = ['WPP_MESSAGE_TYPE_VERSION',
-           'decode_wpp_header',
+           'decode_emo_header',
            'encode_version',
            'write_version']
 
@@ -79,7 +79,7 @@ def get_seq():
     return lib.get_seq()
 
 
-def decode_wpp_header(s):
+def decode_emo_header(s):
     """
 
     :param s: bytes of header
@@ -101,11 +101,11 @@ class ClientParser(object):
     def incoming(self, s):
         assert isinstance(s, bytes)
         self.buf = self.buf + s
-        needed = lib.wpp_decode(self.buf, len(self.buf))
+        needed = lib.emo_decode(self.buf, len(self.buf))
         msg = None
         if needed == 0:
-            valid, wpp_type, wpp_len = decode_wpp_header(self.buf)
-            if wpp_type == WPP_MESSAGE_TYPE_VERSION:
+            valid, emo_type, emo_len = decode_emo_header(self.buf)
+            if emo_type == WPP_MESSAGE_TYPE_VERSION:
                 (client_version,) = struct.unpack('<L', self.buf[10:14])
                 msg = Version(client_version)
                 self.buf = b''
@@ -124,7 +124,7 @@ class ClientParser(object):
 buf_size = 1024
 buf = ctypes.create_string_buffer(buf_size)
 def encode_version():
-    buf_filled = lib.wpp_encode_version(buf, -1)
+    buf_filled = lib.emo_encode_version(buf, -1)
     print("writing {} bytes: {}".format(buf_filled, repr(buf[:buf_filled])))
     return buf[:buf_filled]
 
