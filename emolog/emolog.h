@@ -19,11 +19,11 @@
 
 
 // Version of the library - major micro and minor
-#define CMWPP_LIB_VERSION "0.0.1"
+#define EMOLOG_LIB_VERSION "0.0.1"
 
 
 // protocol version - ever increasing
-#define CMWPP_PROTOCOL_VERSION 1
+#define EMOLOG_PROTOCOL_VERSION 1
 
 
 typedef struct wpp_header {

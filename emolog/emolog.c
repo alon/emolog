@@ -8,7 +8,7 @@
 #include "emolog.h"
 
 
-// TODO: write vararg function to prepend "CMWPP: " instead of manually inserting it every debug call
+// TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
 #ifdef DEBUG
 #define debug printf
 #else
@@ -154,7 +154,7 @@ int header_check_start(const wpp_header *header)
 
 uint16_t wpp_encode_version(uint8_t *dest, int32_t reply_to_seq)
 {
-    wpp_version_payload payload = {CMWPP_PROTOCOL_VERSION, 0};
+    wpp_version_payload payload = {EMOLOG_PROTOCOL_VERSION, 0};
 
     write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload, reply_to_seq);
     return sizeof(wpp_version);
@@ -179,13 +179,13 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
     /* check header integrity, if fail skip a byte */
     header_crc = crc8(src, WPP_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
-        debug("CMWPP: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
+        debug("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;
     }
 
     /* if we missed the header skip a byte, check again */
     if (!header_check_start(hdr)) {
-        debug("CMWPP: header check failed.\n");
+        debug("EMOLOG: header check failed.\n");
         return -1;
     }
 
@@ -195,7 +195,7 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
         assert(ret > 0);
         return ret;
     }
-    debug("CMWPP: about to check crc: expected len %lu >= got len %u (header len %lu)\n",
+    debug("EMOLOG: about to check crc: expected len %lu >= got len %u (header len %lu)\n",
           hdr->length + sizeof(wpp_header), size, sizeof(wpp_header));
 
 
@@ -205,7 +205,7 @@ int16_t wpp_decode(const uint8_t *src, uint16_t size)
     if (payload_crc != hdr->payload_crc) {
         /* we know the length is correct, since the header passed crc, so
          * skip the whole message (including payload) */
-        debug("CMWPP: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
+        debug("EMOLOG: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
         ret = -sizeof(wpp_header) - hdr->length;
         assert(ret < 0);
         return ret;
