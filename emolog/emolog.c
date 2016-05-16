@@ -121,16 +121,15 @@ crc8(uint8_t const message[], int nBytes)
 
 
 /**
- * seq: if -1 ignored, otherwise used instead of the static s_seq, which is also not incremented.
  */
-void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t *payload, int32_t seq)
+void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t *payload)
 {
     emo_header *dest = (emo_header *)dest_u8;
 
     dest->start[0] = 'C';
     dest->start[1] = 'M';
     dest->start[2] = 'P';
-    dest->seq = seq >= 0 ? seq : s_seq++;
+    dest->seq = s_seq++;
     dest->type = type;
     dest->length = length;
     dest->payload_crc = crc8(payload, length);
@@ -138,9 +137,9 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
 }
 
 
-void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *payload, int32_t seq)
+void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *payload)
 {
-    write_header(dest, type, length, payload, seq);
+    write_header(dest, type, length, payload);
     memcpy(dest + sizeof(emo_header), payload, length);
 }
 
@@ -154,9 +153,9 @@ int header_check_start(const emo_header *header)
 
 uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq)
 {
-    emo_version_payload payload = {EMOLOG_PROTOCOL_VERSION, 0};
+    emo_version_payload payload = {EMOLOG_PROTOCOL_VERSION, reply_to_seq};
 
-    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload, reply_to_seq);
+    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_version);
 }
 

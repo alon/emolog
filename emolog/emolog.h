@@ -41,26 +41,50 @@ typedef struct emo_header {
 
 typedef enum {
     WPP_MESSAGE_TYPE_VERSION = 1,
+
 } WPP_MESSAGE_TYPE;
+
+#define MAKE_STRUCT(payload_name)        \
+typedef struct emo_ ## payload_name {    \
+    emo_header h;                   \
+    emo_ ## payload_name ## _payload p;             \
+} __attribute__((packed)) emo_ ## payload_name;
+
+
+/** version */
 
 
 typedef struct emo_version_payload {
     uint16_t   protocol_version;
-    uint16_t   reserved;
+    uint16_t   reply_to_seq; // -1 if initiating, seq of replied to message if responding
 } __attribute__((packed)) emo_version_payload;
 
+MAKE_STRUCT(version)
 
-typedef struct emo_version {
-    emo_header h;
-    emo_version_payload p;
-} __attribute__((packed)) emo_version;
+
+/** ping */
+
+
+typedef struct emo_ping_payload {
+} __attribute__((packed)) emo_ping_payload;
+
+MAKE_STRUCT(ping)
+
+
+/** ack */
+
+typedef struct emo_ack_payload {
+    uint16_t reply_to_seq;
+} __attribute__((packed)) emo_ack_payload;
+
+MAKE_STRUCT(ack)
 
 
 /*
  * All emo_encode functions return the number of encoded bytes
  *
  * reply_to_seq: -1 if not replying, otherwise the sequence number
- * of the version message being replied.
+ * of the version message being replied to.
  */
 uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq);
 
