@@ -17,12 +17,14 @@ __all__ = ['WPP_MESSAGE_TYPE_VERSION',
 
 
 if 'win' in sys.platform:
-    LIBRARY_PATH = './emolog.dll'
+    LIBRARY_PATH = 'emolog.dll'
 else:
-    LIBRARY_PATH = './libemolog.so'
+    LIBRARY_PATH = 'libemolog.so'
 
 
 def build_library():
+    # chdir to path of module
+    os.chdir(os.path.split(__file__)[0])
     os.system("make {}".format(LIBRARY_PATH))
     assert os.path.exists(LIBRARY_PATH)
 
