@@ -6,6 +6,7 @@ API otherwise, plus helpers.
 import ctypes
 import os
 import struct
+import sys
 
 
 __all__ = ['WPP_MESSAGE_TYPE_VERSION',
@@ -14,7 +15,11 @@ __all__ = ['WPP_MESSAGE_TYPE_VERSION',
            'write_version']
 
 
-LIBRARY_PATH = './libemolog.so'
+
+if 'win' in sys.platform:
+    LIBRARY_PATH = './emolog.dll'
+else:
+    LIBRARY_PATH = './libemolog.so'
 
 
 def build_library():

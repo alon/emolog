@@ -5,6 +5,8 @@ emolog/Debug
 *.sw?
 emolog/libcmwpp.so
 emolog/example_user
+emolog/emolog.dll
+emolog/example_user.exe
 RemoteSystemsTempFiles
 tags
 project
