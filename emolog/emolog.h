@@ -41,8 +41,14 @@ typedef struct emo_header {
 
 typedef enum {
     WPP_MESSAGE_TYPE_VERSION = 1,
-
+	WPP_MESSAGE_TYPE_PING = 2,
+	WPP_MESSAGE_TYPE_ACK = 3,
+	WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4,
+	WPP_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
+	WPP_MESSAGE_TYPE_SAMPLER_START = 6,
+	WPP_MESSAGE_TYPE_SAMPLER_STOP = 7,
 } WPP_MESSAGE_TYPE;
+
 
 #define MAKE_STRUCT(payload_name)        \
 typedef struct emo_ ## payload_name {    \
@@ -80,6 +86,39 @@ typedef struct emo_ack_payload {
 MAKE_STRUCT(ack)
 
 
+/** sampler messages  */
+
+
+/** register_variable_sampler */
+
+typedef struct emo_sampler_register_variable_payload {
+	uint32_t phase_iterations;
+	uint32_t period_iterations;
+	uint32_t address;
+	uint16_t size;
+	uint16_t reserved;
+} __attribute__((packed)) emo_sampler_register_variable_payload;
+
+MAKE_STRUCT(sampler_register_variable)
+
+
+typedef struct emo_sampler_clear_payload {
+} __attribute__((packed)) emo_sampler_clear_payload;
+
+MAKE_STRUCT(sampler_clear)
+
+
+typedef struct emo_sampler_start_payload {
+} __attribute__((packed)) emo_sampler_start_payload;
+
+MAKE_STRUCT(sampler_start)
+
+
+typedef struct emo_sampler_stop_payload {
+} __attribute__((packed)) emo_sampler_stop_payload;
+
+MAKE_STRUCT(sampler_stop)
+
 /*
  * All emo_encode functions return the number of encoded bytes
  *
@@ -87,6 +126,17 @@ MAKE_STRUCT(ack)
  * of the version message being replied to.
  */
 uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq);
+
+
+/**
+ * 
+ */
+uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_iterations,
+		uint32_t period_iterations, uint32_t address, uint16_t size);
+
+uint16_t emo_encode_sampler_clear(uint8_t *dest);
+uint16_t emo_encode_sampler_start(uint8_t *dest);
+uint16_t emo_encode_sampler_stop(uint8_t *dest);
 
 
 /**

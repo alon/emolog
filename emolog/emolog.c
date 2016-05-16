@@ -160,6 +160,20 @@ uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq)
 }
 
 
+uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_iterations,
+		uint32_t period_iterations, uint32_t address, uint16_t size)
+{
+    emo_sampler_register_variable_payload payload = {
+    		.phase_iterations=phase_iterations,
+			.period_iterations=period_iterations,
+			.address=address,
+			.size=size};
+
+    write_message(dest, WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
+    return sizeof(emo_version);
+}
+
+
 int16_t emo_decode(const uint8_t *src, uint16_t size)
 {
     const emo_header *hdr;
