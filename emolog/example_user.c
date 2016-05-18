@@ -22,7 +22,7 @@ int serialize_version_test(void)
         return 1;
     }
     decoded = (emo_header *)buf;
-    printf("start:   %c%c%c\n", decoded->start[0], decoded->start[1], decoded->start[2]);
+    printf("start:   %c%c\n", decoded->start[0], decoded->start[1]);
     printf("type:    %d\n", decoded->type);
     printf("length:  %d\n", decoded->length);
     printf("seq:     %d\n", decoded->seq);

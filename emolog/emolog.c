@@ -15,7 +15,7 @@
 #define debug(...)
 #endif
 
-static uint16_t s_seq = 0;
+static uint8_t s_seq = 0;
 
 /**
  * TODO: store the crc table in flash instead of ram by putting it in a global?
@@ -32,14 +32,14 @@ static crc  crcTable[256];
 uint8_t*
 getCrcTable(void)
 {
-	return crcTable;
+    return crcTable;
 }
 
 
-uint16_t
+uint8_t
 get_seq(void)
 {
-	return s_seq;
+    return s_seq;
 }
 
 
@@ -126,9 +126,8 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
 {
     emo_header *dest = (emo_header *)dest_u8;
 
-    dest->start[0] = 'C';
+    dest->start[0] = 'E';
     dest->start[1] = 'M';
-    dest->start[2] = 'P';
     dest->seq = s_seq++;
     dest->type = type;
     dest->length = length;
@@ -146,8 +145,7 @@ void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *
 
 int header_check_start(const emo_header *header)
 {
-    return header->start[0] == 'C' && header->start[1] == 'M' &&
-           header->start[2] == 'P';
+    return header->start[0] == 'E' && header->start[1] == 'M';
 }
 
 
@@ -160,18 +158,79 @@ uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq)
 }
 
 
-uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_iterations,
-		uint32_t period_iterations, uint32_t address, uint16_t size)
+uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
+        uint32_t period_ticks, uint32_t address, uint16_t size)
 {
     emo_sampler_register_variable_payload payload = {
-    		.phase_iterations=phase_iterations,
-			.period_iterations=period_iterations,
-			.address=address,
-			.size=size};
+            .phase_ticks=phase_ticks,
+            .period_ticks=period_ticks,
+            .address=address,
+            .size=size};
 
     write_message(dest, WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_version);
 }
+
+#define EMPTY_MESSAGE_ENCODER(suffix, msg_type)             \
+uint16_t emo_encode_ ## suffix(uint8_t *dest)                \
+{                                                                    \
+    write_message(dest, msg_type, 0, NULL);                            \
+    return sizeof(emo_ ## suffix);                                    \
+}
+
+
+EMPTY_MESSAGE_ENCODER(sampler_stop, WPP_MESSAGE_TYPE_SAMPLER_STOP)
+EMPTY_MESSAGE_ENCODER(sampler_clear, WPP_MESSAGE_TYPE_SAMPLER_CLEAR)
+EMPTY_MESSAGE_ENCODER(sampler_start, WPP_MESSAGE_TYPE_SAMPLER_START)
+
+EMPTY_MESSAGE_ENCODER(ping, WPP_MESSAGE_TYPE_PING)
+
+
+uint16_t emo_encode_ack(uint8_t *dest, uint16_t reply_to_seq)
+{
+    emo_ack_payload payload = { reply_to_seq };
+
+    write_message(dest, WPP_MESSAGE_TYPE_ACK, sizeof(payload), (const uint8_t *)&payload);
+    return sizeof(emo_ack);
+}
+
+
+/* sampler_sample encoding start */
+
+
+static uint16_t sample_payload_length = 0;
+
+
+void emo_encode_sampler_sample_start(uint8_t *dest)
+{
+    sample_payload_length = 0;
+}
+
+
+void emo_encode_sampler_sample_add_var(uint8_t *dest, uint8_t *p, uint16_t size)
+{
+    memcpy(dest + sizeof(emo_sampler_sample) + sample_payload_length, p, size);
+    sample_payload_length += size;
+}
+
+
+uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks)
+{
+    uint16_t ret;
+    emo_sampler_sample_payload *payload = (emo_sampler_sample_payload *)(dest + sizeof(emo_header));
+
+    payload->ticks = ticks;
+    write_header(dest,
+                 WPP_MESSAGE_TYPE_SAMPLER_SAMPLE,
+                 sizeof(emo_sampler_sample_payload) + sample_payload_length,
+                 dest + sizeof(emo_sampler_sample));
+    ret = sizeof(emo_sampler_sample) + sample_payload_length;
+    sample_payload_length = 0;
+    return ret;
+}
+
+
+/* sampler_sample encoding end */
 
 
 int16_t emo_decode(const uint8_t *src, uint16_t size)

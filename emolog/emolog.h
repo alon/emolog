@@ -27,10 +27,10 @@
 
 
 typedef struct emo_header {
-    uint8_t  start[3];    // "CMP"
+    uint8_t  start[2];    // "EM"
     uint8_t  type;        // message type, one of WPP_MESSAGE_TYPE
     uint16_t length;      // number of bytes in payload (not including header)
-    uint16_t seq;         // used to tell ack/nacks targets
+    uint8_t  seq;         // used to tell ack/nacks targets
     uint8_t  payload_crc; // CRC8 of the payload only
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
 } __attribute__((packed)) emo_header;
@@ -47,6 +47,7 @@ typedef enum {
 	WPP_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
 	WPP_MESSAGE_TYPE_SAMPLER_START = 6,
 	WPP_MESSAGE_TYPE_SAMPLER_STOP = 7,
+	WPP_MESSAGE_TYPE_SAMPLER_SAMPLE = 8,
 } WPP_MESSAGE_TYPE;
 
 
@@ -92,8 +93,8 @@ MAKE_STRUCT(ack)
 /** register_variable_sampler */
 
 typedef struct emo_sampler_register_variable_payload {
-	uint32_t phase_iterations;
-	uint32_t period_iterations;
+	uint32_t phase_ticks;
+	uint32_t period_ticks;
 	uint32_t address;
 	uint16_t size;
 	uint16_t reserved;
@@ -119,6 +120,16 @@ typedef struct emo_sampler_stop_payload {
 
 MAKE_STRUCT(sampler_stop)
 
+
+typedef struct emo_sampler_sample_payload {
+	uint32_t ticks;
+	// here come the variables themselves. host sees the ticks, calculates which variables are contained (see XXX) and then can parse the variables (length is known from header as well as additional redundant information)
+} __attribute__((packed)) emo_sampler_sample_payload;
+
+MAKE_STRUCT(sampler_sample)
+
+
+
 /*
  * All emo_encode functions return the number of encoded bytes
  *
@@ -127,6 +138,10 @@ MAKE_STRUCT(sampler_stop)
  */
 uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq);
 
+/*
+ * The simplest message that the sending of requires an ack.
+ */
+uint16_t emo_encode_ping(uint8_t *dest);
 
 /**
  * 
@@ -134,9 +149,24 @@ uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq);
 uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_iterations,
 		uint32_t period_iterations, uint32_t address, uint16_t size);
 
+/*
+ * All three (clear, start, stop) are sent by the Host, and the Embedded must ack
+ */
 uint16_t emo_encode_sampler_clear(uint8_t *dest);
 uint16_t emo_encode_sampler_start(uint8_t *dest);
 uint16_t emo_encode_sampler_stop(uint8_t *dest);
+
+/*
+ * encoding a sample uses three separate function calls:
+ * start - initialize some state
+ * add - add a variable to the message
+ * end - compute crcs, ready for copying out
+ *
+ * Sent by the Embedded, Host does not reply
+ */
+void emo_encode_sampler_sample_start(uint8_t *dest);
+void emo_encode_sampler_sample_add_var(uint8_t *dest, uint8_t *p, uint16_t size);
+uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
 
 
 /**
