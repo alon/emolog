@@ -149,9 +149,9 @@ int header_check_start(const emo_header *header)
 }
 
 
-uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq)
+uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq)
 {
-    emo_version_payload payload = {EMOLOG_PROTOCOL_VERSION, reply_to_seq};
+    emo_version_payload payload = {EMOLOG_PROTOCOL_VERSION, reply_to_seq, 0};
 
     write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_version);
@@ -186,7 +186,7 @@ EMPTY_MESSAGE_ENCODER(sampler_start, WPP_MESSAGE_TYPE_SAMPLER_START)
 EMPTY_MESSAGE_ENCODER(ping, WPP_MESSAGE_TYPE_PING)
 
 
-uint16_t emo_encode_ack(uint8_t *dest, uint16_t reply_to_seq)
+uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq)
 {
     emo_ack_payload payload = { reply_to_seq };
 

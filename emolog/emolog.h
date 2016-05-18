@@ -63,7 +63,8 @@ typedef struct emo_ ## payload_name {    \
 
 typedef struct emo_version_payload {
     uint16_t   protocol_version;
-    uint16_t   reply_to_seq; // -1 if initiating, seq of replied to message if responding
+    uint8_t    reply_to_seq; // -1 if initiating, seq of replied to message if responding
+    uint8_t    reserved;
 } __attribute__((packed)) emo_version_payload;
 
 MAKE_STRUCT(version)
@@ -81,7 +82,7 @@ MAKE_STRUCT(ping)
 /** ack */
 
 typedef struct emo_ack_payload {
-    uint16_t reply_to_seq;
+    uint8_t reply_to_seq;
 } __attribute__((packed)) emo_ack_payload;
 
 MAKE_STRUCT(ack)
@@ -136,12 +137,20 @@ MAKE_STRUCT(sampler_sample)
  * reply_to_seq: -1 if not replying, otherwise the sequence number
  * of the version message being replied to.
  */
-uint16_t emo_encode_version(uint8_t *dest, int32_t reply_to_seq);
+uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq);
+
 
 /*
  * The simplest message that the sending of requires an ack.
  */
 uint16_t emo_encode_ping(uint8_t *dest);
+
+
+/*
+ * ack.
+ */
+uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq);
+
 
 /**
  * 
