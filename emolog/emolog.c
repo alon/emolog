@@ -176,7 +176,7 @@ uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_tick
             .size=size};
 
     write_message(dest, WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
-    return sizeof(emo_version);
+    return sizeof(emo_sampler_register_variable);
 }
 
 #define EMPTY_MESSAGE_ENCODER(suffix, msg_type)             \
