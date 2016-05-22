@@ -25,6 +25,8 @@ __all__ = ['WPP_MESSAGE_TYPE_VERSION',
            'SamplerStop',
            'SamplerEnd']
 
+# use big endian ('>') once TI/CCS htons is working
+endianess = '<'
 
 
 if 'win' in sys.platform:
@@ -51,6 +53,7 @@ def emolog():
 # importing builds!
 lib = emolog()
 
+lib.emo_decode.restype = ctypes.c_int16
 
 ### Globals
 
@@ -121,8 +124,16 @@ class SamplerSample(Message):
 
 
 class MissingBytes(object):
-    def __init__(self, needed):
+    def __init__(self, message, header, needed):
+        self.message = message
         self.needed = needed
+        self.header = header
+
+    def __str__(self):
+        return "Message: {} {!r} Header: {} {!r}, Missing bytes: {}".format(len(self.message),
+                                                                         self.message,
+                                                                         len(self.header),
+                                                                         self.header, self.needed)
 
 
 class SkipBytes(object):
@@ -153,7 +164,7 @@ def decode_emo_header(s):
     :return: success (bool), message type (byte), payload length (uint16)
     """
     assert len(s) >= header_size
-    m1, m2, t, l, seq, payload_crc, header_crc = struct.unpack('>BBBHBBB', s[:header_size])
+    m1, m2, t, l, seq, payload_crc, header_crc = struct.unpack(endianess + 'BBBHBBB', s[:header_size])
     if [m1, m2] != MAGIC_VALUES:
         print("bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES))
         return False, None, None
@@ -208,10 +219,10 @@ class ClientParser(object):
             valid, emo_type, emo_len = decode_emo_header(self.buf)
             payload = self.buf[header_size:]
             if emo_type == WPP_MESSAGE_TYPE_VERSION:
-                (client_version, reply_to_seq, reserved) = struct.unpack('>HBB', payload)
+                (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
                 msg = Version(client_version, reply_to_seq)
             elif emo_type == WPP_MESSAGE_TYPE_ACK:
-                (reply_to_seq,) = struct.unpack('<B', payload)
+                (reply_to_seq,) = struct.unpack(endianess + 'B', payload)
                 msg = Ack(reply_to_seq)
             elif emo_type in [WPP_MESSAGE_TYPE_PING, WPP_MESSAGE_TYPE_SAMPLER_CLEAR, WPP_MESSAGE_TYPE_SAMPLER_START,
                               WPP_MESSAGE_TYPE_SAMPLER_STOP]:
@@ -221,19 +232,19 @@ class ClientParser(object):
                 if emo_type == WPP_MESSAGE_TYPE_SAMPLER_CLEAR:
                     variable_sampler.clear()
             elif emo_type == WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE:
-                msg = SamplerRegisterVariable(*struct.unpack('>LLLH', payload))
+                msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
                 variable_sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
                                                    address=msg.address, size=msg.size)
             elif emo_type == WPP_MESSAGE_TYPE_SAMPLER_SAMPLE:
                 # TODO: this requires having a variable map so we can compute the variables from ticks
-                ticks = struct.unpack('<L', payload[:4])[0]
+                ticks = struct.unpack(endianess + 'L', payload[:4])[0]
                 variables = variable_sampler.variables_from_ticks_and_payload(ticks, payload[4:])
                 msg = SamplerSample(ticks=ticks, variables=variables)
             else:
                 msg = UnknownMessage(buf)
             self.buf = b''
         elif needed > 0:
-            msg = MissingBytes(needed)
+            msg = MissingBytes(message=self.buf, header=self.buf[:header_size], needed=needed)
         else:
             msg = SkipBytes(-needed)
         return msg
@@ -275,22 +286,26 @@ def encode_ack(reply_to_seq):
 
 @show_encoded
 def encode_sampler_stop():
-    return buf[:lib.emo_sampler_stop(buf)]
+    return buf[:lib.emo_encode_sampler_stop(buf)]
 
 
 @show_encoded
 def encode_sampler_start():
-    return buf[:lib.emo_sampler_start(buf)]
+    return buf[:lib.emo_encode_sampler_start(buf)]
 
 
 @show_encoded
 def encode_sampler_clear():
-    return buf[:lib.emo_sampler_clear(buf)]
+    return buf[:lib.emo_encode_sampler_clear(buf)]
 
 
 @show_encoded
-def encode_sampler_stop():
-    return buf[:lib.emo_sampler_register_variable(buf)]
+def encode_sampler_register_variable(phase_ticks, period_ticks, address, size):
+    return buf[:lib.emo_encode_sampler_register_variable(buf,
+                                                         ctypes.c_uint32(phase_ticks),
+                                                         ctypes.c_uint32(period_ticks),
+                                                         ctypes.c_uint32(address),
+                                                         ctypes.c_uint16(size))]
 
 
 def ctypes_mem_from_size_and_val(val, size):
@@ -305,16 +320,11 @@ def ctypes_mem_from_size_and_val(val, size):
 
 @show_encoded
 def encode_sampler_sample(ticks, var_size_pairs):
-    lib.emo_sampler_sample_start(buf)
+    lib.emo_encode_sampler_sample_start(buf)
     for var, size in var_size_pairs:
         p = ctypes_mem_from_size_and_val(var, size)
-        lib.emo_sampler_sample_add_var(ctypes.byref(var), )
-    return buf[:lib.emo_sampler_sample_end(buf, ticks)]
-
-
-@show_encoded
-def encode_sampler_register_variable(phase_ticks, period_ticks, address, size):
-    return buf[:lib.emo_sampler_register_variable(buf, phase_ticks, period_ticks, address, size)]
+        lib.emo_encode_sampler_sample_add_var(buf, ctypes.byref(p), size)
+    return buf[:lib.emo_encode_sampler_sample_end(buf, ticks)]
 
 
 # Helpers to write messages to a file like object, like serial.Serial
