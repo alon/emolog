@@ -26,6 +26,7 @@
 #define EMOLOG_PROTOCOL_VERSION 1
 
 
+#pragma pack(1)
 typedef struct emo_header {
     uint8_t  start[2];    // "EM"
     uint8_t  type;        // message type, one of EMO_MESSAGE_TYPE
@@ -34,6 +35,7 @@ typedef struct emo_header {
     uint8_t  payload_crc; // CRC8 of the payload only
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
 } __attribute__((packed)) emo_header;
+#pragma pack()
 
 
 #define EMO_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
