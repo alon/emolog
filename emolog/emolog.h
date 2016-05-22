@@ -28,7 +28,7 @@
 
 typedef struct emo_header {
     uint8_t  start[2];    // "EM"
-    uint8_t  type;        // message type, one of WPP_MESSAGE_TYPE
+    uint8_t  type;        // message type, one of EMO_MESSAGE_TYPE
     uint16_t length;      // number of bytes in payload (not including header)
     uint8_t  seq;         // used to tell ack/nacks targets
     uint8_t  payload_crc; // CRC8 of the payload only
@@ -36,19 +36,19 @@ typedef struct emo_header {
 } __attribute__((packed)) emo_header;
 
 
-#define WPP_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
+#define EMO_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
 
 
 typedef enum {
-    WPP_MESSAGE_TYPE_VERSION = 1,
-	WPP_MESSAGE_TYPE_PING = 2,
-	WPP_MESSAGE_TYPE_ACK = 3,
-	WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4,
-	WPP_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
-	WPP_MESSAGE_TYPE_SAMPLER_START = 6,
-	WPP_MESSAGE_TYPE_SAMPLER_STOP = 7,
-	WPP_MESSAGE_TYPE_SAMPLER_SAMPLE = 8,
-} WPP_MESSAGE_TYPE;
+    EMO_MESSAGE_TYPE_VERSION = 1,
+	EMO_MESSAGE_TYPE_PING = 2,
+	EMO_MESSAGE_TYPE_ACK = 3,
+	EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4,
+	EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
+	EMO_MESSAGE_TYPE_SAMPLER_START = 6,
+	EMO_MESSAGE_TYPE_SAMPLER_STOP = 7,
+	EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 8,
+} EMO_MESSAGE_TYPE;
 
 
 #define MAKE_STRUCT(payload_name)        \
@@ -209,7 +209,7 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  * }
  * emo_header *header = (emo_header *)buf;
  * switch (emo_header->type) {
- * case WPP_MESSAGE_TYPE_VERSION:
+ * case EMO_MESSAGE_TYPE_VERSION:
  *   handle_version(emo_header)
  *   break;
  *  ...

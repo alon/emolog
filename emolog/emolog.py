@@ -10,7 +10,7 @@ import sys
 from functools import wraps
 
 
-__all__ = ['WPP_MESSAGE_TYPE_VERSION',
+__all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header',
            'encode_version',
            'write_version',
@@ -57,14 +57,14 @@ lib.emo_decode.restype = ctypes.c_int16
 
 ### Globals
 
-WPP_MESSAGE_TYPE_VERSION = 1
-WPP_MESSAGE_TYPE_PING = 2
-WPP_MESSAGE_TYPE_ACK = 3
-WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4
-WPP_MESSAGE_TYPE_SAMPLER_CLEAR = 5
-WPP_MESSAGE_TYPE_SAMPLER_START = 6
-WPP_MESSAGE_TYPE_SAMPLER_STOP = 7
-WPP_MESSAGE_TYPE_SAMPLER_SAMPLE = 8
+EMO_MESSAGE_TYPE_VERSION = 1
+EMO_MESSAGE_TYPE_PING = 2
+EMO_MESSAGE_TYPE_ACK = 3
+EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4
+EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 5
+EMO_MESSAGE_TYPE_SAMPLER_START = 6
+EMO_MESSAGE_TYPE_SAMPLER_STOP = 7
+EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 8
 
 header_size = 8
 
@@ -218,24 +218,24 @@ class ClientParser(object):
         if needed == 0:
             valid, emo_type, emo_len = decode_emo_header(self.buf)
             payload = self.buf[header_size:]
-            if emo_type == WPP_MESSAGE_TYPE_VERSION:
+            if emo_type == EMO_MESSAGE_TYPE_VERSION:
                 (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
                 msg = Version(client_version, reply_to_seq)
-            elif emo_type == WPP_MESSAGE_TYPE_ACK:
+            elif emo_type == EMO_MESSAGE_TYPE_ACK:
                 (reply_to_seq,) = struct.unpack(endianess + 'B', payload)
                 msg = Ack(reply_to_seq)
-            elif emo_type in [WPP_MESSAGE_TYPE_PING, WPP_MESSAGE_TYPE_SAMPLER_CLEAR, WPP_MESSAGE_TYPE_SAMPLER_START,
-                              WPP_MESSAGE_TYPE_SAMPLER_STOP]:
+            elif emo_type in [EMO_MESSAGE_TYPE_PING, EMO_MESSAGE_TYPE_SAMPLER_CLEAR, EMO_MESSAGE_TYPE_SAMPLER_START,
+                              EMO_MESSAGE_TYPE_SAMPLER_STOP]:
                 assert len(payload) == 0
-                msg = {WPP_MESSAGE_TYPE_PING: Ping, WPP_MESSAGE_TYPE_SAMPLER_CLEAR: SamplerClear,
-                       WPP_MESSAGE_TYPE_SAMPLER_START: SamplerStart, WPP_MESSAGE_TYPE_SAMPLER_STOP: SamplerStop}[emo_type]()
-                if emo_type == WPP_MESSAGE_TYPE_SAMPLER_CLEAR:
+                msg = {EMO_MESSAGE_TYPE_PING: Ping, EMO_MESSAGE_TYPE_SAMPLER_CLEAR: SamplerClear,
+                       EMO_MESSAGE_TYPE_SAMPLER_START: SamplerStart, EMO_MESSAGE_TYPE_SAMPLER_STOP: SamplerStop}[emo_type]()
+                if emo_type == EMO_MESSAGE_TYPE_SAMPLER_CLEAR:
                     variable_sampler.clear()
-            elif emo_type == WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE:
+            elif emo_type == EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE:
                 msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
                 variable_sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
                                                    address=msg.address, size=msg.size)
-            elif emo_type == WPP_MESSAGE_TYPE_SAMPLER_SAMPLE:
+            elif emo_type == EMO_MESSAGE_TYPE_SAMPLER_SAMPLE:
                 # TODO: this requires having a variable map so we can compute the variables from ticks
                 ticks = struct.unpack(endianess + 'L', payload[:4])[0]
                 variables = variable_sampler.variables_from_ticks_and_payload(ticks, payload[4:])

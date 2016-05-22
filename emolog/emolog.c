@@ -140,7 +140,7 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
     dest->type = type;
     dest->length = htons(length);
     dest->payload_crc = crc8(payload, length);
-    dest->header_crc = crc8((uint8_t *)dest, WPP_HEADER_NO_CRC_SIZE);
+    dest->header_crc = crc8((uint8_t *)dest, EMO_HEADER_NO_CRC_SIZE);
 }
 
 
@@ -161,7 +161,7 @@ uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq)
 {
     emo_version_payload payload = {EMOLOG_PROTOCOL_VERSION, reply_to_seq, 0};
 
-    write_message(dest, WPP_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
+    write_message(dest, EMO_MESSAGE_TYPE_VERSION, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_version);
 }
 
@@ -175,7 +175,7 @@ uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_tick
             .address=address,
             .size=size};
 
-    write_message(dest, WPP_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
+    write_message(dest, EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_sampler_register_variable);
 }
 
@@ -187,18 +187,18 @@ uint16_t emo_encode_ ## suffix(uint8_t *dest)                \
 }
 
 
-EMPTY_MESSAGE_ENCODER(sampler_stop, WPP_MESSAGE_TYPE_SAMPLER_STOP)
-EMPTY_MESSAGE_ENCODER(sampler_clear, WPP_MESSAGE_TYPE_SAMPLER_CLEAR)
-EMPTY_MESSAGE_ENCODER(sampler_start, WPP_MESSAGE_TYPE_SAMPLER_START)
+EMPTY_MESSAGE_ENCODER(sampler_stop, EMO_MESSAGE_TYPE_SAMPLER_STOP)
+EMPTY_MESSAGE_ENCODER(sampler_clear, EMO_MESSAGE_TYPE_SAMPLER_CLEAR)
+EMPTY_MESSAGE_ENCODER(sampler_start, EMO_MESSAGE_TYPE_SAMPLER_START)
 
-EMPTY_MESSAGE_ENCODER(ping, WPP_MESSAGE_TYPE_PING)
+EMPTY_MESSAGE_ENCODER(ping, EMO_MESSAGE_TYPE_PING)
 
 
 uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq)
 {
     emo_ack_payload payload = { reply_to_seq };
 
-    write_message(dest, WPP_MESSAGE_TYPE_ACK, sizeof(payload), (const uint8_t *)&payload);
+    write_message(dest, EMO_MESSAGE_TYPE_ACK, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_ack);
 }
 
@@ -229,7 +229,7 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks)
 
     payload->ticks = ticks;
     write_header(dest,
-                 WPP_MESSAGE_TYPE_SAMPLER_SAMPLE,
+                 EMO_MESSAGE_TYPE_SAMPLER_SAMPLE,
                  sizeof(emo_sampler_sample_payload) + sample_payload_length,
                  dest + sizeof(emo_header));
     ret = sizeof(emo_sampler_sample) + sample_payload_length;
@@ -258,7 +258,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     hdr = (const emo_header *)src;
 
     /* check header integrity, if fail skip a byte */
-    header_crc = crc8(src, WPP_HEADER_NO_CRC_SIZE);
+    header_crc = crc8(src, EMO_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
         debug("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;
