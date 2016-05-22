@@ -231,7 +231,7 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks)
     write_header(dest,
                  WPP_MESSAGE_TYPE_SAMPLER_SAMPLE,
                  sizeof(emo_sampler_sample_payload) + sample_payload_length,
-                 dest + sizeof(emo_sampler_sample));
+                 dest + sizeof(emo_header));
     ret = sizeof(emo_sampler_sample) + sample_payload_length;
     sample_payload_length = 0;
     return ret;
