@@ -3,6 +3,7 @@
 	<name>protocol_client</name>
 	<comment></comment>
 	<projects>
+		<project>emolog</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
