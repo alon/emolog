@@ -215,7 +215,7 @@ void emo_encode_sampler_sample_start(uint8_t *dest)
 }
 
 
-void emo_encode_sampler_sample_add_var(uint8_t *dest, uint8_t *p, uint16_t size)
+void emo_encode_sampler_sample_add_var(uint8_t *dest, const uint8_t *p, uint16_t size)
 {
     memcpy(dest + sizeof(emo_sampler_sample) + sample_payload_length, p, size);
     sample_payload_length += size;

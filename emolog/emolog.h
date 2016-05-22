@@ -174,7 +174,7 @@ uint16_t emo_encode_sampler_stop(uint8_t *dest);
  * Sent by the Embedded, Host does not reply
  */
 void emo_encode_sampler_sample_start(uint8_t *dest);
-void emo_encode_sampler_sample_add_var(uint8_t *dest, uint8_t *p, uint16_t size);
+void emo_encode_sampler_sample_add_var(uint8_t *dest, const uint8_t *p, uint16_t size);
 uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
 
 
