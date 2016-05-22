@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
@@ -15,8 +16,10 @@
 #include "driverlib/uart.h"
 
 
-#include <cmwpp.h>
+#include <emolog.h>
 
+#include "comm.h"
+#include "sampler.h"
 
 
 /* Water Pump Protocol */
@@ -43,7 +46,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 void
 UARTIntHandler(void)
 {
-    uint32_t ui32Status;
+    uint32_t status;
     int32_t new_char;
     int16_t needed;
     uint16_t n;
@@ -51,21 +54,18 @@ UARTIntHandler(void)
     //
     // Get the interrrupt status.
     //
-    ui32Status = ROM_UARTIntStatus(UART0_BASE, true);
+    status = ROM_UARTIntStatus(UART0_BASE, true);
 
     //
     // Clear the asserted interrupts.
     //
-    ROM_UARTIntClear(UART0_BASE, ui32Status);
+    ROM_UARTIntClear(UART0_BASE, status);
 
     //
     // Loop while there are characters in the receive FIFO.
     //
     while(ROM_UARTCharsAvail(UART0_BASE))
     {
-        //
-        // Read the next character from the UART and write it back to the UART.
-        //
         new_char = ROM_UARTCharGetNonBlocking(UART0_BASE);
         if (buf_pos >= sizeof(buf)) {
             continue; // buffer overflow
@@ -73,13 +73,12 @@ UARTIntHandler(void)
         if (message_available) {
             continue; // not our turn
         }
-
         buf[buf_pos++] = new_char;
     }
 
     needed = -1;
     while (needed < 0) {
-        needed = wpp_decode(buf, buf_pos);
+        needed = emo_decode(buf, buf_pos);
 
         if (needed == 0) {
             message_available = true;
@@ -152,11 +151,20 @@ void handle_message(void)
     uint8_t buf_out[32];
     uint16_t encoded_len;
 
-    wpp_header *header = (wpp_header *)buf;
+    emo_header *header = (emo_header *)buf;
 
-    if (header->type == WPP_MESSAGE_TYPE_VERSION) {
-        encoded_len = wpp_encode_version(buf_out, header->seq);
+    switch (header->type) {
+    case EMO_MESSAGE_TYPE_VERSION: {
+        encoded_len = emo_encode_version(buf_out, header->seq);
         UARTSend(buf_out, encoded_len);
+        break;
+    }
+    case EMO_MESSAGE_TYPE_PING: {
+    	break;
+    }
+    case EMO_MESSAGE_TYPE_ACK: {
+    	break;
+    }
     }
     buf_pos = 0;
     message_available = false;
@@ -173,5 +181,6 @@ void main(void)
         } else {
             SysCtlDelay(100);
         }
+        sampler_sample();
     }
 }
