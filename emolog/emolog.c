@@ -1,5 +1,8 @@
 #include <assert.h>
 #include <string.h>
+#ifdef FOUND_HTONS_IN_CCS
+#include <arpa/inet.h>
+#endif
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -16,6 +19,11 @@
 #endif
 
 static uint8_t s_seq = 0;
+
+#ifndef FOUND_HTONS_IN_CCS
+#define htons(x) x
+#define ntohs(x) x
+#endif
 
 /**
  * TODO: store the crc table in flash instead of ram by putting it in a global?
@@ -130,7 +138,7 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
     dest->start[1] = 'M';
     dest->seq = s_seq++;
     dest->type = type;
-    dest->length = length;
+    dest->length = htons(length);
     dest->payload_crc = crc8(payload, length);
     dest->header_crc = crc8((uint8_t *)dest, WPP_HEADER_NO_CRC_SIZE);
 }
@@ -240,6 +248,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     crc header_crc;
     crc payload_crc;
     int16_t ret;
+    uint16_t length;
 
     if (size < sizeof(emo_header)) {
         ret = sizeof(emo_header) - size;
@@ -261,24 +270,27 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
         return -1;
     }
 
+    /* convert length to local format */
+    length = ntohs(hdr->length);
+
     /* check enough bytes for payload */
-    if (hdr->length > size - sizeof(emo_header)) {
-        ret = hdr->length + sizeof(emo_header) - size;
+    if (length > size - sizeof(emo_header)) {
+        ret = length + sizeof(emo_header) - size;
         assert(ret > 0);
         return ret;
     }
     debug("EMOLOG: about to check crc: expected len %lu >= got len %u (header len %lu)\n",
-          hdr->length + sizeof(emo_header), size, sizeof(emo_header));
+          length + sizeof(emo_header), size, sizeof(emo_header));
 
 
     /* check crc for payload */
     payload = src + sizeof(emo_header);
-    payload_crc = crc8(payload, hdr->length);
+    payload_crc = crc8(payload, length);
     if (payload_crc != hdr->payload_crc) {
         /* we know the length is correct, since the header passed crc, so
          * skip the whole message (including payload) */
         debug("EMOLOG: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
-        ret = -sizeof(emo_header) - hdr->length;
+        ret = -sizeof(emo_header) - length;
         assert(ret < 0);
         return ret;
     }
