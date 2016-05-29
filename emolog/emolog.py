@@ -134,6 +134,7 @@ class MissingBytes(object):
                                                                          self.message,
                                                                          len(self.header),
                                                                          self.header, self.needed)
+    __repr__ = __str__
 
 
 class SkipBytes(object):
@@ -206,6 +207,29 @@ class VariableSampler(object):
 variable_sampler = VariableSampler()
 
 
+class HostSampler(object):
+
+    def __init__(self, s):
+        self.s = s
+        self.sampler = VariableSampler()
+
+    def set_variables(self, vars):
+        write_sampler_clear(self.s)
+        for phase_ticks, period_ticks, address, size in vars:
+            self.register_variable(phase_ticks, period_ticks, address, size)
+
+    def register_variable(self, phase_ticks, period_ticks, address, size):
+        write_sampler_register_variable(self.s, phase_ticks, period_ticks, address, size)
+
+    def read_samples(self, parser):
+        while True:
+            msg = parser.read_one(self.s)
+            if isinstance(msg, SamplerSample):
+                yield msg
+            else:
+                print("ignoring a {}".format(msg))
+
+
 class ClientParser(object):
     def __init__(self):
         self.buf = b''
@@ -247,6 +271,21 @@ class ClientParser(object):
             msg = MissingBytes(message=self.buf, header=self.buf[:header_size], needed=needed)
         else:
             msg = SkipBytes(-needed)
+        return msg
+
+    def read_one(self, serial):
+        assert(len(self.buf) == 0)
+        size = 1
+        while True:
+            msg = self.incoming(serial.read(size))
+            if isinstance(msg, SkipBytes):
+                print("communication error - skipping bytes: {}".format(msg.skip))
+                self.buf = self.buf[msg.skip:]
+            elif isinstance(msg, MissingBytes):
+                #size = max(1, msg.needed)
+                continue
+            elif msg is not None:
+                break
         return msg
 
     def __str__(self):
@@ -331,3 +370,11 @@ def encode_sampler_sample(ticks, var_size_pairs):
 
 def write_version(s):
     s.write(encode_version())
+
+
+def write_sampler_clear(s):
+    s.write(encode_sampler_clear())
+
+
+def write_sampler_register_variable(s, phase_ticks, period_ticks, address, size):
+    s.write(encode_sampler_register_variable(phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))

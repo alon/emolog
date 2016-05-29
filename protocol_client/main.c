@@ -24,15 +24,9 @@
 
 /* Water Pump Protocol */
 
-unsigned char buf[1024];
-
-volatile bool message_available = false;
-volatile uint32_t buf_pos = 0;
-
-
-/* UART */
 
 uint32_t g_ui32SysClock;
+
 
 // The error routine that is called if the driver library encounters an error.
 #ifdef DEBUG
@@ -43,131 +37,83 @@ __error__(char *pcFilename, uint32_t ui32Line)
 #endif
 
 
-void
-UARTIntHandler(void)
-{
-    uint32_t status;
-    int32_t new_char;
-    int16_t needed;
-    uint16_t n;
-
-    //
-    // Get the interrrupt status.
-    //
-    status = ROM_UARTIntStatus(UART0_BASE, true);
-
-    //
-    // Clear the asserted interrupts.
-    //
-    ROM_UARTIntClear(UART0_BASE, status);
-
-    //
-    // Loop while there are characters in the receive FIFO.
-    //
-    while(ROM_UARTCharsAvail(UART0_BASE))
-    {
-        new_char = ROM_UARTCharGetNonBlocking(UART0_BASE);
-        if (buf_pos >= sizeof(buf)) {
-            continue; // buffer overflow
-        }
-        if (message_available) {
-            continue; // not our turn
-        }
-        buf[buf_pos++] = new_char;
-    }
-
-    needed = -1;
-    while (needed < 0) {
-        needed = emo_decode(buf, buf_pos);
-
-        if (needed == 0) {
-            message_available = true;
-            break;
-        } else if (needed < 0) {
-            n = -needed;
-            memcpy(buf, buf + n, buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
-            // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
-            buf_pos -= n;
-        }
-    }
-    assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
-}
-
-
-void
-UARTSend(const uint8_t *pui8Buffer, uint32_t ui32Count)
-{
-    //
-    // Loop while there are more characters to send.
-    //
-    while(ui32Count--)
-    {
-        //
-        // Write the next character to the UART.
-        //
-        ROM_UARTCharPutNonBlocking(UART0_BASE, *pui8Buffer++);
-    }
-}
-
-
 /* Main */
 
-void setup(void)
+void setup_clock(void)
 {
-    // initialize globals
-    message_available = false;
-
-    // initialize hardware
-
     g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
                                              SYSCTL_OSC_MAIN |
                                              SYSCTL_USE_PLL |
                                              SYSCTL_CFG_VCO_480), 120000000);
+}
+
+void setup_led(void)
+{
     ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
     SysCtlDelay(3);
-    GPIOPinConfigure(GPIO_PA0_U0RX);
-    GPIOPinConfigure(GPIO_PA1_U0TX);
-    ROM_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-    ROM_UARTConfigSetExpClk(UART0_BASE, g_ui32SysClock, 115200,
-                            (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
-                             UART_CONFIG_PAR_NONE));
-
-    /* GPIO initialization */
-    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0);
-    ROM_UARTConfigSetExpClk(UART0_BASE, g_ui32SysClock, 115200,
-                            (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
-                             UART_CONFIG_PAR_NONE));
-
-    ROM_IntMasterEnable();
-    ROM_IntEnable(INT_UART0);
-    ROM_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
+    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0); // led
 }
 
 
-void handle_message(void)
+void setup(void)
+{
+    setup_clock();
+    comm_setup();
+    setup_led();
+    ROM_IntMasterEnable();
+}
+
+
+// helpers
+
+void queue_nack(uint8_t reply_to_seq, emo_error_t error)
 {
     uint8_t buf_out[32];
     uint16_t encoded_len;
 
-    emo_header *header = (emo_header *)buf;
+    encoded_len = emo_encode_nack(buf_out, reply_to_seq, error);
+    assert(encoded_len <= sizeof(buf_out));
+    comm_queue_message(buf_out, encoded_len);
+}
+
+
+void handle_message(emo_header *header)
+{
+    uint8_t buf_out[32];
+    uint16_t encoded_len;
 
     switch (header->type) {
     case EMO_MESSAGE_TYPE_VERSION: {
         encoded_len = emo_encode_version(buf_out, header->seq);
-        UARTSend(buf_out, encoded_len);
+        comm_queue_message(buf_out, encoded_len);
         break;
     }
     case EMO_MESSAGE_TYPE_PING: {
+    	// TODO
     	break;
     }
-    case EMO_MESSAGE_TYPE_ACK: {
+    case EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE: {
+    	emo_sampler_register_variable *m = (emo_sampler_register_variable *)header;
+    	emo_sampler_register_variable_payload *p = &m->p;
+    	sampler_register_variable(p->phase_ticks, p->period_ticks, p->address, p->size, header->seq);
     	break;
     }
+    case EMO_MESSAGE_TYPE_SAMPLER_CLEAR: {
+    	sampler_clear();
+    	break;
     }
-    buf_pos = 0;
-    message_available = false;
+    case EMO_MESSAGE_TYPE_SAMPLER_START: {
+    	sampler_start();
+    	break;
+    }
+    case EMO_MESSAGE_TYPE_SAMPLER_STOP: {
+    	sampler_stop();
+    	break;
+    }
+    default: {
+    	queue_nack(header->seq, EMO_ERROR_UNEXPECTED_MESSAGE);
+    }
+    }
 }
 
 
@@ -176,10 +122,10 @@ void main(void)
     setup();
 
     while (1) {
-        if (message_available) {
-            handle_message();
-        } else {
-            SysCtlDelay(100);
+    	emo_header *header;
+        if ((header = comm_peek_message()) != NULL) {
+            handle_message(header);
+            comm_consume_message();
         }
         sampler_sample();
     }

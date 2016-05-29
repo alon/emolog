@@ -203,6 +203,15 @@ uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq)
 }
 
 
+uint16_t emo_encode_nack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error)
+{
+    emo_nack_payload payload = { reply_to_seq, error };
+
+    write_message(dest, EMO_MESSAGE_TYPE_NACK, sizeof(payload), (const uint8_t *)&payload);
+    return sizeof(emo_nack);
+}
+
+
 /* sampler_sample encoding start */
 
 

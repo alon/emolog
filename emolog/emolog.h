@@ -26,7 +26,8 @@
 #define EMOLOG_PROTOCOL_VERSION 1
 
 
-#pragma pack(1)
+#pragma pack(1) // mingw version-sheker doesn't honor __attribute__((packed))
+
 typedef struct emo_header {
     uint8_t  start[2];    // "EM"
     uint8_t  type;        // message type, one of EMO_MESSAGE_TYPE
@@ -35,7 +36,6 @@ typedef struct emo_header {
     uint8_t  payload_crc; // CRC8 of the payload only
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
 } __attribute__((packed)) emo_header;
-#pragma pack()
 
 
 #define EMO_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
@@ -45,12 +45,13 @@ typedef enum {
     EMO_MESSAGE_TYPE_VERSION = 1,
 	EMO_MESSAGE_TYPE_PING = 2,
 	EMO_MESSAGE_TYPE_ACK = 3,
-	EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4,
-	EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
-	EMO_MESSAGE_TYPE_SAMPLER_START = 6,
-	EMO_MESSAGE_TYPE_SAMPLER_STOP = 7,
-	EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 8,
-} EMO_MESSAGE_TYPE;
+	EMO_MESSAGE_TYPE_NACK = 4,
+	EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 5,
+	EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 6,
+	EMO_MESSAGE_TYPE_SAMPLER_START = 7,
+	EMO_MESSAGE_TYPE_SAMPLER_STOP = 8,
+	EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 9,
+} emo_message_t;
 
 
 #define MAKE_STRUCT(payload_name)        \
@@ -88,6 +89,16 @@ typedef struct emo_ack_payload {
 } __attribute__((packed)) emo_ack_payload;
 
 MAKE_STRUCT(ack)
+
+
+/** nak */
+
+typedef struct emo_nack_payload {
+    uint16_t error;
+    uint8_t  reply_to_seq;
+} __attribute__((packed)) emo_nack_payload;
+
+MAKE_STRUCT(nack);
 
 
 /** sampler messages  */
@@ -131,6 +142,8 @@ typedef struct emo_sampler_sample_payload {
 
 MAKE_STRUCT(sampler_sample)
 
+#pragma pack()
+
 
 
 /*
@@ -154,11 +167,26 @@ uint16_t emo_encode_ping(uint8_t *dest);
 uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq);
 
 
+/*
+ * nack.
+ */
+uint16_t emo_encode_nack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error);
+
+
+typedef enum {
+    EMO_ERROR_GENERAL = 1,
+    EMO_ERROR_UNEXPECTED_MESSAGE = 2,
+    EMO_ERROR_BAD_HEADER_CRC = 3,
+    EMO_ERROR_BAD_PAYLOAD_CRC = 4,
+    EMO_ERROR_SAMPLER_REGISTER_VARIABLE__SIZE_EXCEEDED = 5,
+} emo_error_t;
+
+
 /**
  * 
  */
-uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_iterations,
-		uint32_t period_iterations, uint32_t address, uint16_t size);
+uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
+		uint32_t period_ticks, uint32_t address, uint16_t size);
 
 /*
  * All three (clear, start, stop) are sent by the Host, and the Embedded must ack
