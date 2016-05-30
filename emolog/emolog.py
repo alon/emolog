@@ -57,13 +57,17 @@ lib.emo_decode.restype = ctypes.c_int16
 
 ### Globals
 
+class EmoMessageTypes(object):
+    pass
+
+emo_message_types = EmoMessageTypes()
+
 with open('emo_message_t.h') as fd:
-    lines = [l.split('=') for l in fd.readlines()]
+    lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
     lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
     for name, value in lines:
         assert(name.startswith('EMO_MESSAGE_TYPE_'))
-        globals()[name] = value
-    emo_message_types = dict(lines)
+        setattr(emo_message_types, name[len('EMO_MESSAGE_TYPE_'):].lower(), value)
 
 header_size = 8
 
@@ -242,24 +246,26 @@ class ClientParser(object):
         if needed == 0:
             valid, emo_type, emo_len = decode_emo_header(self.buf)
             payload = self.buf[header_size:]
-            if emo_type == EMO_MESSAGE_TYPE_VERSION:
+            if emo_type == emo_message_types.version:
                 (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
                 msg = Version(client_version, reply_to_seq)
-            elif emo_type == EMO_MESSAGE_TYPE_ACK:
+            elif emo_type == emo_message_types.ack:
                 (reply_to_seq,) = struct.unpack(endianess + 'B', payload)
                 msg = Ack(reply_to_seq)
-            elif emo_type in [EMO_MESSAGE_TYPE_PING, EMO_MESSAGE_TYPE_SAMPLER_CLEAR, EMO_MESSAGE_TYPE_SAMPLER_START,
-                              EMO_MESSAGE_TYPE_SAMPLER_STOP]:
+            elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
+                               emo_message_types.sampler_start, emo_message_types.sampler_stop]:
                 assert len(payload) == 0
-                msg = {EMO_MESSAGE_TYPE_PING: Ping, EMO_MESSAGE_TYPE_SAMPLER_CLEAR: SamplerClear,
-                       EMO_MESSAGE_TYPE_SAMPLER_START: SamplerStart, EMO_MESSAGE_TYPE_SAMPLER_STOP: SamplerStop}[emo_type]()
-                if emo_type == EMO_MESSAGE_TYPE_SAMPLER_CLEAR:
+                msg = {emo_message_types.ping: Ping,
+                       emo_message_types.sampler_clear: SamplerClear,
+                       emo_message_types.sampler_start: SamplerStart,
+                       emo_message_types.sampler_stop: SamplerStop}[emo_type]()
+                if emo_type == emo_message_types.sampler_clear:
                     variable_sampler.clear()
-            elif emo_type == EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE:
+            elif emo_type == emo_message_types.sampler_register_variable:
                 msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
                 variable_sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
                                                    address=msg.address, size=msg.size)
-            elif emo_type == EMO_MESSAGE_TYPE_SAMPLER_SAMPLE:
+            elif emo_type == emo_message_types.sampler_sample:
                 # TODO: this requires having a variable map so we can compute the variables from ticks
                 ticks = struct.unpack(endianess + 'L', payload[:4])[0]
                 variables = variable_sampler.variables_from_ticks_and_payload(ticks, payload[4:])
