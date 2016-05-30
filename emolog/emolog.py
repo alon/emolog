@@ -57,14 +57,13 @@ lib.emo_decode.restype = ctypes.c_int16
 
 ### Globals
 
-EMO_MESSAGE_TYPE_VERSION = 1
-EMO_MESSAGE_TYPE_PING = 2
-EMO_MESSAGE_TYPE_ACK = 3
-EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4
-EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 5
-EMO_MESSAGE_TYPE_SAMPLER_START = 6
-EMO_MESSAGE_TYPE_SAMPLER_STOP = 7
-EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 8
+with open('emo_message_t.h') as fd:
+    lines = [l.split('=') for l in fd.readlines()]
+    lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
+    for name, value in lines:
+        assert(name.startswith('EMO_MESSAGE_TYPE_'))
+        globals()[name] = value
+    emo_message_types = dict(lines)
 
 header_size = 8
 
