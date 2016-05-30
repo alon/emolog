@@ -1,4 +1,5 @@
-CFLAGS=-I. -DHOST_DEBUG -ggdb -Wall -m64
+# -DHOST_DEBUG
+CFLAGS=-I. -ggdb -Wall -m64
 
 ifeq ($(OS),Windows_NT)
 LIBPREFIX=
