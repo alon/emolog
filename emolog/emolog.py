@@ -217,6 +217,7 @@ class HostSampler(object):
         write_sampler_clear(self.s)
         for phase_ticks, period_ticks, address, size in vars:
             self.register_variable(phase_ticks, period_ticks, address, size)
+        write_sampler_start(self.s)
 
     def register_variable(self, phase_ticks, period_ticks, address, size):
         write_sampler_register_variable(self.s, phase_ticks, period_ticks, address, size)
@@ -374,6 +375,12 @@ def write_version(s):
 
 def write_sampler_clear(s):
     s.write(encode_sampler_clear())
+
+def write_sampler_start(s):
+    s.write(encode_sampler_start())
+
+def write_sampler_stop(s):
+    s.write(encode_sampler_stop())
 
 
 def write_sampler_register_variable(s, phase_ticks, period_ticks, address, size):
