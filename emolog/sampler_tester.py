@@ -8,7 +8,7 @@ import sys
 from serial import Serial
 from serial.tools.list_ports import comports
 
-from emolog import encode_version, ClientParser, Version, SkipBytes, get_seq
+from emolog import encode_version, ClientParser, Version, get_seq, HostSampler
 
 
 def main():
@@ -26,16 +26,20 @@ def main():
     print("library seq: {}".format(get_seq()))
     print("opening port {}".format(args.serial))
     serial = Serial(args.serial, baudrate=115200)
-    parser = ClientParser(serial=serial)
-    def version_and_parse():
-        msg = parser.send_command(encode_version())
-        if isinstance(msg, Version):
-            print("got version message from client. version = {}".format(msg.version))
-        elif isinstance(msg, SkipBytes):
-            print("parser state: {}".format(parser))
-            raise SystemExit
-    version_and_parse()
-    version_and_parse()
+
+    parser = ClientParser(serial)
+    msg = parser.send_command(encode_version())
+    if isinstance(msg, Version):
+        print("got version message from embedded. version = {}".format(msg.version))
+    else:
+        print("unexpected message from embedded: {}".format(repr(msg)))
+    # initialize sampler
+    sampler = HostSampler(parser)
+
+    # phase_ticks, period_ticks, address, size
+    sampler.set_variables([(0, 1000, 0x100, 4)])
+    for msg in sampler.read_samples():
+        print(repr(msg))
 
 
 if __name__ == '__main__':

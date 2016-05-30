@@ -212,22 +212,23 @@ variable_sampler = VariableSampler()
 
 class HostSampler(object):
 
-    def __init__(self, s):
-        self.s = s
+    def __init__(self, parser):
+        self.parser = parser
         self.sampler = VariableSampler()
 
     def set_variables(self, vars):
-        write_sampler_clear(self.s)
+        self.parser.send_command(encode_sampler_clear())
         for phase_ticks, period_ticks, address, size in vars:
             self.register_variable(phase_ticks, period_ticks, address, size)
-        write_sampler_start(self.s)
+        self.parser.send_command(encode_sampler_start())
 
     def register_variable(self, phase_ticks, period_ticks, address, size):
-        write_sampler_register_variable(self.s, phase_ticks, period_ticks, address, size)
+        self.parser.send_command(encode_sampler_register_variable(
+            phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))
 
-    def read_samples(self, parser):
+    def read_samples(self):
         while True:
-            msg = parser.read_one(self.s)
+            msg = self.parser.read_one()
             if isinstance(msg, SamplerSample):
                 yield msg
             else:
@@ -235,10 +236,12 @@ class HostSampler(object):
 
 
 class ClientParser(object):
-    def __init__(self):
+    def __init__(self, serial):
         self.buf = b''
+        self.serial = serial
 
-    def incoming(self, s):
+    def _read_available(self):
+        s = self.serial.read()
         assert isinstance(s, bytes)
         self.buf = self.buf + s
         needed = lib.emo_decode(self.buf, len(self.buf))
@@ -279,16 +282,23 @@ class ClientParser(object):
             msg = SkipBytes(-needed)
         return msg
 
-    def read_one(self, serial):
+    def send_command(self, command):
+        """
+        Sends a command to the client and waits for a reply and returns it.
+        Blocking.
+        """
+        self.serial.write(command)
+        return self.read_one()
+
+    def read_one(self):
+        # TOOD: timeout
         assert(len(self.buf) == 0)
-        size = 1
         while True:
-            msg = self.incoming(serial.read(size))
+            msg = self._read_available()
             if isinstance(msg, SkipBytes):
                 print("communication error - skipping bytes: {}".format(msg.skip))
                 self.buf = self.buf[msg.skip:]
             elif isinstance(msg, MissingBytes):
-                #size = max(1, msg.needed)
                 continue
             elif msg is not None:
                 break
@@ -370,23 +380,3 @@ def encode_sampler_sample(ticks, var_size_pairs):
         p = ctypes_mem_from_size_and_val(var, size)
         lib.emo_encode_sampler_sample_add_var(buf, ctypes.byref(p), size)
     return buf[:lib.emo_encode_sampler_sample_end(buf, ticks)]
-
-
-# Helpers to write messages to a file like object, like serial.Serial
-
-def write_version(s):
-    s.write(encode_version())
-
-
-def write_sampler_clear(s):
-    s.write(encode_sampler_clear())
-
-def write_sampler_start(s):
-    s.write(encode_sampler_start())
-
-def write_sampler_stop(s):
-    s.write(encode_sampler_stop())
-
-
-def write_sampler_register_variable(s, phase_ticks, period_ticks, address, size):
-    s.write(encode_sampler_register_variable(phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))
