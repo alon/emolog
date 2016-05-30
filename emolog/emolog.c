@@ -12,7 +12,7 @@
 
 
 // TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
-#ifdef DEBUG
+#ifdef HOST_DEBUG
 #define debug printf
 #else
 #define debug(...)
