@@ -7,7 +7,8 @@ import ctypes
 import os
 import struct
 import sys
-from functools import wraps
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
@@ -61,13 +62,16 @@ class EmoMessageTypes(object):
     pass
 
 emo_message_types = EmoMessageTypes()
+emo_message_type_to_str = {}
 
 with open('emo_message_t.h') as fd:
     lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
     lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
     for name, value in lines:
         assert(name.startswith('EMO_MESSAGE_TYPE_'))
-        setattr(emo_message_types, name[len('EMO_MESSAGE_TYPE_'):].lower(), value)
+        short_name = name[len('EMO_MESSAGE_TYPE_'):].lower()
+        setattr(emo_message_types, short_name, value)
+        emo_message_type_to_str[value] = short_name
 
 header_size = 8
 
@@ -76,55 +80,132 @@ MAGIC_VALUES = list(map(ord, 'EM'))
 ### Messages
 
 
-class Message(object):
-    pass
+class Message(metaclass=ABCMeta):
+
+    # Used by all encode functions - can segfault if buffer is too large
+    buf_size = 1024
+    buf = ctypes.create_string_buffer(buf_size)
+
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def encode_inner(self):
+        pass
+
+    def encode(self, **kw):
+        s = self.buf[:self.encode_inner()]
+        print("sending: {}, encoded as {}".format(self, s))
+        return s
+
+    def __str__(self):
+        return '<{}>'.format(emo_message_type_to_str[self.type])
+
+    __repr__ = __str__
 
 
 class Version(Message):
-    def __init__(self, version, reply_to_seq):
+    type = emo_message_types.version
+    def __init__(self, version=None, reply_to_seq=None):
         self.version = version
         self.reply_to_seq = reply_to_seq
 
+    def encode_inner(self):
+        return lib.emo_encode_version(self.buf)
+
 
 class Ping(Message):
-    pass
+    type = emo_message_types.ping
+    def encode_inner(self):
+        return lib.emo_encode_ping(self.buf)
 
 
 class Ack(Message):
+    type = emo_message_types.ack
     def __init__(self, error, reply_to_seq):
         self.error = error
         self.reply_to_seq = reply_to_seq
 
+    def encode_inner(self):
+        return lib.emo_encode_ack(self.error, self.reploy_to_seq)
+
+    def __str__(self):
+        # TODO - string for error
+        return '<{} {} {}>'.format('ack' if self.error == 0 else 'nack', self.reply_to_seq, self.error)
+
+    __repr__ = __str__
+
 
 class SamplerRegisterVariable(Message):
+    type = emo_message_types.sampler_register_variable
     def __init__(self, phase_ticks, period_ticks, address, size):
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
         self.address = address
         self.size = size
 
+    def encode_inner(self):
+        return lib.emo_encode_sampler_register_variable(self.buf,
+                                                     ctypes.c_uint32(self.phase_ticks),
+                                                     ctypes.c_uint32(self.period_ticks),
+                                                     ctypes.c_uint32(self.address),
+                                                     ctypes.c_uint16(self.size))
 
 class SamplerClear(Message):
-    pass
+    type = emo_message_types.sampler_clear
+
+    def encode_inner(self):
+        return lib.emo_encode_sampler_clear(self.buf)
 
 
 class SamplerStart(Message):
-    pass
+    type = emo_message_types.sampler_start
+
+    def encode_inner(self):
+        return lib.emo_encode_sampler_start(self.buf)
 
 
 class SamplerStop(Message):
-    pass
+    type = emo_message_types.sampler_stop
+
+    def encode_inner(self):
+        return lib.emo_encode_sampler_stop(self.buf)
 
 
 class SamplerSample(Message):
-    def __init__(self, ticks, **variables):
+    type = emo_message_types.sampler_sample
+    def __init__(self, ticks, payload=None, var_size_pairs=None):
         """
         :param ticks:
         :param vars: dictionary from variable index to value
         :return:
         """
         self.ticks = ticks
-        self.variables = variables
+        self.payload = payload
+        self.var_size_pairs = var_size_pairs
+        self.variables = None
+
+    def encode_inner(self):
+        lib.emo_encode_sampler_sample_start(self.buf)
+        for var, size in self.var_size_pairs:
+            p = ctypes_mem_from_size_and_val(var, size)
+            lib.emo_encode_sampler_sample_add_var(self.buf, ctypes.byref(p), size)
+        return lib.emo_encode_sampler_sample_end(self.buf, self.ticks)
+
+    def update_with_sampler(self, sampler):
+        self.variables = sampler.variables_from_ticks_and_payload(ticks=self.ticks, payload=self.payload)
+
+    def __str__(self):
+        if self.variables:
+            return '<sample {} variables {}>'.format(self.ticks, repr(self.variables))
+        elif self.payload:
+            return '<sample {} undecoded {}>'.format(self.ticks, repr(self.payload))
+        elif self.var_size_pairs:
+            return '<sample {} var_size_pairs {}>'.format(self.ticks, self.var_size_pairs)
+        else:
+            return '<sample {} error>'.format(self.ticks)
+
+    __repr__ = __str__
 
 
 class MissingBytes(object):
@@ -147,7 +228,8 @@ class SkipBytes(object):
 
 
 class UnknownMessage(object):
-    def __init__(self, buf):
+    def __init__(self, type, buf):
+        self.type = type
         self.buf = buf
 
 
@@ -173,7 +255,6 @@ def decode_emo_header(s):
     if [m1, m2] != MAGIC_VALUES:
         print("bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES))
         return False, None, None
-    print("got message: type {}, seq {}, length {}".format(t, seq, l))
     return True, t, l
 
 
@@ -218,28 +299,35 @@ class HostSampler(object):
         self.sampler = VariableSampler()
 
     def set_variables(self, vars):
-        self.parser.send_command(encode_sampler_clear())
-        for phase_ticks, period_ticks, address, size in vars:
-            self.register_variable(phase_ticks, period_ticks, address, size)
-        self.parser.send_command(encode_sampler_start())
+        self.parser.send_command(SamplerClear())
+        self.sampler.clear()
+        for d in vars:
+            self.sampler.register_variable(**d)
+            self.register_variable(**d)
+        self.parser.send_command(SamplerStart())
 
     def register_variable(self, phase_ticks, period_ticks, address, size):
-        self.parser.send_command(encode_sampler_register_variable(
+        self.parser.send_command(SamplerRegisterVariable(
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))
 
     def read_samples(self):
         while True:
             msg = self.parser.read_one()
             if isinstance(msg, SamplerSample):
+                msg.update_with_sampler(self.sampler)
                 yield msg
             else:
                 print("ignoring a {}".format(msg))
+
+    def stop(self):
+        self.parser.send_command(SamplerStop())
 
 
 class ClientParser(object):
     def __init__(self, serial):
         self.buf = b''
         self.serial = serial
+        self.ignored = defaultdict(int)
 
     def _read_available(self):
         s = self.serial.read()
@@ -272,10 +360,9 @@ class ClientParser(object):
             elif emo_type == emo_message_types.sampler_sample:
                 # TODO: this requires having a variable map so we can compute the variables from ticks
                 ticks = struct.unpack(endianess + 'L', payload[:4])[0]
-                variables = variable_sampler.variables_from_ticks_and_payload(ticks, payload[4:])
-                msg = SamplerSample(ticks=ticks, variables=variables)
+                msg = SamplerSample(ticks=ticks, payload=payload[4:])
             else:
-                msg = UnknownMessage(buf)
+                msg = UnknownMessage(type=emo_type, buf=Message.buf)
             self.buf = b''
         elif needed > 0:
             msg = MissingBytes(message=self.buf, header=self.buf[:header_size], needed=needed)
@@ -288,12 +375,17 @@ class ClientParser(object):
         Sends a command to the client and waits for a reply and returns it.
         Blocking.
         """
-        self.serial.write(command)
+        self.serial.write(command.encode())
         msg = self.read_one()
         if isinstance(msg, Version):
             return msg
-        if msg.error != 0:
-            print("client responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
+        elif isinstance(msg, SamplerSample):
+            # client is still sending samples, ignore silently
+            self.ignored[msg.__class__] += 1
+        else:
+            assert isinstance(msg, Ack)
+            if msg.error != 0:
+                print("client responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
 
     def read_one(self):
         # TOOD: timeout
@@ -315,59 +407,6 @@ class ClientParser(object):
     __repr__ = __str__
 
 
-def show_encoded(f):
-    @wraps(f)
-    def wrapped(*args, **kw):
-        ret = f(*args, **kw)
-        print("writing {} bytes: {}".format(len(ret), repr(ret)))
-        return ret
-    return wrapped
-
-
-# Used by all encode functions - can segfault if buffer is too large
-buf_size = 1024
-buf = ctypes.create_string_buffer(buf_size)
-
-
-@show_encoded
-def encode_version():
-    return buf[:lib.emo_encode_version(buf)]
-
-
-@show_encoded
-def encode_ping():
-    return buf[:lib.emo_encode_ping(buf)]
-
-
-@show_encoded
-def encode_ack(reply_to_seq):
-    return buf[:lib.emo_encode_ack(buf, reply_to_seq)]
-
-
-@show_encoded
-def encode_sampler_stop():
-    return buf[:lib.emo_encode_sampler_stop(buf)]
-
-
-@show_encoded
-def encode_sampler_start():
-    return buf[:lib.emo_encode_sampler_start(buf)]
-
-
-@show_encoded
-def encode_sampler_clear():
-    return buf[:lib.emo_encode_sampler_clear(buf)]
-
-
-@show_encoded
-def encode_sampler_register_variable(phase_ticks, period_ticks, address, size):
-    return buf[:lib.emo_encode_sampler_register_variable(buf,
-                                                         ctypes.c_uint32(phase_ticks),
-                                                         ctypes.c_uint32(period_ticks),
-                                                         ctypes.c_uint32(address),
-                                                         ctypes.c_uint16(size))]
-
-
 def ctypes_mem_from_size_and_val(val, size):
     if size == 4:
         return ctypes.c_int32(val)
@@ -376,12 +415,3 @@ def ctypes_mem_from_size_and_val(val, size):
     elif size == 1:
         return ctypes.c_int8(val)
     raise Exception("unknown size {}".format(size))
-
-
-@show_encoded
-def encode_sampler_sample(ticks, var_size_pairs):
-    lib.emo_encode_sampler_sample_start(buf)
-    for var, size in var_size_pairs:
-        p = ctypes_mem_from_size_and_val(var, size)
-        lib.emo_encode_sampler_sample_add_var(buf, ctypes.byref(p), size)
-    return buf[:lib.emo_encode_sampler_sample_end(buf, ticks)]
