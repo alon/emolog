@@ -74,23 +74,20 @@ typedef struct emo_ping_payload {
 MAKE_STRUCT(ping)
 
 
-/** ack */
+/*
+ * ack used for both success and error result reporting. every host message
+ * must get a response from the client:
+ *
+ * version / version
+ * other   / ack
+ */
 
 typedef struct emo_ack_payload {
-    uint8_t reply_to_seq;
-} __attribute__((packed)) emo_ack_payload;
-
-MAKE_STRUCT(ack)
-
-
-/** nak */
-
-typedef struct emo_nack_payload {
     uint16_t error;
     uint8_t  reply_to_seq;
-} __attribute__((packed)) emo_nack_payload;
+} __attribute__((packed)) emo_ack_payload;
 
-MAKE_STRUCT(nack);
+MAKE_STRUCT(ack);
 
 
 /** sampler messages  */
@@ -156,21 +153,17 @@ uint16_t emo_encode_ping(uint8_t *dest);
 /*
  * ack.
  */
-uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq);
-
-
-/*
- * nack.
- */
-uint16_t emo_encode_nack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error);
+uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error);
 
 
 typedef enum {
+    EMO_ERROR_NONE = 0,
     EMO_ERROR_GENERAL = 1,
     EMO_ERROR_UNEXPECTED_MESSAGE = 2,
     EMO_ERROR_BAD_HEADER_CRC = 3,
     EMO_ERROR_BAD_PAYLOAD_CRC = 4,
     EMO_ERROR_SAMPLER_REGISTER_VARIABLE__SIZE_EXCEEDED = 5,
+    EMO_ERROR_SAMPLER_TABLE_EMPTY = 6,
 } emo_error_t;
 
 

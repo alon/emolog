@@ -66,12 +66,12 @@ void setup(void)
 
 // helpers
 
-void queue_nack(uint8_t reply_to_seq, emo_error_t error)
+void queue_ack(uint8_t reply_to_seq, emo_error_t error)
 {
     uint8_t buf_out[32];
     uint16_t encoded_len;
 
-    encoded_len = emo_encode_nack(buf_out, reply_to_seq, error);
+    encoded_len = emo_encode_ack(buf_out, reply_to_seq, error);
     assert(encoded_len <= sizeof(buf_out));
     comm_queue_message(buf_out, encoded_len);
 }
@@ -81,6 +81,7 @@ void handle_message(emo_header *header)
 {
     uint8_t buf_out[32];
     uint16_t encoded_len;
+    emo_error_t error = EMO_ERROR_NONE;
 
     switch (header->type) {
     case EMO_MESSAGE_TYPE_VERSION: {
@@ -89,30 +90,34 @@ void handle_message(emo_header *header)
         break;
     }
     case EMO_MESSAGE_TYPE_PING: {
-    	// TODO
-    	break;
+        // TODO
+        break;
     }
     case EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE: {
-    	emo_sampler_register_variable *m = (emo_sampler_register_variable *)header;
-    	emo_sampler_register_variable_payload *p = &m->p;
-    	sampler_register_variable(p->phase_ticks, p->period_ticks, p->address, p->size, header->seq);
-    	break;
+        emo_sampler_register_variable *m = (emo_sampler_register_variable *)header;
+        emo_sampler_register_variable_payload *p = &m->p;
+        error = sampler_register_variable(p->phase_ticks, p->period_ticks, p->address, p->size, header->seq);
+        break;
     }
     case EMO_MESSAGE_TYPE_SAMPLER_CLEAR: {
-    	sampler_clear();
-    	break;
+        sampler_clear();
+        break;
     }
     case EMO_MESSAGE_TYPE_SAMPLER_START: {
-    	sampler_start();
-    	break;
+        sampler_start();
+        break;
     }
     case EMO_MESSAGE_TYPE_SAMPLER_STOP: {
-    	sampler_stop();
-    	break;
+        sampler_stop();
+        break;
     }
     default: {
-    	queue_nack(header->seq, EMO_ERROR_UNEXPECTED_MESSAGE);
+        error = EMO_ERROR_UNEXPECTED_MESSAGE;
     }
+    }
+
+    if (header->type != EMO_MESSAGE_TYPE_VERSION) {
+        queue_ack(header->seq, error);
     }
 }
 
@@ -122,7 +127,7 @@ void main(void)
     setup();
 
     while (1) {
-    	emo_header *header;
+        emo_header *header;
         if ((header = comm_peek_message()) != NULL) {
             handle_message(header);
             comm_consume_message();

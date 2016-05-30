@@ -64,16 +64,13 @@ void sampler_sample(void)
 /**
  * output: This message can generate a nack if the variable table overflows.
  */
-void sampler_register_variable(uint32_t phase_ticks, uint32_t period_ticks, uint32_t address, uint16_t size, uint8_t seq)
+
+emo_error_t sampler_register_variable(uint32_t phase_ticks, uint32_t period_ticks, uint32_t address, uint16_t size, uint8_t seq)
 {
 	row_t *row;
-    uint8_t buf_out[32];
-    uint16_t encoded_len;
 
 	if (sampler_table_size >= MAX_VARS) {
-		encoded_len = emo_encode_nack(buf_out, seq, EMO_ERROR_SAMPLER_REGISTER_VARIABLE__SIZE_EXCEEDED);
-		comm_queue_message(buf_out, encoded_len);
-		return;
+		return EMO_ERROR_SAMPLER_REGISTER_VARIABLE__SIZE_EXCEEDED;
 	}
 	row = &sampler_table[sampler_table_size];
 	row->address = address;
@@ -81,6 +78,7 @@ void sampler_register_variable(uint32_t phase_ticks, uint32_t period_ticks, uint
 	row->phase_ticks = phase_ticks;
 	row->period_ticks = period_ticks;
 	sampler_table_size++;
+	return EMO_ERROR_NONE;
 }
 
 
@@ -97,8 +95,12 @@ void sampler_stop(void)
 }
 
 
-void sampler_start(void)
+emo_error_t sampler_start(void)
 {
+	if (sampler_table_size == 0) {
+		return EMO_ERROR_SAMPLER_TABLE_EMPTY;
+	}
 	sampler_running = true;
 	sampler_ticks = 0;
+	return EMO_ERROR_NONE;
 }

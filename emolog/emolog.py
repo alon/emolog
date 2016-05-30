@@ -38,13 +38,13 @@ else:
 def build_library():
     # chdir to path of module
     os.chdir(os.path.split(__file__)[0])
-    os.system("make {}".format(LIBRARY_PATH))
+    ret = os.system("make {}".format(LIBRARY_PATH))
+    assert ret == 0, "make failed with error code {}, see above.".format(ret)
     assert os.path.exists(LIBRARY_PATH)
 
 
 def emolog():
-    if not os.path.exists(LIBRARY_PATH):
-        build_library()
+    build_library()
     assert os.path.exists(LIBRARY_PATH)
     lib = ctypes.CDLL(os.path.join('.', LIBRARY_PATH))
     return lib
@@ -91,7 +91,8 @@ class Ping(Message):
 
 
 class Ack(Message):
-    def __init__(self, reply_to_seq):
+    def __init__(self, error, reply_to_seq):
+        self.error = error
         self.reply_to_seq = reply_to_seq
 
 
@@ -253,8 +254,8 @@ class ClientParser(object):
                 (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
                 msg = Version(client_version, reply_to_seq)
             elif emo_type == emo_message_types.ack:
-                (reply_to_seq,) = struct.unpack(endianess + 'B', payload)
-                msg = Ack(reply_to_seq)
+                (error, reply_to_seq) = struct.unpack(endianess + 'HB', payload)
+                msg = Ack(error, reply_to_seq)
             elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
                                emo_message_types.sampler_start, emo_message_types.sampler_stop]:
                 assert len(payload) == 0
@@ -288,7 +289,11 @@ class ClientParser(object):
         Blocking.
         """
         self.serial.write(command)
-        return self.read_one()
+        msg = self.read_one()
+        if isinstance(msg, Version):
+            return msg
+        if msg.error != 0:
+            print("client responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
 
     def read_one(self):
         # TOOD: timeout

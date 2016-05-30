@@ -13,9 +13,9 @@ void sampler_sample(void);
 
 // Host to Embedded
 void sampler_clear(void);
-void sampler_start(void);
+emo_error_t sampler_start(void);
 void sampler_stop(void);
-void sampler_register_variable(uint32_t phase_ticks, uint32_t period_ticks, uint32_t address, uint16_t size, uint8_t seq);
+emo_error_t sampler_register_variable(uint32_t phase_ticks, uint32_t period_ticks, uint32_t address, uint16_t size, uint8_t seq);
 
 
 #endif /* SAMPLER_H_ */

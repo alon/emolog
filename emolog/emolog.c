@@ -194,21 +194,12 @@ EMPTY_MESSAGE_ENCODER(sampler_start, EMO_MESSAGE_TYPE_SAMPLER_START)
 EMPTY_MESSAGE_ENCODER(ping, EMO_MESSAGE_TYPE_PING)
 
 
-uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq)
+uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error)
 {
-    emo_ack_payload payload = { reply_to_seq };
+    emo_ack_payload payload = { .error = error, .reply_to_seq = reply_to_seq };
 
     write_message(dest, EMO_MESSAGE_TYPE_ACK, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_ack);
-}
-
-
-uint16_t emo_encode_nack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error)
-{
-    emo_nack_payload payload = { reply_to_seq, error };
-
-    write_message(dest, EMO_MESSAGE_TYPE_NACK, sizeof(payload), (const uint8_t *)&payload);
-    return sizeof(emo_nack);
 }
 
 
