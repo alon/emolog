@@ -289,9 +289,6 @@ class VariableSampler(object):
         return variables
 
 
-variable_sampler = VariableSampler()
-
-
 class HostSampler(object):
 
     def __init__(self, parser):
@@ -323,52 +320,66 @@ class HostSampler(object):
         self.parser.send_command(SamplerStop())
 
 
+def emo_decode(buf):
+    needed = lib.emo_decode(buf, len(buf))
+    msg = None
+    if needed == 0:
+        valid, emo_type, emo_len = decode_emo_header(buf)
+        payload = buf[header_size:]
+        if emo_type == emo_message_types.version:
+            (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
+            msg = Version(client_version, reply_to_seq)
+        elif emo_type == emo_message_types.ack:
+            (error, reply_to_seq) = struct.unpack(endianess + 'HB', payload)
+            msg = Ack(error, reply_to_seq)
+        elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
+                          emo_message_types.sampler_start, emo_message_types.sampler_stop]:
+            assert len(payload) == 0
+            msg = {emo_message_types.ping: Ping,
+                   emo_message_types.sampler_clear: SamplerClear,
+                   emo_message_types.sampler_start: SamplerStart,
+                   emo_message_types.sampler_stop: SamplerStop}[emo_type]()
+        elif emo_type == emo_message_types.sampler_register_variable:
+            msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
+        elif emo_type == emo_message_types.sampler_sample:
+            # TODO: this requires having a variable map so we can compute the variables from ticks
+            ticks = struct.unpack(endianess + 'L', payload[:4])[0]
+            msg = SamplerSample(ticks=ticks, payload=payload[4:])
+        else:
+            msg = UnknownMessage(type=emo_type, buf=Message.buf)
+    elif needed > 0:
+        msg = MissingBytes(message=buf, header=buf[:header_size], needed=needed)
+    else:
+        msg = SkipBytes(-needed)
+    return msg
+
+
 class ClientParser(object):
     def __init__(self, serial):
         self.buf = b''
         self.serial = serial
         self.ignored = defaultdict(int)
+        self.sampler = VariableSampler()
 
     def _read_available(self):
         s = self.serial.read()
         assert isinstance(s, bytes)
         self.buf = self.buf + s
         needed = lib.emo_decode(self.buf, len(self.buf))
-        msg = None
-        if needed == 0:
-            valid, emo_type, emo_len = decode_emo_header(self.buf)
-            payload = self.buf[header_size:]
-            if emo_type == emo_message_types.version:
-                (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
-                msg = Version(client_version, reply_to_seq)
-            elif emo_type == emo_message_types.ack:
-                (error, reply_to_seq) = struct.unpack(endianess + 'HB', payload)
-                msg = Ack(error, reply_to_seq)
-            elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
-                               emo_message_types.sampler_start, emo_message_types.sampler_stop]:
-                assert len(payload) == 0
-                msg = {emo_message_types.ping: Ping,
-                       emo_message_types.sampler_clear: SamplerClear,
-                       emo_message_types.sampler_start: SamplerStart,
-                       emo_message_types.sampler_stop: SamplerStop}[emo_type]()
-                if emo_type == emo_message_types.sampler_clear:
-                    variable_sampler.clear()
-            elif emo_type == emo_message_types.sampler_register_variable:
-                msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
-                variable_sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
-                                                   address=msg.address, size=msg.size)
-            elif emo_type == emo_message_types.sampler_sample:
-                # TODO: this requires having a variable map so we can compute the variables from ticks
-                ticks = struct.unpack(endianess + 'L', payload[:4])[0]
-                msg = SamplerSample(ticks=ticks, payload=payload[4:])
-            else:
-                msg = UnknownMessage(type=emo_type, buf=Message.buf)
-            self.buf = b''
-        elif needed > 0:
-            msg = MissingBytes(message=self.buf, header=self.buf[:header_size], needed=needed)
+        msg = emo_decode(self.buf)
+        if isinstance(msg, MissingBytes):
+            pass
+        elif isinstance(msg, SkipBytes):
+            pass
         else:
-            msg = SkipBytes(-needed)
-        return msg
+            self.buf = b''
+        if isinstance(msg, VariableSampler):
+            self.sampler.clear()
+        elif isinstance(msg, SamplerRegisterVariable):
+            self.sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
+                                               address=msg.address, size=msg.size)
+        elif isinstance(msg, SamplerSample):
+            msg.update_with_sampler(self.sampler)
 
     def send_command(self, command):
         """
