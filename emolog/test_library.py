@@ -1,4 +1,5 @@
-import unittest
+from io import StringIO
+
 
 import pytest
 
@@ -32,3 +33,8 @@ def test_decode_sane(name, reply_class, params):
     encoded = reply_class(**params).encode()
     msg = emolog.emo_decode(encoded)
     assert isinstance(msg, reply_class), "expected {}, got {}".format(reply_class, str(msg))
+
+
+def test_client_parser():
+    serial = StringIO()
+    parser = emolog.ClientParser(serial)
