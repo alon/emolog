@@ -8,7 +8,7 @@ import emolog
 test_decode_sanity_data = [
     ('version', emolog.Version, {}),
     ('ping', emolog.Ping, {}),
-    ('ack', emolog.Ack, {"reply_to_seq": 5}),
+    ('ack', emolog.Ack, {"reply_to_seq": 5, "error": 0}),
     ('sampler_register_variable', emolog.SamplerRegisterVariable,
      {
         'phase_ticks': 1,

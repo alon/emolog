@@ -127,7 +127,7 @@ class Ack(Message):
         self.reply_to_seq = reply_to_seq
 
     def encode_inner(self):
-        return lib.emo_encode_ack(self.error, self.reploy_to_seq)
+        return lib.emo_encode_ack(self.buf, self.error, self.reply_to_seq)
 
     def __str__(self):
         # TODO - string for error
