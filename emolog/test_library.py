@@ -29,7 +29,6 @@ test_decode_sanity_data = [
 
 @pytest.mark.parametrize("name,reply_class,params", test_decode_sanity_data)
 def test_decode_sane(name, reply_class, params):
-    encoded = getattr(emolog, 'encode_{}'.format(name))(**params)
-    parser = emolog.ClientParser()
-    msg = parser.incoming(encoded)
+    encoded = reply_class(**params).encode()
+    msg = emolog.emo_decode(encoded)
     assert isinstance(msg, reply_class), "expected {}, got {}".format(reply_class, str(msg))
