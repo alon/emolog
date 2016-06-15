@@ -27,3 +27,7 @@ class TestDwarf(TestCase):
         self.assertEqual([c.name for c in sorted_children], ['foo1', 'foo2', 'p'])
         for v, offset in zip(sorted_children, [0, 4, 8]):
             self.assertEqual(v.address - foo.address, offset)
+        p = [c for c in sorted_children if c.name == 'p'][0]
+        sorted_p_children = list(sorted(p.children, key=lambda c: c.name))
+        for v, offset in zip(sorted_p_children, [0, 4]):
+            self.assertEqual(v.address - p.address, offset)
