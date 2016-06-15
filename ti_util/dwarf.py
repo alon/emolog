@@ -36,12 +36,24 @@ class FileParser:
         for child in die.iter_children():
             self.read_die_rec(child)
 
+    def pretty_print(self, children = None, tab=0):
+        if children is None:
+            children = self.interesting_vars
+        for v in children:
+            print("{}{!s}".format(' ' * tab, v))
+            self.pretty_print(children=v.children, tab=tab + 1)
+
+
+DW_OP_plus_uconst = 0x23 # DWARF v3 page 20, December 20, 2005
+DW_OP_addr = 0x3 # Page 14
+
 
 class VarDescriptor:
 
     uninteresting_var_names = ['main_func_sp', 'g_pfnVectors']
 
     def __init__(self, all_dies, var_die, parent):
+        self.parent = parent
         self.all_dies = all_dies
         self.var_die = var_die
         self.name = var_die.attributes['DW_AT_name'].value.decode('utf-8')  # TODO is that the right way to do bytes -> str?
@@ -53,14 +65,34 @@ class VarDescriptor:
 
     def parse_location(self):
         # TODO: handle address parsing better and for more cases (using an interface for processing DWARF expressions?)
+        ret = self._parse_member_location()
+        if ret is None:
+            ret = self._parse_location_attribute()
+        if ret is None:
+            ret = "(No Address)"
+        return ret
+
+    def _parse_member_location(self):
+        if not 'DW_AT_data_member_location' in self.var_die.attributes:
+            return None
+        assert self.parent is not None
+        attr = self.var_die.attributes['DW_AT_data_member_location']
+        assert attr.form == 'DW_FORM_block1'
+        opcode = attr.value[0]
+        if opcode != DW_OP_plus_uconst:
+            return '(Address Type of data member is Unsupported)'
+        return self.parent.address + attr.value[1]
+
+    def _parse_location_attribute(self):
         if 'DW_AT_location' not in self.var_die.attributes:
-            return "(No Address)"
+            return None
         loc = self.var_die.attributes['DW_AT_location']
+        opcode = loc.value[0]
         if loc.form != 'DW_FORM_block1':
             return "(Address Type Unsupported)"
         if len(loc.value) != 5:
             return "(Address Type Unsupported)"
-        if loc.value[0] != 3:
+        if opcode != DW_OP_addr:
             return "(Address Type Unsupported)"
         a, b, c, d = loc.value[1:]
         return a + (b << 8) + (c << 16) + (d << 24)
@@ -126,6 +158,10 @@ class VarDescriptor:
         return None # we don't know or there is no size to this DIE
 
     def _create_children(self):
+        all_but_last, last = self.visit_type_chain()
+        if last.tag in {'DW_TAG_class_type', 'DW_TAG_struct_type'}:
+            assert last.has_children
+            return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member']
         return []
 
     def get_decl_file(self):
@@ -154,7 +190,8 @@ class VarDescriptor:
 
 def main():
     parser = FileParser(sys.argv[1])
-
+    parser.pretty_print()
+    pass
 
 if __name__ == '__main__':
     main()
