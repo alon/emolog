@@ -47,6 +47,7 @@ class VarDescriptor:
         self.name = var_die.attributes['DW_AT_name'].value.decode('utf-8')  # TODO is that the right way to do bytes -> str?
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
+        self.size = self._get_size()
         # TODO: children, parent
 
     def parse_location(self):
@@ -115,7 +116,7 @@ class VarDescriptor:
 
         return ' '.join(type_str)
 
-    def get_size(self):
+    def _get_size(self):
         return 0
 
     def get_decl_file(self):
