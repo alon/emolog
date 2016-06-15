@@ -134,16 +134,20 @@ class VarDescriptor:
     __repr__ = __str__
 
 
-if __name__ == '__main__':
+def main():
     VarDescriptor.read_dies_from_dwarf_file(sys.argv[1])
 
-    var_dies = {offset : die for (offset, die) in VarDescriptor.all_dies.items() if die.tag == 'DW_TAG_variable'}
+    var_dies = {offset: die for offset, die in VarDescriptor.all_dies.items() if die.tag == 'DW_TAG_variable'}
     print("read %d DIEs which include %d variable DIEs" % (len(VarDescriptor.all_dies), len(var_dies)))
 
     vars = []
-    for (offset, var_die) in var_dies.items():
+    for offset, var_die in var_dies.items():
         vars.append(VarDescriptor(var_die, None))
 
     interesting_vars = [v for v in vars if v.is_interesting()]
     interesting_vars[2].get_type_str()  #TEMP
     pass
+
+
+if __name__ == '__main__':
+    main()
