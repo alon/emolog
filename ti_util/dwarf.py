@@ -48,6 +48,7 @@ class VarDescriptor:
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
+        self.children = self._create_children()
         # TODO: children, parent
 
     def parse_location(self):
@@ -123,6 +124,9 @@ class VarDescriptor:
             assert byte_size.form == 'DW_FORM_data1'
             return byte_size.value
         return None # we don't know or there is no size to this DIE
+
+    def _create_children(self):
+        return []
 
     def get_decl_file(self):
         # TODO: this is oversimplifying, it reports only the main file of the compilation unit.
