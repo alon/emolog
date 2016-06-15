@@ -16,7 +16,6 @@ class FileParser:
             var_descriptors.append(VarDescriptor(self.all_dies, var_die, None))
 
         self.interesting_vars = interesting_vars = [v for v in var_descriptors if v.is_interesting()]
-        interesting_vars[2].get_type_str()  # TEMP
         pass
 
     def read_dies_from_dwarf_file(self, filename):
