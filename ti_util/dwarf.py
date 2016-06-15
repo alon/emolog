@@ -3,25 +3,23 @@ import sys
 from elftools.elf.elffile import ELFFile
 
 
-class VarDescriptor:
-    all_dies = {}
-    uninteresting_var_names = ['main_func_sp', 'g_pfnVectors']
+class FileParser:
+    def __init__(self, filename):
+        self.all_dies = {}
+        self.read_dies_from_dwarf_file(filename)
 
-    def __init__(self, var_die, parent):
-        self.var_die = var_die
-        self.name = var_die.attributes['DW_AT_name'].value.decode('utf-8')  # TODO is that the right way to do bytes -> str?
-        self.address = self.parse_location()
-        self.type = self.get_type_die(var_die)
-        # TODO: children, parent
+        var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable'}
+        print("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
 
-    @staticmethod
-    def read_die_rec(die):
-        VarDescriptor.all_dies[die.offset] = die
-        for child in die.iter_children():
-            VarDescriptor.read_die_rec(child)
+        self.var_descriptors = var_descriptors = []
+        for offset, var_die in var_dies.items():
+            var_descriptors.append(VarDescriptor(self.all_dies, var_die, None))
 
-    @staticmethod
-    def read_dies_from_dwarf_file(filename):
+        self.interesting_vars = interesting_vars = [v for v in var_descriptors if v.is_interesting()]
+        interesting_vars[2].get_type_str()  # TEMP
+        pass
+
+    def read_dies_from_dwarf_file(self, filename):
         print('Processing file:', filename)
         with open(filename, 'rb') as f:
             elffile = ELFFile(f)
@@ -32,11 +30,25 @@ class VarDescriptor:
             dwarfinfo = elffile.get_dwarf_info()
             for CU in dwarfinfo.iter_CUs():
                 top_DIE = CU.get_top_DIE()
-                VarDescriptor.read_die_rec(top_DIE)
-                # TEMP
-                # lineprog = dwarfinfo.line_program_for_CU(CU)
-                # print (len(lineprog.header.file_entry), lineprog.header.file_entry)
-                # END TEMP
+                self.read_die_rec(top_DIE)
+
+    def read_die_rec(self, die):
+        self.all_dies[die.offset] = die
+        for child in die.iter_children():
+            self.read_die_rec(child)
+
+
+class VarDescriptor:
+
+    uninteresting_var_names = ['main_func_sp', 'g_pfnVectors']
+
+    def __init__(self, all_dies, var_die, parent):
+        self.all_dies = all_dies
+        self.var_die = var_die
+        self.name = var_die.attributes['DW_AT_name'].value.decode('utf-8')  # TODO is that the right way to do bytes -> str?
+        self.address = self.parse_location()
+        self.type = self.get_type_die(var_die)
+        # TODO: children, parent
 
     def parse_location(self):
         # TODO: handle address parsing better and for more cases (using an interface for processing DWARF expressions?)
@@ -52,8 +64,7 @@ class VarDescriptor:
         a, b, c, d = loc.value[1:]
         return a + (b << 8) + (c << 16) + (d << 24)
 
-    @staticmethod
-    def get_type_die(die):
+    def get_type_die(self, die):
         type_attr = die.attributes['DW_AT_type']
         if type_attr.form == 'DW_FORM_ref_addr':
             type_die_offset = type_attr.value  # store offset is absolute offset in the DWARF info
@@ -62,20 +73,8 @@ class VarDescriptor:
         else:
             return ("Unsupported form of the type attribute: %s" % type_attr.form)
 
-        type_die = VarDescriptor.all_dies[type_die_offset]
+        type_die = self.all_dies[type_die_offset]
         return type_die
-
-    # def get_die_from_attr_ref(self, attribute):
-    #     if attribute.form == 'DW_FORM_ref_addr':
-    #         die_offset = attribute.value  # stored offset is absolute offset in the DWARF info
-    #     elif attribute.form == 'DW_FORM_ref4':
-    #         die_offset = attribute.value + self.var_die.cu.cu_offset  # Stored offset is relative to the current Compilation Unit
-    #     else:
-    #         return ("Unsupported form of the type attribute: %s" % attribute.form)
-    #
-    #     type_die = VarDescriptor.all_dies[die_offset]
-    #     return (type_die)
-
 
     def is_interesting(self):
         # TODO: better criteria than the address?
@@ -87,24 +86,31 @@ class VarDescriptor:
             return False
         return True
 
-    def get_type_str(self):
-        type_tags_to_names = {'DW_TAG_class_type': 'class',
-                              'DW_TAG_const_type': 'const',
-                              'DW_TAG_volatile_type': 'volatile',
-                              'DW_TAG_pointer_type': 'pointer to',
-                              'DW_TAG_array_type': 'array of'}  # TODO: move this?
+    type_tags_to_names = {'DW_TAG_class_type': 'class',
+                          'DW_TAG_const_type': 'const',
+                          'DW_TAG_volatile_type': 'volatile',
+                          'DW_TAG_pointer_type': 'pointer to',
+                          'DW_TAG_array_type': 'array of'}
 
-        type_str = []
+    def visit_type_chain(self):
         cur_type = self.type
+        all_but_last = []
         while 'DW_AT_type' in cur_type.attributes:     # while not the final link in the type-chain
-            if cur_type.tag in type_tags_to_names:
-                type_str.append(type_tags_to_names[cur_type.tag])
+            all_but_last.append(cur_type)
+            cur_type = self.get_type_die(cur_type)
+        return all_but_last, cur_type
+
+    def get_type_str(self):
+        type_str = []
+        all_but_last, last_cur_type = self.visit_type_chain()
+        for cur_type in all_but_last:
+            if cur_type.tag in self.type_tags_to_names:
+                type_str.append(self.type_tags_to_names[cur_type.tag])
             else:
                 type_str.append(cur_type.tag)
-            cur_type = VarDescriptor.get_type_die(cur_type)
 
-        if 'DW_AT_name' in cur_type.attributes:
-            type_str.append(cur_type.attributes['DW_AT_name'].value.decode('utf-8'))
+        if 'DW_AT_name' in last_cur_type.attributes:
+            type_str.append(last_cur_type.attributes['DW_AT_name'].value.decode('utf-8'))
         else:
             type_str.append('(unnamed variable)')
 
@@ -135,18 +141,7 @@ class VarDescriptor:
 
 
 def main():
-    VarDescriptor.read_dies_from_dwarf_file(sys.argv[1])
-
-    var_dies = {offset: die for offset, die in VarDescriptor.all_dies.items() if die.tag == 'DW_TAG_variable'}
-    print("read %d DIEs which include %d variable DIEs" % (len(VarDescriptor.all_dies), len(var_dies)))
-
-    vars = []
-    for offset, var_die in var_dies.items():
-        vars.append(VarDescriptor(var_die, None))
-
-    interesting_vars = [v for v in vars if v.is_interesting()]
-    interesting_vars[2].get_type_str()  #TEMP
-    pass
+    parser = FileParser(sys.argv[1])
 
 
 if __name__ == '__main__':
