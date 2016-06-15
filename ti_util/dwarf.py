@@ -81,7 +81,10 @@ class VarDescriptor:
         opcode = attr.value[0]
         if opcode != DW_OP_plus_uconst:
             return '(Address Type of data member is Unsupported)'
-        return self.parent.address + attr.value[1]
+        offset = attr.value[1]
+        if not isinstance(self.parent.address, int):
+            return 0
+        return self.parent.address + offset
 
     def _parse_location_attribute(self):
         if 'DW_AT_location' not in self.var_die.attributes:
@@ -159,7 +162,7 @@ class VarDescriptor:
 
     def _create_children(self):
         all_but_last, last = self.visit_type_chain()
-        if last.tag in {'DW_TAG_class_type', 'DW_TAG_struct_type'}:
+        if last.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'}:
             assert last.has_children
             return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member']
         return []
