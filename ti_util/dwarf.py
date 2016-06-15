@@ -117,7 +117,12 @@ class VarDescriptor:
         return ' '.join(type_str)
 
     def _get_size(self):
-        return 0
+        _all_but_last, last = self.visit_type_chain()
+        byte_size = last.attributes.get('DW_AT_byte_size', None)
+        if byte_size is not None:
+            assert byte_size.form == 'DW_FORM_data1'
+            return byte_size.value
+        return None # we don't know or there is no size to this DIE
 
     def get_decl_file(self):
         # TODO: this is oversimplifying, it reports only the main file of the compilation unit.
