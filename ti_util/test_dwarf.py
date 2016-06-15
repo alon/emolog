@@ -16,3 +16,14 @@ class TestDwarf(TestCase):
             self.assertEqual(ivar_type, expected_type)
             self.assertEqual(ivar.name, expected_name)
             self.assertEqual(ivar.size, expected_size)
+
+    def test_class(self):
+        parser = FileParser("sanity.out")
+        foo = [v for v in parser.interesting_vars if v.name == 'foo'][0]
+        self.assertEqual(foo.get_type_str(), 'Foo')
+        # look for children
+        self.assertEqual(len(foo.children), 3)
+        sorted_children = list(sorted(foo.children, key=lambda c: c.name))
+        self.assertEqual([c.name for c in sorted_children], ['foo1', 'foo2', 'p'])
+        for v, offset in zip(sorted_children, [0, 4, 8]):
+            self.assertEqual(v.address - foo.address, offset)
