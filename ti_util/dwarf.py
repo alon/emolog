@@ -115,6 +115,9 @@ class VarDescriptor:
 
         return ' '.join(type_str)
 
+    def get_size(self):
+        return 0
+
     def get_decl_file(self):
         # TODO: this is oversimplifying, it reports only the main file of the compilation unit.
         # TODO: if the variable is in a non-main file (such as a .h file) it will probably not be reported correctly.
