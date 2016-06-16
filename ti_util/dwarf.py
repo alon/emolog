@@ -40,7 +40,7 @@ class FileParser:
         if children is None:
             children = self.interesting_vars
         for v in children:
-            print("{}{!s}".format(' ' * tab, v))
+            print("{}{!s}".format('   ' * tab, v))
             self.pretty_print(children=v.children, tab=tab + 1)
 
 
@@ -167,6 +167,11 @@ class VarDescriptor:
             return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member']
         return []
 
+    def get_full_name(self):
+        if self.parent is None:
+            return self.name
+        return self.parent.get_full_name() + '.' + self.name
+
     def get_decl_file(self):
         # TODO: this is oversimplifying, it reports only the main file of the compilation unit.
         # TODO: if the variable is in a non-main file (such as a .h file) it will probably not be reported correctly.
@@ -186,7 +191,7 @@ class VarDescriptor:
             address_str = hex(self.address)
         else:
             address_str = self.address
-        return "<%s %s @ %s (%s, line %s)>" % (self.get_type_str(), self.name, address_str, self.get_decl_file(), self.get_decl_line())
+        return "<%s %s @ %s (%s, line %s)>" % (self.get_type_str(), self.get_full_name(), address_str, self.get_decl_file(), self.get_decl_line())
 
     __repr__ = __str__
 
