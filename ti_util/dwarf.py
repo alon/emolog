@@ -36,6 +36,10 @@ class FileParser:
         for child in die.iter_children():
             self.read_die_rec(child)
 
+    def visit_interesting_vars_tree_leafs(self):
+        for v in self.interesting_vars:
+            yield from v.visit_leafs()
+
     def pretty_print(self, children = None, tab=0):
         if children is None:
             children = self.interesting_vars
@@ -136,6 +140,13 @@ class VarDescriptor:
             cur_type = self.get_type_die(cur_type)
         return all_but_last, cur_type
 
+    def visit_leafs(self):
+        if self.children == []:
+            yield self
+        else:
+            for child in self.children:
+                yield from child.visit_leafs()
+
     def get_type_str(self):
         type_str = []
         all_but_last, last_cur_type = self.visit_type_chain()
@@ -186,7 +197,6 @@ class VarDescriptor:
         return self.var_die.attributes['DW_AT_decl_line'].value
 
     def __str__(self):
-        # return "<name: %s, type: %s, address: %s>" % (self.name, self.get_type_str(), hex(self.address))
         if isinstance(self.address, int):
             address_str = hex(self.address)
         else:

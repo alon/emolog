@@ -14,6 +14,7 @@ from emolog import ClientParser, Version, get_seq, HostSampler
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--serial', default=None, help='serial port to connect to (platform specific)')
+    parser.add_argument('--filename', required=True, help='DWARF file to read variables from')
     args = parser.parse_args()
     if args.serial is None:
         stellaris = [x for x in comports() if 'stellaris' in x.description.lower()]
@@ -41,7 +42,9 @@ def main():
     else:
         print("unexpected message from embedded: {}".format(repr(msg)))
 
-    sampler.set_variables([dict(phase_ticks=0, period_ticks=200000, address=0x100, size=4)])
+    file_parser = FileParser(filename=args.filename)
+    for v in file_parser.visit_interesting_vars_tree_leafs():
+        sampler.set_variables([dict(phase_ticks=0, period_ticks=200000, address=v.address, size=v.size)])
     for msg in sampler.read_samples():
         print(repr(msg))
 
