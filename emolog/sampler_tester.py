@@ -5,6 +5,8 @@ import struct
 import argparse
 import sys
 
+import qt5
+
 from serial import Serial
 from serial.tools.list_ports import comports
 
@@ -33,30 +35,40 @@ def main():
 
     print("library seq: {}".format(get_seq()))
     print("opening port {}".format(args.serial))
-    serial = Serial(args.serial, baudrate=115200)
 
-    parser = ClientParser(serial)
+    def generate_samples():
+        serial = Serial(args.serial, baudrate=115200)
 
-    # initialize sampler
-    sampler = HostSampler(parser)
-    sampler.stop()
-    # clear buffer from any commands the client may have sent us
-    serial.flushInput()
+        parser = ClientParser(serial)
 
-    msg = parser.send_command(Version())
-    if isinstance(msg, Version):
-        print("got version message from embedded. version = {}".format(msg.version))
-    else:
-        print("unexpected message from embedded: {}".format(repr(msg)))
+        # initialize sampler
+        sampler = HostSampler(parser)
+        sampler.stop()
+        # clear buffer from any commands the client may have sent us
+        serial.flushInput()
 
-    sampled_vars = [v for v in file_parser.visit_interesting_vars_tree_leafs() if v.name in ['sawtooth', 'sine']] # TEMP test only
-    var_dict = [dict(phase_ticks=0, period_ticks=1, address=v.address, size=v.size) for v in sampled_vars]
-    print("sampling:")
-    for v in sampled_vars:
-        print("{:20}: address 0x{:10}, size {:4}".format(v.name, hex(v.address), v.size))
-    sampler.set_variables(var_dict)
-    for msg in sampler.read_samples():
-        print(repr(msg))
+        msg = parser.send_command(Version())
+        if isinstance(msg, Version):
+            print("got version message from embedded. version = {}".format(msg.version))
+        else:
+            print("unexpected message from embedded: {}".format(repr(msg)))
+
+        sampled_vars = [v for v in file_parser.visit_interesting_vars_tree_leafs() if v.name in ['sawtooth', 'sine']] # TEMP test only
+        var_dict = [dict(phase_ticks=0, period_ticks=1, address=v.address, size=v.size) for v in sampled_vars]
+        print("sampling:")
+        for v in sampled_vars:
+            print("{:20}: address 0x{:10}, size {:4}".format(v.name, hex(v.address), v.size))
+        sampler.set_variables(var_dict)
+        yield sampled_vars
+        for msg in sampler.read_samples():
+            yield msg
+
+    t = []
+    gen = generate_samples()
+    sampled_vars = gen.send(None)
+    vars = [[] for i in range(len(sampled_vars))]
+    qt5.callback = lambda: [struct.unpack('<'+t, x)[0] for t, x in zip('lf', gen.send(None).variables)]
+    qt5.main()
 
 
 if __name__ == '__main__':
