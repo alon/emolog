@@ -31,3 +31,9 @@ class TestDwarf(TestCase):
         sorted_p_children = list(sorted(p.children, key=lambda c: c.name))
         for v, offset in zip(sorted_p_children, [0, 4]):
             self.assertEqual(v.address - p.address, offset)
+
+    def test_linked_list(self):
+        parser = FileParser("linked_list.out")
+
+        foo = [v for v in parser.interesting_vars if v.name == 'foo'][0]
+

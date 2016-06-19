@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
@@ -15,18 +16,22 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
-
 #include <emolog.h>
 
 #include "comm.h"
 #include "sampler.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846 // pedantic
+#endif
 
 /* Water Pump Protocol */
 
 
 uint32_t g_ui32SysClock;
 
+uint32_t sawtooth = 0;
+float sine = 0;
 
 // The error routine that is called if the driver library encounters an error.
 #ifdef DEBUG
@@ -125,8 +130,12 @@ void handle_message(emo_header *header)
 void main(void)
 {
     setup();
+    uint32_t ticks = 0;
 
     while (1) {
+        sawtooth = (sawtooth + 1) % 100;
+        sine = sin(2 * M_PI * ((float)ticks / 100.0));
+
         emo_header *header;
         if ((header = comm_peek_message()) != NULL) {
             handle_message(header);

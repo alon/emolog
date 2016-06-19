@@ -8,6 +8,7 @@ import sys
 from serial import Serial
 from serial.tools.list_ports import comports
 
+from dwarf import FileParser
 from emolog import ClientParser, Version, get_seq, HostSampler
 
 
@@ -24,6 +25,12 @@ def main():
         if len(stellaris) > 1:
             print("picking the first out of available {}".format(','.join([x.device for x in stellaris])))
         args.serial = stellaris[0].device
+
+    print("parsing TI out file {}".format(args.filename))
+    file_parser = FileParser(filename=args.filename)
+    for v in file_parser.visit_interesting_vars_tree_leafs():
+        print(v.get_full_name())
+
     print("library seq: {}".format(get_seq()))
     print("opening port {}".format(args.serial))
     serial = Serial(args.serial, baudrate=115200)
@@ -42,7 +49,7 @@ def main():
     else:
         print("unexpected message from embedded: {}".format(repr(msg)))
 
-    file_parser = FileParser(filename=args.filename)
+
     for v in file_parser.visit_interesting_vars_tree_leafs():
         sampler.set_variables([dict(phase_ticks=0, period_ticks=200000, address=v.address, size=v.size)])
     for msg in sampler.read_samples():

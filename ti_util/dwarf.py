@@ -64,8 +64,10 @@ class VarDescriptor:
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
-        self.children = self._create_children()
-        # TODO: children, parent
+        if not self.is_pointer():
+            self.children = self._create_children()
+        else:
+            self.children = []
 
     def parse_location(self):
         # TODO: handle address parsing better and for more cases (using an interface for processing DWARF expressions?)
@@ -126,10 +128,18 @@ class VarDescriptor:
             return False
         return True
 
+    DW_TAG_pointer_type = 'DW_TAG_pointer_type'
+
+    def is_pointer(self):
+        type_chain, last_type = self.visit_type_chain()
+        type_chain.append(last_type)
+        type_tags = [die.tag for die in type_chain]
+        return self.DW_TAG_pointer_type in type_tags
+
     type_tags_to_names = {'DW_TAG_class_type': 'class',
                           'DW_TAG_const_type': 'const',
                           'DW_TAG_volatile_type': 'volatile',
-                          'DW_TAG_pointer_type': 'pointer to',
+                          DW_TAG_pointer_type: 'pointer to',
                           'DW_TAG_array_type': 'array of'}
 
     def visit_type_chain(self):
