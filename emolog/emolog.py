@@ -139,6 +139,7 @@ class Ack(Message):
 class SamplerRegisterVariable(Message):
     type = emo_message_types.sampler_register_variable
     def __init__(self, phase_ticks, period_ticks, address, size):
+        assert size is not None
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
         self.address = address
@@ -380,6 +381,7 @@ class ClientParser(object):
                                                address=msg.address, size=msg.size)
         elif isinstance(msg, SamplerSample):
             msg.update_with_sampler(self.sampler)
+        return msg
 
     def send_command(self, command):
         """

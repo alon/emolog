@@ -28,7 +28,7 @@
 /* Water Pump Protocol */
 
 
-uint32_t g_ui32SysClock;
+uint32_t sys_clk_hz;
 
 uint32_t sawtooth = 0;
 float sine = 0;
@@ -44,9 +44,16 @@ __error__(char *pcFilename, uint32_t ui32Line)
 
 /* Main */
 
+
+void delay_ms(uint32_t ms)
+{
+	SysCtlDelay(sys_clk_hz / 1000 / 3 * ms);
+}
+
+
 void setup_clock(void)
 {
-    g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
+    sys_clk_hz = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
                                              SYSCTL_OSC_MAIN |
                                              SYSCTL_USE_PLL |
                                              SYSCTL_CFG_VCO_480), 120000000);
@@ -142,5 +149,8 @@ void main(void)
             comm_consume_message();
         }
         sampler_sample();
+        ticks++;
+        delay_ms(500);
+
     }
 }

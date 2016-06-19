@@ -64,6 +64,11 @@ class VarDescriptor:
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
+
+        if self.name == 'sigtable': # TEMP
+            print("hello nurse")
+            self.get_type_str()
+
         if not self.is_pointer():
             self.children = self._create_children()
         else:
@@ -143,6 +148,7 @@ class VarDescriptor:
                           'DW_TAG_array_type': 'array of'}
 
     def visit_type_chain(self):
+
         cur_type = self.type
         all_but_last = []
         while 'DW_AT_type' in cur_type.attributes:     # while not the final link in the type-chain

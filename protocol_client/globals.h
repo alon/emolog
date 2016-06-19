@@ -9,7 +9,7 @@
 #define GLOBALS_H_
 
 
-extern uint32_t g_ui32SysClock;
+extern uint32_t sys_clk_hz;
 
 
 

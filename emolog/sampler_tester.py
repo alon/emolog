@@ -29,7 +29,7 @@ def main():
     print("parsing TI out file {}".format(args.filename))
     file_parser = FileParser(filename=args.filename)
     for v in file_parser.visit_interesting_vars_tree_leafs():
-        print(v.get_full_name())
+        print("   {}".format(v.get_full_name()))
 
     print("library seq: {}".format(get_seq()))
     print("opening port {}".format(args.serial))
@@ -49,9 +49,12 @@ def main():
     else:
         print("unexpected message from embedded: {}".format(repr(msg)))
 
-
-    for v in file_parser.visit_interesting_vars_tree_leafs():
-        sampler.set_variables([dict(phase_ticks=0, period_ticks=200000, address=v.address, size=v.size)])
+    sampled_vars = [v for v in file_parser.visit_interesting_vars_tree_leafs() if v.name in ['sawtooth', 'sine']] # TEMP test only
+    var_dict = [dict(phase_ticks=0, period_ticks=1, address=v.address, size=v.size) for v in sampled_vars]
+    print("sampling:")
+    for v in sampled_vars:
+        print("{:20}: address 0x{:10}, size {:4}".format(v.name, hex(v.address), v.size))
+    sampler.set_variables(var_dict)
     for msg in sampler.read_samples():
         print(repr(msg))
 
