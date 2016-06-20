@@ -65,10 +65,6 @@ class VarDescriptor:
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
 
-        if self.name == 'sigtable': # TEMP
-            print("hello nurse")
-            self.get_type_str()
-
         if not self.is_pointer():
             self.children = self._create_children()
         else:
@@ -133,7 +129,19 @@ class VarDescriptor:
             return False
         return True
 
+    DW_TAG_class_type = 'DW_TAG_class_type'
+    DW_TAG_const_type = 'DW_TAG_const_type'
+    DW_TAG_volatile_type = 'DW_TAG_volatile_type'
     DW_TAG_pointer_type = 'DW_TAG_pointer_type'
+    DW_TAG_array_type = 'DW_TAG_array_type'
+    DW_TAG_typedef = 'DW_TAG_typedef'
+
+    type_tags_to_names = {DW_TAG_class_type: 'class',
+                          DW_TAG_const_type: 'const',
+                          DW_TAG_volatile_type: 'volatile',
+                          DW_TAG_pointer_type: 'pointer to',
+                          DW_TAG_array_type: 'array of',
+                          DW_TAG_typedef: 'typedef'}
 
     def is_pointer(self):
         type_chain, last_type = self.visit_type_chain()
@@ -141,11 +149,11 @@ class VarDescriptor:
         type_tags = [die.tag for die in type_chain]
         return self.DW_TAG_pointer_type in type_tags
 
-    type_tags_to_names = {'DW_TAG_class_type': 'class',
-                          'DW_TAG_const_type': 'const',
-                          'DW_TAG_volatile_type': 'volatile',
-                          DW_TAG_pointer_type: 'pointer to',
-                          'DW_TAG_array_type': 'array of'}
+    def is_array(self):
+        type_chain, last_type = self.visit_type_chain()
+        type_chain.append(last_type)
+        type_tags = [die.tag for die in type_chain]
+        return self.DW_TAG_array_type in type_tags
 
     def visit_type_chain(self):
 
@@ -180,10 +188,20 @@ class VarDescriptor:
         return ' '.join(type_str)
 
     def _get_size(self):
-        _all_but_last, last = self.visit_type_chain()
-        byte_size = last.attributes.get('DW_AT_byte_size', None)
+        type_chain, last_type = self.visit_type_chain()
+        type_chain.append(last_type)
+
+        # if this is an array of anything (including array of arrays etc) take the size from the *first* array die
+        # otherwise from the last die in the type-chain
+        array_type_dies = [die for die in type_chain if die.tag == self.DW_TAG_array_type]
+        if array_type_dies != []:
+            die_with_relevant_size = array_type_dies[0]
+        else:
+            die_with_relevant_size = last_type
+
+        byte_size = die_with_relevant_size.attributes.get('DW_AT_byte_size', None)
         if byte_size is not None:
-            assert byte_size.form == 'DW_FORM_data1'
+            assert(byte_size.form in ['DW_FORM_data1', 'DW_FORM_data2'])
             return byte_size.value
         return None # we don't know or there is no size to this DIE
 
