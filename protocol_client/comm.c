@@ -37,42 +37,37 @@
 
 #include "globals.h"
 #include "comm.h"
-
+#include "tx_circular_buffer.h"
 
 static volatile bool message_available = false;
 
-
-static unsigned char recv_buf[1024];
-
-
-static volatile uint32_t recv_buf_pos = 0;
+static unsigned char rx_buf[RX_BUF_SIZE];
+static volatile uint32_t rx_buf_pos = 0;
 
 
-void
-UARTSend(const uint8_t *pui8Buffer, uint32_t ui32Count)
+bool comm_queue_message(uint8_t *src, size_t len)
 {
-    //
-    // Loop while there are more characters to send.
-    //
-    while(ui32Count--)
-    {
-        //
-        // Write the next character to the UART.
-        //
-        ROM_UARTCharPut(UART0_BASE, *pui8Buffer++); // TODO: DMA
-    }
-}
+	if (tx_buf_bytes_free() < len)
+	{
+		return false; // not enough space
+	}
 
+	bool ret;
+	int i;
+	for (i = 0; i < len; i++)
+	{
+		ret = tx_buf_put(src[i]);
+		assert(ret);	// should never fail to put all bytes since free space was checked
+	}
+	handle_uart_tx();
 
-void comm_queue_message(uint8_t *src, size_t len)
-{
-	UARTSend(src, len);
+	return true;
 }
 
 
 void comm_consume_message(void)
 {
-    recv_buf_pos = 0;
+    rx_buf_pos = 0;
     message_available = false;
 }
 
@@ -93,67 +88,93 @@ void comm_setup(void)
                             (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
                              UART_CONFIG_PAR_NONE));
 
+    ROM_UARTFIFOEnable(UART0_BASE);
     ROM_IntEnable(INT_UART0);
-    ROM_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
+    ROM_UARTFIFOLevelSet(UART0_BASE, UART_FIFO_TX4_8, UART_FIFO_RX4_8);
+    ROM_UARTTxIntModeSet(UART0_BASE, UART_TXINT_MODE_EOT);	// TX interrupt only on TX FIFO completely empty (rather than at specified level)
+
+    // Note that the RX interrupt happens only at the FIFO level specified. Therefore, we also need to interrupt on the RX timeout
+    // (happens after 32 bits's time at the UART's baud rate), otherwise we won't trigger an interrupt on the last bytes.
+    ROM_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT | UART_INT_TX);
 }
 
 
 emo_header *comm_peek_message(void)
 {
 	if (message_available) {
-		return (emo_header *)recv_buf;
+		return (emo_header *)rx_buf;
 	} else {
 		return NULL;
 	}
 }
 
 
-void
-UARTIntHandler(void)
+void uart_int_handler(void)
 {
     uint32_t status;
+
+    status = ROM_UARTIntStatus(UART0_BASE, true);
+    ROM_UARTIntClear(UART0_BASE, status);     		// Clear all asserted interrupts for the UART
+
+    if (status & UART_INT_TX){
+    	handle_uart_tx();
+    }
+
+    if (status & (UART_INT_RX | UART_INT_RT )){
+    	handle_uart_rx();
+    }
+}
+
+
+// called from the UART interrupt handler when the RX FIFO is over the specified level or when the receive timeout has triggered
+void handle_uart_rx(void)
+{
     int32_t new_char;
     int16_t needed;
     uint16_t n;
 
-    //
-    // Get the interrrupt status.
-    //
-    status = ROM_UARTIntStatus(UART0_BASE, true);
-
-    //
-    // Clear the asserted interrupts.
-    //
-    ROM_UARTIntClear(UART0_BASE, status);
-
-    //
     // Loop while there are characters in the receive FIFO.
-    //
-    while(ROM_UARTCharsAvail(UART0_BASE))
-    {
-        new_char = ROM_UARTCharGetNonBlocking(UART0_BASE);
-        if (recv_buf_pos >= sizeof(recv_buf)) {
-            continue; // buffer overflow
-        }
-        if (message_available) {
-            continue; // not our turn
-        }
-        recv_buf[recv_buf_pos++] = new_char;
-    }
+     while(ROM_UARTCharsAvail(UART0_BASE))
+     {
+         new_char = ROM_UARTCharGetNonBlocking(UART0_BASE);
+         if (rx_buf_pos >= sizeof(rx_buf)) {
+             continue; // buffer overflow
+         }
+         if (message_available) {
+             continue; // not our turn
+         }
+         rx_buf[rx_buf_pos++] = new_char;
+     }
 
-    needed = -1;
-    while (needed < 0) {
-        needed = emo_decode(recv_buf, recv_buf_pos);
+     needed = -1;
+     while (needed < 0) {
+         needed = emo_decode(rx_buf, rx_buf_pos);
 
-        if (needed == 0) {
-            message_available = true;
-            break;
-        } else if (needed < 0) {
-            n = -needed;
-            memcpy(recv_buf, recv_buf + n, recv_buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
-            // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
-            recv_buf_pos -= n;
-        }
-    }
-    assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
+         if (needed == 0) {
+             message_available = true;
+             break;
+         } else if (needed < 0) {
+             n = -needed;
+             memcpy(rx_buf, rx_buf + n, rx_buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
+             // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
+             rx_buf_pos -= n;
+         }
+     }
+     assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
 }
+
+
+// called either from the UART interrupt handler when all the bytes in the tx FIFO have been transmitted,
+// or from comm_queue_message() to get the initial transmission going
+void handle_uart_tx(void)
+{
+	int ret;
+	while (!tx_buf_is_empty() && UARTSpaceAvail(UART0_BASE))
+	{
+		ret = UARTCharPutNonBlocking(UART0_BASE, tx_buf_get());
+		assert(ret);	// should always return true since we just checked there is space in the UART TX buffer
+	}
+}
+
+
+

@@ -74,7 +74,7 @@ class MyDynamicMplCanvas(MyMplCanvas):
         self.vals = []
         self.start = datetime.now()
         timer.timeout.connect(self.update_figure)
-        timer.start(1000)
+        timer.start(10)
 
     def compute_initial_figure(self):
         self.axes.plot([0, 1, 2, 3], [1, 2, 0, 4], 'r')
@@ -83,15 +83,17 @@ class MyDynamicMplCanvas(MyMplCanvas):
         global callback
         # Build a list of 4 random integers between 0 and 10 (both inclusive)
 
-        self.t = (self.t + [(datetime.now() - self.start).total_seconds()])[-4:]
+        self.t = (self.t + [(datetime.now() - self.start).total_seconds()])[-50:]
         new_vals = callback()
         #new_vals = [1, 1.2]
         if len(self.vals) == 0:
             self.vals = [[x] for x in new_vals]
         else:
-            self.vals = [(vs + [new_x])[-4:] for vs, new_x in zip(self.vals, new_vals)]
+            self.vals = [(vs + [new_x])[-50:] for vs, new_x in zip(self.vals, new_vals)]
         args = sum([[self.t, l] for l in self.vals], [])
+
         self.axes.plot(*args)
+        self.axes.set_ylim([-100, 100])
         self.draw()
 
 

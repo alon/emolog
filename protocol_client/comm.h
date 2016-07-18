@@ -13,6 +13,9 @@
 
 #include "emolog.h"
 
+#define RX_BUF_SIZE			1024
+#define TX_BUF_SIZE			1024
+
 
 void comm_setup(void);
 
@@ -30,9 +33,16 @@ void comm_consume_message(void);
 /**
  * queue message for sending.
  *
- * TODO: Can fail. What should the behavior be?
+ *  @return:
+ *   true - message queued
+ *   false - message not queued, tx buffer full
  */
-void comm_queue_message(uint8_t *src, size_t len);
+bool comm_queue_message(uint8_t *src, size_t len);
 
+// called from the UART interrupt handler when there are incoming bytes in the RX FIFO
+void handle_uart_rx(void);
+
+// called from the UART interrupt handler when all the bytes in the tx FIFO have been transmitted
+void handle_uart_tx(void);
 
 #endif /* COMM_H_ */

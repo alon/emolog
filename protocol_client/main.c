@@ -141,7 +141,7 @@ void main(void)
 
     while (1) {
         sawtooth = (sawtooth + 1) % 100;
-        sine = sin(2 * M_PI * ((float)ticks / 100.0));
+        sine = 50.0 * sin(2 * M_PI * ((float)ticks / 100.0));
 
         emo_header *header;
         if ((header = comm_peek_message()) != NULL) {
@@ -150,7 +150,8 @@ void main(void)
         }
         sampler_sample();
         ticks++;
-        delay_ms(500);
+        delay_ms(50);
 
     }
 }
+

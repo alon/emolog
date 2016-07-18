@@ -390,6 +390,7 @@ class ClientParser(object):
         """
         self.serial.write(command.encode())
         msg = self.read_one()
+        print("Got {}".format(msg))
         if isinstance(msg, Version):
             return msg
         elif isinstance(msg, SamplerSample):
@@ -397,6 +398,7 @@ class ClientParser(object):
             self.ignored[msg.__class__] += 1
         else:
             assert isinstance(msg, Ack)
+            #print("Got Ack")
             if msg.error != 0:
                 print("client responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
 

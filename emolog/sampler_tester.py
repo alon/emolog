@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
 import ctypes
 import struct
 import argparse
@@ -69,6 +70,13 @@ def main():
     vars = [[] for i in range(len(sampled_vars))]
     qt5.callback = lambda: [struct.unpack('<'+t, x)[0] for t, x in zip('lf', gen.send(None).variables)]
     qt5.main()
+    start = last = datetime.now()
+    for new_raw_vals in gen:
+        cur = datetime.now()
+        raw_int, raw_float = new_raw_vals.variables
+        new_vals = struct.unpack('<lf', raw_int + raw_float)
+        print('{} (+{}): {}'.format(cur - start, cur - last, new_vals))
+        last = cur
 
 
 if __name__ == '__main__':
