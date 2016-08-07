@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
+import os
 import ctypes
 import struct
 import argparse
@@ -15,12 +16,41 @@ from dwarf import FileParser
 from emolog import ClientParser, Version, get_seq, HostSampler
 
 
+class BiDiPipe(object):
+    verbose = True
+
+    def __init__(self, pipeout, pipein):
+        self.outp = open(pipeout, 'wb')
+        self.inp = open(pipein, 'rb')
+
+    def _verbose(self, s):
+        if not self.verbose:
+            return
+        print('Pipe: {}'.format(s))
+
+    def write(self, s):
+        self._verbose(repr(s))
+        self.outp.write(s)
+        self.outp.flush()
+
+    def read(self):
+        read = self.inp.read()
+        if len(read) == 0:
+            raise EOFError('read end closed')
+        self._verbose(repr(read))
+        return read
+
+    def flushInput(self):
+        self.inp.flush()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--serial', default=None, help='serial port to connect to (platform specific)')
     parser.add_argument('--filename', required=True, help='DWARF file to read variables from')
+    parser.add_argument('--pipe', required=False, help="comma separated pair of fifo names for testing")
     args = parser.parse_args()
-    if args.serial is None:
+    if args.serial is None and args.pipe is None:
         stellaris = [x for x in comports() if 'stellaris' in x.description.lower()]
         if len(stellaris) == 0:
             print("no stellaris com port found - is the board connected and powered?")
@@ -29,24 +59,33 @@ def main():
             print("picking the first out of available {}".format(','.join([x.device for x in stellaris])))
         args.serial = stellaris[0].device
 
+    if args.pipe is not None and args.serial is not None:
+        print("error: cannot use serial and pipe at the same time")
+        raise SystemExit
+
     print("parsing TI out file {}".format(args.filename))
     file_parser = FileParser(filename=args.filename)
     for v in file_parser.visit_interesting_vars_tree_leafs():
         print("   {}".format(v.get_full_name()))
 
     print("library seq: {}".format(get_seq()))
-    print("opening port {}".format(args.serial))
+    print("opening port {}".format(args.serial or args.pipe))
 
     def generate_samples():
-        serial = Serial(args.serial, baudrate=115200)
+        if args.pipe:
+            pipes = args.pipe.split(',')
+            assert len(pipes) == 2 and os.path.exists(pipes[0]) and os.path.exists(pipes[1])
+            comm = BiDiPipe(pipeout=pipes[0], pipein=pipes[1])
+        else:
+            comm = Serial(args.serial, baudrate=115200)
 
-        parser = ClientParser(serial)
+        parser = ClientParser(comm)
 
         # initialize sampler
         sampler = HostSampler(parser)
         sampler.stop()
         # clear buffer from any commands the client may have sent us
-        serial.flushInput()
+        comm.flushInput()
 
         msg = parser.send_command(Version())
         if isinstance(msg, Version):

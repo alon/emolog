@@ -87,7 +87,7 @@ class MyDynamicMplCanvas(MyMplCanvas):
         new_vals = callback()
         #new_vals = [1, 1.2]
         if len(self.vals) == 0:
-            self.vals = [[x] for x in new_vals]
+            self.vals = [[x] for x in self.new_vals]
         else:
             self.vals = [(vs + [new_x])[-50:] for vs, new_x in zip(self.vals, new_vals)]
         args = sum([[self.t, l] for l in self.vals], [])
