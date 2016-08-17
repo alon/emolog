@@ -1,6 +1,6 @@
 import QtQuick 2.6
 import QtQuick.Controls 1.2
-import Qt.labs.controls 1.0
+
 
 ApplicationWindow {
     width: 640
