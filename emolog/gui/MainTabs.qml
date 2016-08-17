@@ -10,11 +10,12 @@ TabView {
 
     Component {
         id: main_tab
-        Rectangle {color: "red"}
+        MainTab {}
     }
 
     Component {
         id: settings_tab
-        Rectangle {color: "blue"}
+        SettingsTab {}
     }
+
 }
