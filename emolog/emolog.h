@@ -96,11 +96,11 @@ MAKE_STRUCT(ack);
 /** register_variable_sampler */
 
 typedef struct emo_sampler_register_variable_payload {
-	uint32_t phase_ticks;
-	uint32_t period_ticks;
-	uint32_t address;
-	uint16_t size;
-	uint16_t reserved;
+    uint32_t phase_ticks;
+    uint32_t period_ticks;
+    uint32_t address;
+    uint16_t size;
+    uint16_t reserved;
 } __attribute__((packed)) emo_sampler_register_variable_payload;
 
 MAKE_STRUCT(sampler_register_variable)
@@ -125,8 +125,10 @@ MAKE_STRUCT(sampler_stop)
 
 
 typedef struct emo_sampler_sample_payload {
-	uint32_t ticks;
-	// here come the variables themselves. host sees the ticks, calculates which variables are contained (see XXX) and then can parse the variables (length is known from header as well as additional redundant information)
+    uint32_t ticks;
+    // here come the variables themselves.
+    // host sees the ticks, calculates which variables are contained (see XXX)
+    // and then can parse the variables (length is known from header as well as additional redundant information)
 } __attribute__((packed)) emo_sampler_sample_payload;
 
 MAKE_STRUCT(sampler_sample)
@@ -168,10 +170,10 @@ typedef enum {
 
 
 /**
- * 
+ *
  */
 uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
-		uint32_t period_ticks, uint32_t address, uint16_t size);
+        uint32_t period_ticks, uint32_t address, uint16_t size);
 
 /*
  * All three (clear, start, stop) are sent by the Host, and the Embedded must ack

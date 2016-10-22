@@ -136,9 +136,9 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
 
     dest->start[0] = 'E';
     dest->start[1] = 'M';
-    dest->seq = s_seq++;
     dest->type = type;
     dest->length = htons(length);
+    dest->seq = s_seq++;
     dest->payload_crc = crc8(payload, length);
     dest->header_crc = crc8((uint8_t *)dest, EMO_HEADER_NO_CRC_SIZE);
 }
