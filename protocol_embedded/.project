@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>protocol_client</name>
+	<name>protocol_embedded</name>
 	<comment></comment>
 	<projects>
 		<project>emolog</project>
