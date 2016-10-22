@@ -26,6 +26,7 @@ import ctypes
 import os
 import struct
 import sys
+from math import sin
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
@@ -34,7 +35,9 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header',
            'encode_version',
            'write_version',
-           'ClientParser',
+           'Client',
+           'Parser',
+           'FakeSineEmbedded',
            'Version',
            'Ack',
            'Ping',
@@ -148,7 +151,7 @@ class Ack(Message):
         self.reply_to_seq = reply_to_seq
 
     def encode_inner(self):
-        return lib.emo_encode_ack(self.buf, self.error, self.reply_to_seq)
+        return lib.emo_encode_ack(self.buf, self.reply_to_seq, self.error)
 
     def __str__(self):
         # TODO - string for error
@@ -224,10 +227,11 @@ class SamplerSample(Message):
     def __str__(self):
         if self.variables:
             return '<sample {} variables {}>'.format(self.ticks, repr(self.variables))
-        elif self.payload:
-            return '<sample {} undecoded {}>'.format(self.ticks, repr(self.payload))
-        elif self.var_size_pairs:
+        elif self.var_size_pairs is not None:
+            assert self.payload is None
             return '<sample {} var_size_pairs {}>'.format(self.ticks, self.var_size_pairs)
+        elif self.payload is not None:
+            return '<sample {} undecoded {}>'.format(self.ticks, repr(self.payload))
         else:
             return '<sample {} error>'.format(self.ticks)
 
@@ -315,55 +319,14 @@ class VariableSampler(object):
         return variables
 
 
-class ClientSampler(object):
-    """
-    Note: removed handling of Acks
-     - TODO
-
-    Removed ignored message handling
-     - TODO
-    """
-
-    def __init__(self, parser):
-        self.parser = parser
-        self.sampler = VariableSampler()
-
-    def set_variables(self, vars):
-        self.parser.send_message(SamplerClear())
-        self.sampler.clear()
-        for d in vars:
-            self.sampler.register_variable(**d)
-            self.register_variable(**d)
-        self.parser.send_message(SamplerStart())
-
-    def register_variable(self, phase_ticks, period_ticks, address, size):
-        self.parser.send_message(SamplerRegisterVariable(
-            phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))
-
-    def stop(self):
-        self.parser.send_message(SamplerStop())
-
-    def handle_tranport_read_for_read(self):
-        msg = self.parser.read_available()
-        if isinstance(msg, Version):
-            return msg
-        elif isinstance(msg, SamplerSample):
-            # if we are stopped this is to be ignored?
-            msg.update_with_sampler(self.sampler)
-        elif isinstance(msg, Ack):
-            #print("Got Ack")
-            if msg.error != 0:
-                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-        else:
-            print("ignoring a {}".format(msg))
-
-
 def emo_decode(buf):
     needed = lib.emo_decode(buf, len(buf))
     msg = None
     if needed == 0:
         valid, emo_type, emo_len, seq = decode_emo_header(buf)
-        payload = buf[header_size:]
+        print("decoded header of length {}, got {}, {}, {}, {}".format(len(buf), valid, emo_type, emo_len, seq))
+        payload = buf[header_size:header_size + emo_len]
+        buf = buf[header_size + emo_len:]
         if emo_type == emo_message_types.version:
             (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
@@ -391,39 +354,107 @@ def emo_decode(buf):
         msg = MissingBytes(message=buf, header=buf[:header_size], needed=needed)
     else:
         msg = SkipBytes(-needed)
-    return msg
+        buf = buf[needed:]
+    return msg, buf
 
 
 class Parser(object):
     def __init__(self, transport):
-        self.buf = b''
         self.transport = transport
-        self.read_available() # get stuck early if transport.read is blocking - it should not be
+        self.buf = self.transport.read() # get stuck early if transport.read is blocking - it should not be
+        self.send_seq = 0
 
-    def read_available(self):
+    def iter_available_messages(self):
         s = self.transport.read()
         assert isinstance(s, bytes)
         self.buf = self.buf + s
-        needed = lib.emo_decode(self.buf, len(self.buf))
-        msg = emo_decode(self.buf)
-        if isinstance(msg, SkipBytes):
-            print("communication error - skipping bytes: {}".format(msg.skip))
-            self.buf = self.buf[msg.skip:]
-        elif not isinstance(msg, MissingBytes):
-            self.buf = b''
-        return msg
+        while len(self.buf) > 0:
+            needed = lib.emo_decode(self.buf, len(self.buf))
+            msg, left_over_buf = emo_decode(self.buf)
+            self.buf = left_over_buf
+            if isinstance(msg, SkipBytes):
+                print("communication error - skipped {} bytes".format(msg.skip))
+            elif isinstance(msg, MissingBytes):
+                break
+            yield msg
 
-    def send_message(self, command):
+    def send_message(self, command_class, **kw):
         """
         Sends a command to the client and waits for a reply and returns it.
         Blocking.
         """
+        command = command_class(seq=self.send_seq, **kw)
+        self.send_seq += 1
         self.transport.write(command.encode())
 
     def __str__(self):
-        return '<ClientParser: #{}: {!r}'.format(len(self.buf), self.buf)
+        return '<Parser: #{}: {!r}'.format(len(self.buf), self.buf)
 
     __repr__ = __str__
+
+
+class Client(object):
+    """
+    Note: removed handling of Acks
+     - TODO
+
+    Removed ignored message handling
+     - TODO
+    """
+
+    def __init__(self, eventloop, transport):
+        self.parser = Parser(transport)
+        self.sampler = VariableSampler()
+        self.eventloop = eventloop
+        self.received_samples = 0
+        eventloop.add_reader(transport, self.handle_transport_ready_for_read)
+
+    def set_variables(self, vars):
+        self.parser.send_message(SamplerClear)
+        self.sampler.clear()
+        for d in vars:
+            self.sampler.register_variable(**d)
+            self.register_variable(**d)
+        self.parser.send_message(SamplerStart)
+
+    def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
+        self.parser.send_message(SamplerRegisterVariable,
+            phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size)
+
+    def send_sampler_clear(self):
+        self.parser.send_message(SamplerClear)
+
+    def send_sampler_start(self):
+        self.parser.send_message(SamplerStart)
+
+    def send_sampler_stop(self):
+        self.parser.send_message(SamplerStop)
+
+    def send_version(self):
+        # We don't tell our version to the embedded right now - it doesn't care
+        # anyway
+        self.parser.send_message(Version)
+
+    def stop(self):
+        self.parser.send_message(SamplerStop)
+
+    def handle_transport_ready_for_read(self):
+        for msg in self.parser.iter_available_messages():
+            self.handle_message(msg)
+
+    def handle_message(self, msg):
+        if isinstance(msg, Version):
+            print("Got Version: {}".format(msg.version))
+        elif isinstance(msg, SamplerSample):
+            # if we are stopped this is to be ignored?
+            msg.update_with_sampler(self.sampler)
+            self.received_samples += 1
+            print("Got Sample: {}".format(msg))
+        elif isinstance(msg, Ack):
+            if msg.error != 0:
+                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
+        else:
+            print("ignoring a {}".format(msg))
 
 
 class FakeSineEmbedded(object):
@@ -441,59 +472,79 @@ class FakeSineEmbedded(object):
     """
 
     VERSION = 1
-    TICKS_PER_SECOND = 1000000
+    TICK_TIME = 0.00001 # 10kHz - enough for testing I hope.
 
-    Sine = namedtuple('Sine', ['freq', 'amp', 'phase_ticks'])
+    # we ignore address, and size is used to return the same size as requested
+    Sine = namedtuple('Sine', [
+        # Sinus parameters
+        'freq', 'amp', 'phase',
+        # Sampling parameters
+        'period_ticks', 'phase_ticks', 'size', 'address'])
 
     def __init__(self, eventloop, transport):
-        self.parser = ClientParser(transport)
+        self.parser = Parser(transport)
         self.eventloop = eventloop
         self.sines = []
-        self.seq = 0
         self.start_time = time()
-
-    def _send_message(self, msg_class, **kw):
-        msg = msg_class(seq=self.seq, **kw)
-        self.seq += 1
-        self.parser.send_message(msg)
-        # TODO - handle the ack?
-        # put it in a separate class probably, track
-        # outgoing messages with expected acks
+        self.running = False
+        self.ticks = 0
+        eventloop.add_reader(transport, self.handle_transport_ready_for_read)
 
     def handle_transport_ready_for_read(self):
-        msg = self.parser.read_available()
+        for msg in self.parser.iter_available_messages():
+            self.handle_message(msg)
+
+    def handle_message(self, msg):
         # handle everything except Version
         if isinstance(msg, SamplerClear):
-            self.sines.clear()
+            self.on_sampler_clear()
         elif isinstance(msg, SamplerStart):
-            self.start_sending_samples()
+            self.on_sampler_start()
         elif isinstance(msg, SamplerStop):
-            self.stop_sending_samples()
+            self.on_sampler_stop()
         elif isinstance(msg, SamplerRegisterVariable):
-            self.register_variable(msg)
+            self.on_sampler_register_variable(msg)
 
         # reply with ACK to everything
         if isinstance(msg, Version):
-            self._send_message(Version, version=self.VERSION, reply_to_seq=msg.seq)
+            self.parser.send_message(Version, version=self.VERSION, reply_to_seq=msg.seq)
         else:
-            self._send_message(Ack, error=error, reply_to_seq=msg.seq)
+            self.parser.send_message(Ack, error=0, reply_to_seq=msg.seq)
 
-    def start_sending_samples(self):
-        self.eventloop.add_timer(self.handle_time_event)
+    def on_sampler_clear(self):
+        self.sines.clear()
 
-    def register_variable(self, msg):
+    def on_sampler_stop(self):
+        self.running = False
+
+    def on_sampler_start(self):
+        self.running = True
+        self.ticks = 0
+        self.eventloop.call_later(0.0, self.handle_time_event)
+
+    def on_sampler_register_variable(self, msg):
         phase_ticks, period_ticks, address, size = (
             msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
-        self.sines.append(Sine())
+        self.sines.append(self.Sine(size=size, address=address,
+                               freq=1, amp=100, phase=0.0,
+                               phase_ticks=phase_ticks,
+                               period_ticks=period_ticks))
 
     def handle_time_event(self):
+        # ignore time for the ticks aspect - a tick is a call of this function.
+        # easy.
+        if not self.running:
+            return
+        self.ticks += 1
         t = time() - self.start_time
-        ticks = int(t * self.TICKS_PER_SECOND)
         var_size_pairs = []
         for sine in self.sines:
-
-            var_size_pairs = (sine.amp * sin(sine.phase + sine.freq * t))
-        self._send_message(SamplerSample, ticks=ticks, payload=payload, var_size_pairs=var_size_pairs)
+            if self.ticks % sine.period_ticks == sine.phase_ticks:
+                var_size_pairs.append((int(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
+        # We could use the gcd to find the minimal tick size but this is good enough
+        if len(var_size_pairs) > 0:
+            self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
+        self.eventloop.call_later(self.TICK_TIME, self.handle_time_event)
 
 
 def ctypes_mem_from_size_and_val(val, size):

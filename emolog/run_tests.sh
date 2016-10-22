@@ -1,3 +1,3 @@
 #!/bin/bash
 export PYTHONPATH=.
-py.test --ignore=venv
+py.test --ignore=venv $@
