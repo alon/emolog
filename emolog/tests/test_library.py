@@ -1,5 +1,4 @@
-from io import StringIO
-
+from io import BytesIO
 
 import pytest
 
@@ -30,11 +29,11 @@ test_decode_sanity_data = [
 
 @pytest.mark.parametrize("name,reply_class,params", test_decode_sanity_data)
 def test_decode_sane(name, reply_class, params):
-    encoded = reply_class(**params).encode()
+    encoded = reply_class(seq=0, **params).encode()
     msg = emolog.emo_decode(encoded)
     assert isinstance(msg, reply_class), "expected {}, got {}".format(reply_class, str(msg))
 
 
 def test_client_parser():
-    serial = StringIO()
-    parser = emolog.ClientParser(serial)
+    serial = BytesIO()
+    parser = emolog.Parser(serial)

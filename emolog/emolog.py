@@ -1,8 +1,27 @@
 """
+Emolog is a logging protocol for debugging embedded c programs.
+
+It consists of:
+    1. python high-level library (this)
+    2. c library compilable on for linux/windows hosts and TI embedded target
+
+Usage for real life:
+    1. link c library into your program
+    2. call init
+    3. select a serial channel for transport,
+    4. call handler on arriving data
+    5. implement sending of response messages
+
+Usage for testing purposes:
+    1. TODO
+
+
 Wrap emolog c library. Build it if it doesn't exist. Provides the same
 API otherwise, plus helpers.
 """
 
+from collections import namedtuple
+from time import time
 import ctypes
 import os
 import struct
@@ -39,7 +58,7 @@ else:
 def build_library():
     # chdir to path of module
     os.chdir(os.path.split(__file__)[0])
-    ret = os.system("make {}".format(LIBRARY_PATH))
+    ret = os.system("make {} 2>&1 > /dev/null".format(LIBRARY_PATH))
     assert ret == 0, "make failed with error code {}, see above.".format(ret)
     assert os.path.exists(LIBRARY_PATH)
 
@@ -82,12 +101,12 @@ MAGIC_VALUES = list(map(ord, 'EM'))
 
 class Message(metaclass=ABCMeta):
 
-    # Used by all encode functions - can segfault if buffer is too large
+    # Used by all encode functions - can segfault if buffer is too small
     buf_size = 1024
     buf = ctypes.create_string_buffer(buf_size)
 
-    def __init__(self):
-        pass
+    def __init__(self, seq):
+        self.seq = seq
 
     @abstractmethod
     def encode_inner(self):
@@ -106,7 +125,8 @@ class Message(metaclass=ABCMeta):
 
 class Version(Message):
     type = emo_message_types.version
-    def __init__(self, version=None, reply_to_seq=None):
+    def __init__(self, seq, version=None, reply_to_seq=None):
+        super(Version, self).__init__(seq=seq)
         self.version = version
         self.reply_to_seq = reply_to_seq
 
@@ -122,7 +142,8 @@ class Ping(Message):
 
 class Ack(Message):
     type = emo_message_types.ack
-    def __init__(self, error, reply_to_seq):
+    def __init__(self, seq, error, reply_to_seq):
+        super(Ack, self).__init__(seq=seq)
         self.error = error
         self.reply_to_seq = reply_to_seq
 
@@ -138,7 +159,9 @@ class Ack(Message):
 
 class SamplerRegisterVariable(Message):
     type = emo_message_types.sampler_register_variable
-    def __init__(self, phase_ticks, period_ticks, address, size):
+
+    def __init__(self, seq, phase_ticks, period_ticks, address, size):
+        super(SamplerRegisterVariable, self).__init__(seq=seq)
         assert size is not None
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
@@ -175,12 +198,14 @@ class SamplerStop(Message):
 
 class SamplerSample(Message):
     type = emo_message_types.sampler_sample
-    def __init__(self, ticks, payload=None, var_size_pairs=None):
+
+    def __init__(self, seq, ticks, payload=None, var_size_pairs=None):
         """
         :param ticks:
         :param vars: dictionary from variable index to value
         :return:
         """
+        super(SamplerSample, self).__init__(seq=seq)
         self.ticks = ticks
         self.payload = payload
         self.var_size_pairs = var_size_pairs
@@ -247,16 +272,16 @@ def get_seq():
 
 def decode_emo_header(s):
     """
-
+    Decode emolog header
     :param s: bytes of header
-    :return: success (bool), message type (byte), payload length (uint16)
+    :return: success (bool), message type (byte), payload length (uint16), message sequence (byte)
     """
     assert len(s) >= header_size
-    m1, m2, t, l, seq, payload_crc, header_crc = struct.unpack(endianess + 'BBBHBBB', s[:header_size])
+    m1, m2, _type, length, seq, payload_crc, header_crc = struct.unpack(endianess + 'BBBHBBB', s[:header_size])
     if [m1, m2] != MAGIC_VALUES:
         print("bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES))
-        return False, None, None
-    return True, t, l
+        return False, None, None, None
+    return True, _type, length, seq
 
 
 class RegisteredVariable(object):
@@ -290,64 +315,78 @@ class VariableSampler(object):
         return variables
 
 
-class HostSampler(object):
+class ClientSampler(object):
+    """
+    Note: removed handling of Acks
+     - TODO
+
+    Removed ignored message handling
+     - TODO
+    """
 
     def __init__(self, parser):
         self.parser = parser
         self.sampler = VariableSampler()
 
     def set_variables(self, vars):
-        self.parser.send_command(SamplerClear())
+        self.parser.send_message(SamplerClear())
         self.sampler.clear()
         for d in vars:
             self.sampler.register_variable(**d)
             self.register_variable(**d)
-        self.parser.send_command(SamplerStart())
+        self.parser.send_message(SamplerStart())
 
     def register_variable(self, phase_ticks, period_ticks, address, size):
-        self.parser.send_command(SamplerRegisterVariable(
+        self.parser.send_message(SamplerRegisterVariable(
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size))
 
-    def read_samples(self):
-        while True:
-            msg = self.parser.read_one()
-            if isinstance(msg, SamplerSample):
-                msg.update_with_sampler(self.sampler)
-                yield msg
-            else:
-                print("ignoring a {}".format(msg))
-
     def stop(self):
-        self.parser.send_command(SamplerStop())
+        self.parser.send_message(SamplerStop())
+
+    def handle_tranport_read_for_read(self):
+        msg = self.parser.read_available()
+        if isinstance(msg, Version):
+            return msg
+        elif isinstance(msg, SamplerSample):
+            # if we are stopped this is to be ignored?
+            msg.update_with_sampler(self.sampler)
+        elif isinstance(msg, Ack):
+            #print("Got Ack")
+            if msg.error != 0:
+                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
+        else:
+            print("ignoring a {}".format(msg))
 
 
 def emo_decode(buf):
     needed = lib.emo_decode(buf, len(buf))
     msg = None
     if needed == 0:
-        valid, emo_type, emo_len = decode_emo_header(buf)
+        valid, emo_type, emo_len, seq = decode_emo_header(buf)
         payload = buf[header_size:]
         if emo_type == emo_message_types.version:
             (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
-            msg = Version(client_version, reply_to_seq)
+            msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
         elif emo_type == emo_message_types.ack:
             (error, reply_to_seq) = struct.unpack(endianess + 'HB', payload)
-            msg = Ack(error, reply_to_seq)
+            msg = Ack(seq=seq, error=error, reply_to_seq=reply_to_seq)
         elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
                           emo_message_types.sampler_start, emo_message_types.sampler_stop]:
             assert len(payload) == 0
             msg = {emo_message_types.ping: Ping,
                    emo_message_types.sampler_clear: SamplerClear,
                    emo_message_types.sampler_start: SamplerStart,
-                   emo_message_types.sampler_stop: SamplerStop}[emo_type]()
+                   emo_message_types.sampler_stop: SamplerStop}[emo_type](seq=seq)
         elif emo_type == emo_message_types.sampler_register_variable:
-            msg = SamplerRegisterVariable(*struct.unpack(endianess + 'LLLHH', payload)[:4])
+            phase_ticks, period_ticks, address, size, _reserved = struct.unpack(endianess + 'LLLHH', payload)
+            msg = SamplerRegisterVariable(seq=seq, phase_ticks=phase_ticks, period_ticks=period_ticks,
+                                          address=address, size=size)
         elif emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
             ticks = struct.unpack(endianess + 'L', payload[:4])[0]
-            msg = SamplerSample(ticks=ticks, payload=payload[4:])
+            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
         else:
-            msg = UnknownMessage(type=emo_type, buf=Message.buf)
+            msg = UnknownMessage(seq=seq, type=emo_type, buf=Message.buf)
     elif needed > 0:
         msg = MissingBytes(message=buf, header=buf[:header_size], needed=needed)
     else:
@@ -355,71 +394,106 @@ def emo_decode(buf):
     return msg
 
 
-class ClientParser(object):
-    def __init__(self, serial):
+class Parser(object):
+    def __init__(self, transport):
         self.buf = b''
-        self.serial = serial
-        self.ignored = defaultdict(int)
-        self.sampler = VariableSampler()
+        self.transport = transport
+        self.read_available() # get stuck early if transport.read is blocking - it should not be
 
-    def _read_available(self):
-        s = self.serial.read()
+    def read_available(self):
+        s = self.transport.read()
         assert isinstance(s, bytes)
         self.buf = self.buf + s
         needed = lib.emo_decode(self.buf, len(self.buf))
         msg = emo_decode(self.buf)
-        if isinstance(msg, MissingBytes):
-            pass
-        elif isinstance(msg, SkipBytes):
-            pass
-        else:
+        if isinstance(msg, SkipBytes):
+            print("communication error - skipping bytes: {}".format(msg.skip))
+            self.buf = self.buf[msg.skip:]
+        elif not isinstance(msg, MissingBytes):
             self.buf = b''
-        if isinstance(msg, VariableSampler):
-            self.sampler.clear()
-        elif isinstance(msg, SamplerRegisterVariable):
-            self.sampler.register_variable(phase_ticks=msg.phase_ticks, period_ticks=msg.period_ticks,
-                                               address=msg.address, size=msg.size)
-        elif isinstance(msg, SamplerSample):
-            msg.update_with_sampler(self.sampler)
         return msg
 
-    def send_command(self, command):
+    def send_message(self, command):
         """
         Sends a command to the client and waits for a reply and returns it.
         Blocking.
         """
-        self.serial.write(command.encode())
-        msg = self.read_one()
-        print("Got {}".format(msg))
-        if isinstance(msg, Version):
-            return msg
-        elif isinstance(msg, SamplerSample):
-            # client is still sending samples, ignore silently
-            self.ignored[msg.__class__] += 1
-        else:
-            assert isinstance(msg, Ack)
-            #print("Got Ack")
-            if msg.error != 0:
-                print("client responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-
-    def read_one(self):
-        # TOOD: timeout
-        assert(len(self.buf) == 0)
-        while True:
-            msg = self._read_available()
-            if isinstance(msg, SkipBytes):
-                print("communication error - skipping bytes: {}".format(msg.skip))
-                self.buf = self.buf[msg.skip:]
-            elif isinstance(msg, MissingBytes):
-                continue
-            elif msg is not None:
-                break
-        return msg
+        self.transport.write(command.encode())
 
     def __str__(self):
         return '<ClientParser: #{}: {!r}'.format(len(self.buf), self.buf)
 
     __repr__ = __str__
+
+
+class FakeSineEmbedded(object):
+    """
+    Implement a simple embedded side. We don't care about the addresses,
+    just fake a sinus on each address, starting at t=phase_ticks when requested,
+    having a frequency that rises. Actually I'll wing it - it's really just
+    a source of signals for debugging:
+        the protocol
+        the GUI
+
+    Also an example of how an embedded side behaves:
+        Respond with ACK to everything
+        Except to Version: respond with our Version
+    """
+
+    VERSION = 1
+    TICKS_PER_SECOND = 1000000
+
+    Sine = namedtuple('Sine', ['freq', 'amp', 'phase_ticks'])
+
+    def __init__(self, eventloop, transport):
+        self.parser = ClientParser(transport)
+        self.eventloop = eventloop
+        self.sines = []
+        self.seq = 0
+        self.start_time = time()
+
+    def _send_message(self, msg_class, **kw):
+        msg = msg_class(seq=self.seq, **kw)
+        self.seq += 1
+        self.parser.send_message(msg)
+        # TODO - handle the ack?
+        # put it in a separate class probably, track
+        # outgoing messages with expected acks
+
+    def handle_transport_ready_for_read(self):
+        msg = self.parser.read_available()
+        # handle everything except Version
+        if isinstance(msg, SamplerClear):
+            self.sines.clear()
+        elif isinstance(msg, SamplerStart):
+            self.start_sending_samples()
+        elif isinstance(msg, SamplerStop):
+            self.stop_sending_samples()
+        elif isinstance(msg, SamplerRegisterVariable):
+            self.register_variable(msg)
+
+        # reply with ACK to everything
+        if isinstance(msg, Version):
+            self._send_message(Version, version=self.VERSION, reply_to_seq=msg.seq)
+        else:
+            self._send_message(Ack, error=error, reply_to_seq=msg.seq)
+
+    def start_sending_samples(self):
+        self.eventloop.add_timer(self.handle_time_event)
+
+    def register_variable(self, msg):
+        phase_ticks, period_ticks, address, size = (
+            msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
+        self.sines.append(Sine())
+
+    def handle_time_event(self):
+        t = time() - self.start_time
+        ticks = int(t * self.TICKS_PER_SECOND)
+        var_size_pairs = []
+        for sine in self.sines:
+
+            var_size_pairs = (sine.amp * sin(sine.phase + sine.freq * t))
+        self._send_message(SamplerSample, ticks=ticks, payload=payload, var_size_pairs=var_size_pairs)
 
 
 def ctypes_mem_from_size_and_val(val, size):
