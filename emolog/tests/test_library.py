@@ -2,6 +2,8 @@ import asyncio
 from io import BytesIO
 from socket import socketpair
 
+from PyQt5.QtWidgets import QApplication
+from quamash import QEventLoop
 import pytest
 
 import emolog
@@ -73,25 +75,41 @@ class AsyncIOEventLoop(object):
             fd = fdlike.socket
         else:
             fd = fdlike
-        self.loop.add_reader(fd, callback)
+        self.loop.add_reader(fd.fileno(), callback) # 'fileno()' is not needed for asyncio, but is for QEventLoop from quamash
 
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
 
 
-def test_client_and_fake_thingy():
-    asyncioloop = asyncio.get_event_loop()
-    eventloop = AsyncIOEventLoop(asyncioloop)
+def _test_client_and_sine(eventloop):
     rsock, wsock = socketpair()
     client = emolog.Client(eventloop=eventloop, transport=SocketToFile(wsock))
     embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=SocketToFile(rsock))
-    def test():
+    def _client_sine_test(loop):
         client.send_version()
         client.send_sampler_stop()
         client.send_sampler_clear()
         client.send_sampler_register_variable(phase_ticks=0, period_ticks=2, address=123, size=4)
         client.send_sampler_start()
-        yield from asyncio.sleep(0.1)
-        asyncioloop.stop()
-    asyncioloop.run_until_complete(test())
+        yield from asyncio.sleep(0.001)
+        loop.stop()
+    return client, _client_sine_test
+
+
+def test_client_and_fake_thingy():
+    asyncioloop = asyncio.get_event_loop()
+    eventloop = AsyncIOEventLoop(asyncioloop)
+    client, main = _test_client_and_sine(eventloop)
+    asyncioloop.run_until_complete(main(asyncioloop))
+    assert client.received_samples > 0
+
+
+def test_client_and_fake_thingy_qt_loop():
+    app = QApplication([])
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    eventloop = AsyncIOEventLoop(loop)
+    client, main = _test_client_and_sine(eventloop)
+    with loop:
+        loop.run_until_complete(main(loop))
     assert client.received_samples > 0
