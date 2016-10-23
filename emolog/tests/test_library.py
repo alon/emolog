@@ -49,42 +49,10 @@ def test_client_with_c_thing():
     pass
 
 
-class SocketToFile(object):
-    def __init__(self, socket):
-        self.socket = socket
-        socket.setblocking(False)
-
-    def read(self, n=None):
-        if n is None:
-            n = 1024
-        try:
-            return self.socket.recv(n)
-        except BlockingIOError:
-            return b''
-
-    def write(self, s):
-        return self.socket.send(s)
-
-
-class AsyncIOEventLoop(object):
-    def __init__(self, loop):
-        self.loop = loop
-
-    def add_reader(self, fdlike, callback):
-        if isinstance(fdlike, SocketToFile):
-            fd = fdlike.socket
-        else:
-            fd = fdlike
-        self.loop.add_reader(fd.fileno(), callback) # 'fileno()' is not needed for asyncio, but is for QEventLoop from quamash
-
-    def call_later(self, dt, callback):
-        self.loop.call_later(dt, callback)
-
-
-def _test_client_and_sine(eventloop):
-    rsock, wsock = socketpair()
-    client = emolog.Client(eventloop=eventloop, transport=SocketToFile(wsock))
-    embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=SocketToFile(rsock))
+def _test_client_and_sine_helper(eventloop, client_end, embedded_end=None):
+    client = emolog.Client(eventloop=eventloop, transport=client_end)
+    if embedded_end is not None:
+        embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=embedded_end)
     def _client_sine_test(loop):
         client.send_version()
         client.send_sampler_stop()
@@ -96,20 +64,48 @@ def _test_client_and_sine(eventloop):
     return client, _client_sine_test
 
 
+def _test_client_and_sine_socket_pair(eventloop):
+    rsock, wsock = socketpair()
+    return _test_client_and_sine_helper(eventloop=eventloop,
+                                        client_end=emolog.SocketToFile(wsock),
+                                        embedded_end=emolog.SocketToFile(rsock))
+
+
 def test_client_and_fake_thingy():
-    asyncioloop = asyncio.get_event_loop()
-    eventloop = AsyncIOEventLoop(asyncioloop)
-    client, main = _test_client_and_sine(eventloop)
-    asyncioloop.run_until_complete(main(asyncioloop))
+    loop = asyncio.get_event_loop()
+    eventloop = emolog.AsyncIOEventLoop(loop)
+    client, main = _test_client_and_sine_socket_pair(eventloop)
+    loop.run_until_complete(main(loop))
     assert client.received_samples > 0
 
 
-def test_client_and_fake_thingy_qt_loop():
+def qt_event_loop():
     app = QApplication([])
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
-    eventloop = AsyncIOEventLoop(loop)
-    client, main = _test_client_and_sine(eventloop)
+    return loop
+
+
+def test_client_and_fake_thingy_qt_loop():
+    loop = qt_event_loop()
+    eventloop = emolog.AsyncIOEventLoop(loop)
+    client, main = _test_client_and_sine_socket_pair(eventloop)
     with loop:
         loop.run_until_complete(main(loop))
     assert client.received_samples > 0
+
+
+def test_client_and_fake_thingy_qt_pipe():
+    """
+    This is as close to the gui as possible - uses a pipe that is akin to
+    using a tty/COM device, i.e. serial USB connection to the TI, as
+    with the real hardware
+    """
+    eventloop = qt_event_loop()
+    def main():
+        embedded_process_create = asyncio.create_subprocess_exec('./tests/embedded_sine.py')
+        embedded_process = yield from embedded_process_create
+        client_end = embedded_process._transport
+        client, main = _test_client_and_sine_helper(eventloop=eventloop, client_end=client_end)
+    with eventloop:
+        eventloop.run_until_complete(main())
