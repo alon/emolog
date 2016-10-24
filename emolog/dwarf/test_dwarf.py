@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from dwarf import FileParser
+from . import FileParser
 
 
 class TestDwarf(TestCase):
