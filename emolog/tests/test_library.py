@@ -53,7 +53,7 @@ def _client_test_helper(client, loop):
     client.send_version()
     client.send_sampler_stop()
     client.send_sampler_clear()
-    client.send_sampler_register_variable(phase_ticks=0, period_ticks=2, address=123, size=4)
+    client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4)])
     client.send_sampler_start()
     yield from asyncio.sleep(0.01)
     loop.stop()

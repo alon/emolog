@@ -327,8 +327,9 @@ def emo_decode(buf):
     msg = None
     if needed == 0:
         valid, emo_type, emo_len, seq = decode_emo_header(buf)
-        print("decoded header of length {}, got {}, {}, {}, {}".format(len(buf), valid, emo_type, emo_len, seq),
-              file=sys.stderr)
+        print("decoded header of length {}, got {}, T {}, # {}, seq {}".format(
+            len(buf), 'valid' if valid else 'invalid', emo_type, emo_len, seq),
+            file=sys.stderr)
         payload = buf[header_size:header_size + emo_len]
         buf = buf[header_size + emo_len:]
         if emo_type == emo_message_types.version:
@@ -371,7 +372,7 @@ def none_to_empty_buffer(item):
 class Parser(object):
     def __init__(self, transport):
         self.transport = transport
-        self.buf = none_to_empty_buffer(self.transport.read()) # get stuck early if transport.read is blocking - it should not be
+        self.buf = b''
         self.send_seq = 0
         self.empty_count = 0
 
@@ -424,46 +425,77 @@ class Client(object):
         self.sampler = VariableSampler()
         self.eventloop = eventloop
         self.received_samples = 0
+        self.acked = True # True if embedded acked (Version is an ack too) the last message
+        self.queue = []
         if add_reader:
             eventloop.add_reader(transport, self.handle_transport_ready_for_read)
         # else: caller is in charge of calling handle_transport_ready_for_read
 
-    def set_variables(self, vars):
-        self.parser.send_message(SamplerClear)
+    def send_set_variables(self, vars):
+        self.send_sampler_clear()
         self.sampler.clear()
         for d in vars:
             self.sampler.register_variable(**d)
-            self.register_variable(**d)
-        self.parser.send_message(SamplerStart)
+            self.send_sampler_register_variable(**d)
+        self.queue_or_send(SamplerStart)
+
+    def send_sampler_clear(self):
+        self.queue_or_send(SamplerClear)
 
     def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
-        self.parser.send_message(SamplerRegisterVariable,
+        self.queue_or_send(SamplerRegisterVariable,
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size)
 
     def send_sampler_clear(self):
-        self.parser.send_message(SamplerClear)
+        self.queue_or_send(SamplerClear)
 
     def send_sampler_start(self):
-        self.parser.send_message(SamplerStart)
+        self.queue_or_send(SamplerStart)
 
     def send_sampler_stop(self):
-        self.parser.send_message(SamplerStop)
+        self.queue_or_send(SamplerStop)
 
     def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care
         # anyway
-        self.parser.send_message(Version)
+        self.queue_or_send(Version)
 
     def stop(self):
-        self.parser.send_message(SamplerStop)
+        self.queue_or_send(SamplerStop)
+
+    def queue_or_send(self, msg_type, **kw):
+        """
+        We are running in asyncio
+
+        We must await an ack from the embedded. That is the protocol and
+        importantly the embedded has a tiny 16 byte buffer so it cannot
+        handle more than a message at a time.
+        """
+        if self.acked:
+            self.send_message(msg_type, **kw)
+        else:
+            print("queing {}".format(msg_type))
+            self.queue.append((msg_type, kw))
+
+    def send_message(self, msg_type, **kw):
+        print("sending {}".format(msg_type))
+        self.parser.send_message(msg_type, **kw)
+        self.acked = False
 
     def handle_transport_ready_for_read(self):
         for msg in self.parser.iter_available_messages():
             self.handle_message(msg)
+        # now send the first queued message
+        if self.acked and len(self.queue) > 0:
+            print("dequeing (left {})".format(len(self.queue) - 1))
+            msg_type, kw = self.queue[0]
+            del self.queue[0]
+            self.send_message(msg_type, **kw)
 
     def handle_message(self, msg):
         if isinstance(msg, Version):
             print("Got Version: {}".format(msg.version))
+            self.acked = True
         elif isinstance(msg, SamplerSample):
             # if we are stopped this is to be ignored?
             msg.update_with_sampler(self.sampler)
@@ -472,6 +504,7 @@ class Client(object):
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
+            self.acked = True
         else:
             print("ignoring a {}".format(msg))
 
@@ -711,5 +744,5 @@ def get_serial(comport=None, hint_description=None, baudrate=115200):
         if len(available) > 1:
             print("picking the first out of available {}".format(','.join([x.device for x in available])))
         comport = available[0].device
-    return Serial(comport, baudrate=baudrate)
+    return serial.Serial(comport, baudrate=baudrate)
 
