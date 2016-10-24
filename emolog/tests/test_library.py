@@ -49,18 +49,21 @@ def test_client_with_c_thing():
     pass
 
 
+def _client_test_helper(client, loop):
+    client.send_version()
+    client.send_sampler_stop()
+    client.send_sampler_clear()
+    client.send_sampler_register_variable(phase_ticks=0, period_ticks=2, address=123, size=4)
+    client.send_sampler_start()
+    yield from asyncio.sleep(0.01)
+    loop.stop()
+
+
 def _test_client_and_sine_helper(eventloop, client_end, embedded_end=None):
     client = emolog.Client(eventloop=eventloop, transport=client_end)
     if embedded_end is not None:
         embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=embedded_end)
-    def _client_sine_test(loop):
-        client.send_version()
-        client.send_sampler_stop()
-        client.send_sampler_clear()
-        client.send_sampler_register_variable(phase_ticks=0, period_ticks=2, address=123, size=4)
-        client.send_sampler_start()
-        yield from asyncio.sleep(0.001)
-        loop.stop()
+    _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
 
 
@@ -95,17 +98,18 @@ def test_client_and_fake_thingy_qt_loop():
     assert client.received_samples > 0
 
 
-def test_client_and_fake_thingy_qt_pipe():
+def failed_blasted_data_not_reaching_subprocess_test_client_and_fake_thingy_qt_pipe():
     """
     This is as close to the gui as possible - uses a pipe that is akin to
     using a tty/COM device, i.e. serial USB connection to the TI, as
     with the real hardware
     """
     eventloop = qt_event_loop()
+    eventloop.set_debug(True)
     def main():
-        embedded_process_create = asyncio.create_subprocess_exec('./tests/embedded_sine.py')
-        embedded_process = yield from embedded_process_create
-        client_end = embedded_process._transport
-        client, main = _test_client_and_sine_helper(eventloop=eventloop, client_end=client_end)
+        client_to_fake = emolog.ClientToFake(eventloop=eventloop)
+        yield from client_to_fake.initialize()
+        yield from _client_test_helper(client=client_to_fake.client, loop=eventloop)
     with eventloop:
         eventloop.run_until_complete(main())
+

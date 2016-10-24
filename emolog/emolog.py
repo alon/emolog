@@ -20,6 +20,7 @@ Wrap emolog c library. Build it if it doesn't exist. Provides the same
 API otherwise, plus helpers.
 """
 
+import asyncio
 from collections import namedtuple
 from time import time
 import ctypes
@@ -29,7 +30,6 @@ import sys
 from math import sin
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header',
@@ -120,7 +120,7 @@ class Message(metaclass=ABCMeta):
 
     def encode(self, **kw):
         s = self.buf[:self.encode_inner()]
-        print("sending: {}, encoded as {}".format(self, s))
+        print("sending: {}, encoded as {}".format(self, s), file=sys.stderr)
         return s
 
     def __str__(self):
@@ -327,7 +327,8 @@ def emo_decode(buf):
     msg = None
     if needed == 0:
         valid, emo_type, emo_len, seq = decode_emo_header(buf)
-        print("decoded header of length {}, got {}, {}, {}, {}".format(len(buf), valid, emo_type, emo_len, seq))
+        print("decoded header of length {}, got {}, {}, {}, {}".format(len(buf), valid, emo_type, emo_len, seq),
+              file=sys.stderr)
         payload = buf[header_size:header_size + emo_len]
         buf = buf[header_size + emo_len:]
         if emo_type == emo_message_types.version:
@@ -357,26 +358,39 @@ def emo_decode(buf):
         msg = MissingBytes(message=buf, header=buf[:header_size], needed=needed)
     else:
         msg = SkipBytes(-needed)
-        buf = buf[needed:]
+        buf = buf[-needed:]
     return msg, buf
+
+
+def none_to_empty_buffer(item):
+    if item is None:
+        return b''
+    return item
 
 
 class Parser(object):
     def __init__(self, transport):
         self.transport = transport
-        self.buf = self.transport.read() # get stuck early if transport.read is blocking - it should not be
+        self.buf = none_to_empty_buffer(self.transport.read()) # get stuck early if transport.read is blocking - it should not be
         self.send_seq = 0
+        self.empty_count = 0
 
     def iter_available_messages(self):
         s = self.transport.read()
         assert isinstance(s, bytes)
+        if len(s) == 0:
+            self.empty_count += 1
+            # stream closed - quit - but wait a bit to be sure
+            if self.empty_count > 2:
+                raise SystemExit()
         self.buf = self.buf + s
         while len(self.buf) > 0:
             needed = lib.emo_decode(self.buf, len(self.buf))
             msg, left_over_buf = emo_decode(self.buf)
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
-                print("communication error - skipped {} bytes".format(msg.skip))
+                print("communication error - skipped {} bytes".format(msg.skip),
+                      file=sys.stderr)
             elif isinstance(msg, MissingBytes):
                 break
             yield msg
@@ -405,12 +419,14 @@ class Client(object):
      - TODO
     """
 
-    def __init__(self, eventloop, transport):
+    def __init__(self, eventloop, transport, add_reader=True):
         self.parser = Parser(transport)
         self.sampler = VariableSampler()
         self.eventloop = eventloop
         self.received_samples = 0
-        eventloop.add_reader(transport, self.handle_transport_ready_for_read)
+        if add_reader:
+            eventloop.add_reader(transport, self.handle_transport_ready_for_read)
+        # else: caller is in charge of calling handle_transport_ready_for_read
 
     def set_variables(self, vars):
         self.parser.send_message(SamplerClear)
@@ -460,6 +476,78 @@ class Client(object):
             print("ignoring a {}".format(msg))
 
 
+class TransportFed(object):
+    def __init__(self, writefd):
+        self.data = []
+        self.writefd = writefd
+
+    def feed_me(self, s):
+        self.data.append(s)
+
+    def read(self):
+        s = b''.join(reversed(self.data))
+        self.data.clear()
+        return s
+
+    def write(self, s):
+        self.writefd.write(s)
+
+
+class TransportPairOfFd(object):
+    def __init__(self, fdin, fdout):
+        self.fdin = fdin
+        self.fdout = fdout
+
+    def write(self, s):
+        self.fdout.write(s)
+
+    def read(self):
+        data = self.fdin.read()
+        return data
+
+    def fileno(self):
+        """ used by Client to get the reader fileno """
+        return self.fdin.fileno()
+
+
+class TransportStdinAndOut(TransportPairOfFd):
+    def __init__(self):
+        super(TransportStdinAndOut, self).__init__(fdin=sys.stdin.buffer,
+                                                   fdout=sys.stdout.buffer)
+
+
+class ClientToFake(asyncio.SubprocessProtocol):
+    """
+    Implemented as an asyncio protocol over a subprocess.
+    The subprocess runs the FakeSineEmbedded implementation below, but can
+    later run a c program to simulate the ti-side with the same code, thereby
+    testing it.
+    """
+    def __init__(self, eventloop, subprocess_cmdline=None):
+        self.eventloop = eventloop
+        if subprocess_cmdline is None:
+            subprocess_cmdline = ["./embedded_sine.py"]
+        self.subprocess_cmdline = subprocess_cmdline
+
+    def initialize(self):
+        embedded_process_create = self.eventloop.subprocess_exec(protocol_factory=lambda: self,
+                                                                 program=self.subprocess_cmdline[0],
+                                                                 *self.subprocess_cmdline[1:])
+        transport, protocol = yield from embedded_process_create
+        print("ClientToFake: transport={}, protocol={}".format(transport, protocol))
+        self.transport = TransportFed(transport.get_pipe_transport(0))
+        self.client = Client(eventloop=AsyncIOEventLoop(self.eventloop),
+                             transport=self.transport, add_reader=False)
+
+    def pipe_data_received(self, fd, data):
+        print("ClientToFake: got data {!r}".format(data))
+        self.transport.feed_me(data)
+        self.client.handle_transport_ready_for_read()
+
+    def process_exited(self):
+        print("subprocess has quit")
+
+
 class FakeSineEmbedded(object):
     """
     Implement a simple embedded side. We don't care about the addresses,
@@ -472,6 +560,8 @@ class FakeSineEmbedded(object):
     Also an example of how an embedded side behaves:
         Respond with ACK to everything
         Except to Version: respond with our Version
+
+    !important! do not write to STDOUT - used in a pipe
     """
 
     VERSION = 1
@@ -498,6 +588,9 @@ class FakeSineEmbedded(object):
             self.handle_message(msg)
 
     def handle_message(self, msg):
+        if not isinstance(msg, Message):
+            return
+
         # handle everything except Version
         if isinstance(msg, SamplerClear):
             self.on_sampler_clear()
@@ -599,4 +692,24 @@ class AsyncIOEventLoop(object):
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
 
+
+def get_serial(comport=None, hint_description=None, baudrate=115200):
+    import serial
+    from serial.tools.list_ports import comports
+
+    if comport is None:
+        available = comports()
+        if len(available) == 0:
+            print("no com ports available - is board powered and connected?")
+            raise SystemExit
+        if hint_description is not None:
+            hint_description = hint_description.lower()
+            available = [x for x in available if hint_description in x.description.lower()]
+        if len(available) == 0:
+            print("no com port matching hint available - is board powered and connected?")
+            raise SystemExit
+        if len(available) > 1:
+            print("picking the first out of available {}".format(','.join([x.device for x in available])))
+        comport = available[0].device
+    return Serial(comport, baudrate=baudrate)
 
