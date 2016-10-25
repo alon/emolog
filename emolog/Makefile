@@ -16,10 +16,10 @@ LIBRARY=$(LIBPREFIX)emolog$(LIBSUFFIX)
 all: $(LIBRARY) example_user$(EXESUFFIX)
 
 $(LIBRARY): emolog.h emolog.c
-	gcc $(CFLAGS) -shared -fPIC -o $(LIBRARY) emolog.c
+	$(CC) $(CFLAGS) -shared -fPIC -o $(LIBRARY) emolog.c
 
 example_user$(EXESUFFIX): example_user.c $(LIBRARY)
-	gcc $(CFLAGS) -o example_user -L. -lemolog example_user.c
+	$(CC) $(CFLAGS) -o example_user -L. -lemolog example_user.c
 
 .PHONY: clean run
 
