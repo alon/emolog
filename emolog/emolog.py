@@ -581,6 +581,49 @@ class ClientToFake(asyncio.SubprocessProtocol):
     def process_exited(self):
         print("subprocess has quit")
 
+        
+class ClientAsProtocol(asyncio.Protocol):
+    """
+    Not using add_reader; if this works fine, it will become the default, replacing Client,
+    and we will have a single Client, no more "ClientToFake", that will just be a method
+    creating the subprocess and returning a regular Client instance; all of this because
+    the windows implementation of asyncio does not support add_reader - but maybe it is cleaner
+    too? not sure. doesn't matter really.
+    """
+
+    def __init__(self, *args, **kw):
+        super(ClientAsProtocol, self).__init__(*args, **kw)
+        self.connection_made_future = asyncio.Future()
+    
+    def connection_made(self, transport):
+        self._debug_log("connection_made")
+        self.the_connection_transport = transport
+        transport.serial.rts = False
+        self.transport = TransportFed(transport)
+        self.client = Client(eventloop=AsyncIOEventLoop(asyncio.get_event_loop()),
+                             transport=self.transport, add_reader=False)
+        self.connection_made_future.set_result(self.client)
+
+    def data_received(self, data):
+        self.transport.feed_me(data)
+        self.client.handle_transport_ready_for_read()
+        
+    def connection_lost(self, exc):
+        # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
+        # this wouldn't happen - we wouldn't notice at this level. So quit?
+        self._debug_log("serial connection_lost")
+        # ?? asyncio.get_event_loop.stop()
+
+    def pause_writing(self):
+        # interesting?
+        self._debug_log(self.transport.get_write_buffer_size())
+
+    def resume_writing(self):
+        self._debug_log(self.transport.get_write_buffer_size())
+
+    def _debug_log(self, s):
+        print("ClientAsProtocol: {}".format(s), file=sys.stderr)
+        
 
 class FakeSineEmbedded(object):
     """
@@ -726,8 +769,19 @@ class AsyncIOEventLoop(object):
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
 
+async def make_serial_client(comport, baudrate):
+    import serial_asyncio
+    # TODO: test asyncserial also with the Protocol+Transport scheme.
+    # But polling (pyserial-async latest) good enough I think, start with that
+    ## import asyncserial
+    ## return asyncserial.AsyncSerial(comport, baudrate=baudrate)
+    serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
+                                                  ClientAsProtocol, comport, baudrate=baudrate)
+    client = await protocol.connection_made_future
+    return client
 
-def get_serial(comport=None, hint_description=None, baudrate=115200):
+
+async def get_serial_client(comport=None, hint_description=None, baudrate=115200):
     import serial
     from serial.tools.list_ports import comports
 
@@ -745,5 +799,5 @@ def get_serial(comport=None, hint_description=None, baudrate=115200):
         if len(available) > 1:
             print("picking the first out of available {}".format(','.join([x.device for x in available])))
         comport = available[0].device
-    return serial.Serial(comport, baudrate=baudrate)
+    return await make_serial_client(comport, baudrate=baudrate)
 
