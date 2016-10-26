@@ -2,8 +2,6 @@ import asyncio
 from io import BytesIO
 from socket import socketpair
 
-from PyQt5.QtWidgets import QApplication
-from quamash import QEventLoop
 import pytest
 
 import emolog
@@ -55,7 +53,9 @@ def _client_test_helper(client, loop):
     client.send_sampler_clear()
     client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4)])
     client.send_sampler_start()
-    yield from asyncio.sleep(0.01)
+    # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
+    # worthy of checking. How will it affect serial?
+    yield from asyncio.sleep(0.1)
     loop.stop()
 
 
@@ -83,19 +83,27 @@ def test_client_and_fake_thingy():
 
 
 def qt_event_loop():
+    from PyQt5.QtWidgets import QApplication
+    from quamash import QEventLoop
     app = QApplication([])
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
     return loop
 
 
-def test_client_and_fake_thingy_qt_loop():
-    loop = qt_event_loop()
-    eventloop = emolog.AsyncIOEventLoop(loop)
-    client, main = _test_client_and_sine_socket_pair(eventloop)
-    with loop:
-        loop.run_until_complete(main(loop))
-    assert client.received_samples > 0
+try:
+    import PyQt5
+except:
+    pass
+else:
+    # TODO - use the skip_if function, don't remember API atm
+    def test_client_and_fake_thingy_qt_loop():
+        loop = qt_event_loop()
+        eventloop = emolog.AsyncIOEventLoop(loop)
+        client, main = _test_client_and_sine_socket_pair(eventloop)
+        with loop:
+            loop.run_until_complete(main(loop))
+        assert client.received_samples > 0
 
 
 def failed_blasted_data_not_reaching_subprocess_test_client_and_fake_thingy_qt_pipe():
