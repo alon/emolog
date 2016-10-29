@@ -534,12 +534,19 @@ class Client(asyncio.Protocol):
             self.received_samples += 1
             if self.verbose:
                 print("Got Sample: {}".format(msg))
+            self.handle_sampler_sample(msg)
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=sys.stderr)
             self.acked.set_result(True)
         else:
             print("ignoring a {}".format(msg))
+
+    def handle_sampler_sample(self, msg):
+        """
+        Override me
+        """
+        pass
 
 
 class TransportFed(object):
@@ -762,19 +769,20 @@ class AsyncIOEventLoop(object):
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
 
-async def make_serial_client(comport, baudrate):
+async def make_serial_client(comport, baudrate, protocol):
     import serial_asyncio
     # TODO: test asyncserial also with the Protocol+Transport scheme.
     # But polling (pyserial-async latest) good enough I think, start with that
     ## import asyncserial
     ## return asyncserial.AsyncSerial(comport, baudrate=baudrate)
     serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
-                                                  Client, comport, baudrate=baudrate)
+                                                  protocol, comport, baudrate=baudrate)
     client = await protocol.connection_made_future
     return client
 
 
-async def get_serial_client(comport=None, hint_description=None, baudrate=115200):
+async def get_serial_client(comport=None, hint_description=None, baudrate=115200,
+                            protocol=Client):
     import serial
     from serial.tools.list_ports import comports
 
@@ -792,5 +800,5 @@ async def get_serial_client(comport=None, hint_description=None, baudrate=115200
         if len(available) > 1:
             print("picking the first out of available {}".format(','.join([x.device for x in available])))
         comport = available[0].device
-    return await make_serial_client(comport, baudrate=baudrate)
+    return await make_serial_client(comport, baudrate=baudrate, protocol=protocol)
 
