@@ -21,6 +21,7 @@ API otherwise, plus helpers.
 """
 
 import asyncio
+from asyncio import Future
 from collections import namedtuple
 from time import time
 import ctypes
@@ -121,7 +122,6 @@ class Message(metaclass=ABCMeta):
 
     def encode(self, **kw):
         s = self.buf[:self.encode_inner()]
-        print("sending: {}, encoded as {}".format(self, s), file=sys.stderr)
         return s
 
     def __str__(self):
@@ -282,14 +282,14 @@ def decode_emo_header(s):
     """
     Decode emolog header
     :param s: bytes of header
-    :return: success (bool), message type (byte), payload length (uint16), message sequence (byte)
+    :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
     """
     assert len(s) >= header_size
     m1, m2, _type, length, seq, payload_crc, header_crc = struct.unpack(endianess + 'BBBHBBB', s[:header_size])
     if [m1, m2] != MAGIC_VALUES:
-        print("bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES))
-        return False, None, None, None
-    return True, _type, length, seq
+        error = "bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES)
+        return error, None, None, None
+    return None, _type, length, seq
 
 
 class RegisteredVariable(object):
@@ -326,11 +326,11 @@ class VariableSampler(object):
 def emo_decode(buf):
     needed = lib.emo_decode(buf, len(buf))
     msg = None
+    error = None
     if needed == 0:
-        valid, emo_type, emo_len, seq = decode_emo_header(buf)
-        print("decoded header of length {}, got {}, T {}, # {}, seq {}".format(
-            len(buf), 'valid' if valid else 'invalid', emo_type, emo_len, seq),
-            file=sys.stderr)
+        error, emo_type, emo_len, seq = decode_emo_header(buf)
+        if error:
+            return None, buf[1:], error
         payload = buf[header_size:header_size + emo_len]
         buf = buf[header_size + emo_len:]
         if emo_type == emo_message_types.version:
@@ -361,7 +361,7 @@ def emo_decode(buf):
     else:
         msg = SkipBytes(-needed)
         buf = buf[-needed:]
-    return msg, buf
+    return msg, buf, error
 
 
 def none_to_empty_buffer(item):
@@ -371,11 +371,15 @@ def none_to_empty_buffer(item):
 
 
 class Parser(object):
-    def __init__(self, transport):
+    def __init__(self, transport, debug=False):
         self.transport = transport
         self.buf = b''
         self.send_seq = 0
         self.empty_count = 0
+
+        # debug flags
+        self.debug_message_encoding = debug
+        self.debug_message_decoding = debug
 
     def iter_available_messages(self, s):
         assert isinstance(s, bytes)
@@ -386,8 +390,19 @@ class Parser(object):
                 raise SystemExit()
         self.buf = self.buf + s
         while len(self.buf) > 0:
-            needed = lib.emo_decode(self.buf, len(self.buf))
-            msg, left_over_buf = emo_decode(self.buf)
+            msg, left_over_buf, error = emo_decode(self.buf)
+            if error:
+                print(error, file=sys.stderr)
+            if self.debug_message_decoding:
+                if error:
+                    print("decoding error, buf length {}, error: {}".format(
+                        len(self.buf), error))
+                elif not hasattr(msg, 'type'):
+                    print("decoded {}".format(msg))
+                else:
+                    print("decoded header of length {}, T {}, # {}, seq {}".format(
+                        len(self.buf), msg.type, len(self.buf) - len(left_over_buf), msg.seq),
+            file=sys.stderr)
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
                 print("communication error - skipped {} bytes".format(msg.skip),
@@ -403,6 +418,9 @@ class Parser(object):
         """
         command = command_class(seq=self.send_seq, **kw)
         self.send_seq += 1
+        encoded = command.encode()
+        if self.debug_message_encoding:
+            print("sending: {}, encoded as {}".format(command, encoded), file=sys.stderr)
         self.transport.write(command.encode())
 
     def __str__(self):
@@ -420,12 +438,12 @@ class Client(asyncio.Protocol):
      - TODO
     """
 
-    def __init__(self, *args, **kw):
-        super(Client, self).__init__(*args, **kw)
+    def __init__(self, verbose=False):
+        self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
-        self.acked = True # True if embedded acked (Version is an ack too) the last message
-        self.queue = []
+        self.acked = Future()
+        self.acked.set_result(True)
         self.parser = None
         self.transport = None
         self.connection_made_future = asyncio.Future()
@@ -455,38 +473,38 @@ class Client(asyncio.Protocol):
         self.parser = Parser(transport)
         self.connection_made_future.set_result(self)
 
-    def send_set_variables(self, vars):
-        self.send_sampler_clear()
+    async def send_set_variables(self, vars):
+        await self.send_sampler_clear()
         self.sampler.clear()
         for d in vars:
             self.sampler.register_variable(**d)
-            self.send_sampler_register_variable(**d)
+            await self.send_sampler_register_variable(**d)
 
-    def send_sampler_clear(self):
-        self.queue_or_send(SamplerClear)
+    async def send_sampler_clear(self):
+        await self.send_after_last(SamplerClear)
 
-    def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
-        self.queue_or_send(SamplerRegisterVariable,
+    async def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
+        await self.send_after_last(SamplerRegisterVariable,
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size)
 
-    def send_sampler_clear(self):
-        self.queue_or_send(SamplerClear)
+    async def send_sampler_clear(self):
+        await self.send_after_last(SamplerClear)
 
-    def send_sampler_start(self):
-        self.queue_or_send(SamplerStart)
+    async def send_sampler_start(self):
+        await self.send_after_last(SamplerStart)
 
-    def send_sampler_stop(self):
-        self.queue_or_send(SamplerStop)
+    async def send_sampler_stop(self):
+        await self.send_after_last(SamplerStop)
 
-    def send_version(self):
+    async def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care
         # anyway
-        self.queue_or_send(Version)
+        await self.send_after_last(Version)
 
-    def stop(self):
-        self.queue_or_send(SamplerStop)
+    async def stop(self):
+        await self.send_after_last(SamplerStop)
 
-    def queue_or_send(self, msg_type, **kw):
+    async def send_after_last(self, msg_type, **kw):
         """
         We are running in asyncio
 
@@ -494,40 +512,32 @@ class Client(asyncio.Protocol):
         importantly the embedded has a tiny 16 byte buffer so it cannot
         handle more than a message at a time.
         """
-        if self.acked:
-            self.send_message(msg_type, **kw)
-        else:
-            print("queing {}".format(msg_type))
-            self.queue.append((msg_type, kw))
+        await self.acked
+        self.send_message(msg_type, **kw)
 
     def send_message(self, msg_type, **kw):
-        print("sending {}".format(msg_type))
         self.parser.send_message(msg_type, **kw)
-        self.acked = False
+        self.acked = asyncio.Future()
 
     def data_received(self, data):
         for msg in self.parser.iter_available_messages(data):
             self.handle_message(msg)
-        # now send the first queued message
-        if self.acked and len(self.queue) > 0:
-            print("dequeing (left {})".format(len(self.queue) - 1))
-            msg_type, kw = self.queue[0]
-            del self.queue[0]
-            self.send_message(msg_type, **kw)
 
     def handle_message(self, msg):
         if isinstance(msg, Version):
-            print("Got Version: {}".format(msg.version))
-            self.acked = True
+            if self.verbose:
+                print("Got Version: {}".format(msg.version))
+            self.acked.set_result(True)
         elif isinstance(msg, SamplerSample):
             # if we are stopped this is to be ignored?
             msg.update_with_sampler(self.sampler)
             self.received_samples += 1
-            print("Got Sample: {}".format(msg))
+            if self.verbose:
+                print("Got Sample: {}".format(msg))
         elif isinstance(msg, Ack):
             if msg.error != 0:
-                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-            self.acked = True
+                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=sys.stderr)
+            self.acked.set_result(True)
         else:
             print("ignoring a {}".format(msg))
 
@@ -682,7 +692,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         phase_ticks, period_ticks, address, size = (
             msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
         self.sines.append(self.Sine(size=size, address=address,
-                               freq=1, amp=100, phase=0.0,
+                               freq=100, amp=100, phase=0.0,
                                phase_ticks=phase_ticks,
                                period_ticks=period_ticks))
 

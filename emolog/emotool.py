@@ -18,14 +18,11 @@ def getvars(filename, varparts):
     return sampled_vars
 
 
-def start_fake_sine():
+async def start_fake_sine():
     loop = asyncio.get_event_loop()
-    eventloop = emolog.AsyncIOEventLoop(loop)
     rsock, wsock = socketpair()
-    client_end = emolog.SocketToFile(wsock)
-    embedded_end = emolog.SocketToFile(rsock)
-    embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=embedded_end)
-    return client_end
+    await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
+    return wsock
 
 
 async def amain():
@@ -41,16 +38,15 @@ async def amain():
     var_dict = [dict(phase_ticks=0, period_ticks=args.rate, address=v.address, size=v.size) for v in sampled_vars]
 
     if args.fake_sine:
-        client_end = start_fake_sine()
+        client_end = await start_fake_sine()
         loop = asyncio.get_event_loop()
-        eventloop = emolog.AsyncIOEventLoop(loop)
-        client = emolog.Client(eventloop=eventloop, transport=client_end)
+        client_transport, client = await loop.create_connection(emolog.Client, sock=client_end)
     else:
         client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint)
-    client.send_version()
-    client.send_sampler_stop()
-    client.send_set_variables(var_dict)
-    client.send_sampler_start()
+    await client.send_version()
+    await client.send_sampler_stop()
+    await client.send_set_variables(var_dict)
+    await client.send_sampler_start()
 
     # TODO? ctrl-c
     while True:

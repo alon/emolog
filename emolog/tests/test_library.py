@@ -32,7 +32,7 @@ test_decode_sanity_data = [
 @pytest.mark.parametrize("name,reply_class,params", test_decode_sanity_data)
 def test_decode_sane(name, reply_class, params):
     encoded = reply_class(seq=0, **params).encode()
-    msg, remaining_buf = emolog.emo_decode(encoded)
+    msg, remaining_buf, error = emolog.emo_decode(encoded)
     assert isinstance(msg, reply_class), "expected {}, got {}".format(reply_class, str(msg))
     assert len(remaining_buf) == 0
 
@@ -47,16 +47,15 @@ def test_client_with_c_thing():
     pass
 
 
-def _client_test_helper(client, loop):
-    client.send_version()
-    client.send_sampler_stop()
-    client.send_sampler_clear()
-    client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4)])
-    client.send_sampler_start()
+async def _client_test_helper(client, loop):
+    await client.send_version()
+    await client.send_sampler_stop()
+    await client.send_sampler_clear()
+    await client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4)])
+    await client.send_sampler_start()
     # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
     # worthy of checking. How will it affect serial?
-    yield from asyncio.sleep(0.1)
-    loop.stop()
+    await asyncio.sleep(0.1)
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
