@@ -28,14 +28,14 @@ how do I manage the tests.
 + embeddedsimulator.py - what was I thinking? srsly, what is it exactly? asyncio tester, it should do what the rountrip is, Step A.
 
 * Integration testing
-- Step A: Python embedded implementation [0/3]
-  - [ ] Write python client to embedded communication [0/2]
-    - [ ] Write Embedded protocol application layer
-    - [ ] Fix FakeSineEmbedded
+- Step A: Python embedded implementation [2/3]
+  - [X] Write python client to embedded communication [2/2]
+    - [X] Write Embedded protocol application layer
+    - [X] Fix FakeSineEmbedded
       - it registers a transport which is a pipe
       - handles the messages
       - produces samples of sines
-  - [ ] Python tester, automated, no GUI
+  - [X] Python tester, automated, no GUI
   - [ ] Python GUI with python sine embedded
   - will just return a sinus for every registered variable, with rising frequency
   - The source can say whatever it wants (source being the client figuring out the addresses)
@@ -55,3 +55,6 @@ Step B: test with a TI application
 - uses the same compiler, same protocol
 - can check actual speed. Attempt to raise the speed to see the limit
 
+* Client changelist [0/1]
+** TODO only work with asyncio and protocols. Since I know it works with serial + qt, and at worst for serial I can introduce a subprocess (asyncio works fine with that under windows with proactor)
+** 

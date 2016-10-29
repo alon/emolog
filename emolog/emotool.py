@@ -16,7 +16,7 @@ def getvars(filename, varparts):
     return sampled_vars
 
 
-def main():
+async def amain(fake_transport=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--serial', default=None, help='serial port to use')
     parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
@@ -27,18 +27,25 @@ def main():
     sampled_vars = getvars(args.elf, args.var_parts.split(','))
     var_dict = [dict(phase_ticks=0, period_ticks=args.rate, address=v.address, size=v.size) for v in sampled_vars]
 
+    if fake_transport is not None:
+        loop = asyncio.get_event_loop()
+        eventloop = emolog.AsyncIOEventLoop(loop)
+        client = emolog.Client(eventloop=eventloop, transport=fake_transport)
+    else:
+        client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint)
+    client.send_version()
+    client.send_sampler_stop()
+    client.send_set_variables(var_dict)
+    client.send_sampler_start()
+
+    # TODO? ctrl-c
+    while True:
+        await asyncio.sleep(0.1)
+
+
+def main():
     if sys.platform == 'win32':
         asyncio.set_event_loop(asyncio.ProactorEventLoop())
-
-    async def emain():
-        client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint)
-        client.send_version()
-        client.send_sampler_stop()
-        client.send_set_variables(var_dict)
-        client.send_sampler_start()
-        # TODO? ctrl-c
-        while True:
-            await asyncio.sleep(0.1)
 
     asyncio.get_event_loop().run_until_complete(emain())
 
