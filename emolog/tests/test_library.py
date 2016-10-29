@@ -59,25 +59,24 @@ def _client_test_helper(client, loop):
     loop.stop()
 
 
-def _test_client_and_sine_helper(eventloop, client_end, embedded_end=None):
-    client = emolog.Client(eventloop=eventloop, transport=client_end)
+async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
+    client_transport, client = await loop.create_connection(emolog.Client, sock=client_end)
     if embedded_end is not None:
-        embedded = emolog.FakeSineEmbedded(eventloop=eventloop, transport=embedded_end)
+        embedded_transport, embedded = await loop.create_connection(emolog.FakeSineEmbedded, sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
 
 
-def _test_client_and_sine_socket_pair(eventloop):
+async def _test_client_and_sine_socket_pair(loop):
     rsock, wsock = socketpair()
-    return _test_client_and_sine_helper(eventloop=eventloop,
-                                        client_end=emolog.SocketToFile(wsock),
-                                        embedded_end=emolog.SocketToFile(rsock))
+    return await _test_client_and_sine_helper(loop=loop,
+                                        client_end=wsock,
+                                        embedded_end=rsock)
 
 
 def test_client_and_fake_thingy():
     loop = asyncio.get_event_loop()
-    eventloop = emolog.AsyncIOEventLoop(loop)
-    client, main = _test_client_and_sine_socket_pair(eventloop)
+    client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
     loop.run_until_complete(main(loop))
     assert client.received_samples > 0
 
@@ -99,8 +98,7 @@ else:
     # TODO - use the skip_if function, don't remember API atm
     def test_client_and_fake_thingy_qt_loop():
         loop = qt_event_loop()
-        eventloop = emolog.AsyncIOEventLoop(loop)
-        client, main = _test_client_and_sine_socket_pair(eventloop)
+        client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
         with loop:
             loop.run_until_complete(main(loop))
         assert client.received_samples > 0

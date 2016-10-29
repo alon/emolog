@@ -377,8 +377,7 @@ class Parser(object):
         self.send_seq = 0
         self.empty_count = 0
 
-    def iter_available_messages(self):
-        s = self.transport.read()
+    def iter_available_messages(self, s):
         assert isinstance(s, bytes)
         if len(s) == 0:
             self.empty_count += 1
@@ -412,7 +411,7 @@ class Parser(object):
     __repr__ = __str__
 
 
-class Client(object):
+class Client(asyncio.Protocol):
     """
     Note: removed handling of Acks
      - TODO
@@ -421,16 +420,40 @@ class Client(object):
      - TODO
     """
 
-    def __init__(self, eventloop, transport, add_reader=True):
-        self.parser = Parser(transport)
+    def __init__(self, *args, **kw):
+        super(Client, self).__init__(*args, **kw)
         self.sampler = VariableSampler()
-        self.eventloop = eventloop
         self.received_samples = 0
         self.acked = True # True if embedded acked (Version is an ack too) the last message
         self.queue = []
-        if add_reader:
-            eventloop.add_reader(transport, self.handle_transport_ready_for_read)
-        # else: caller is in charge of calling handle_transport_ready_for_read
+        self.parser = None
+        self.transport = None
+        self.connection_made_future = asyncio.Future()
+
+    def connection_lost(self, exc):
+        # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
+        # this wouldn't happen - we wouldn't notice at this level. So quit?
+        self._debug_log("serial connection_lost")
+        # ?? asyncio.get_event_loop.stop()
+
+    def pause_writing(self):
+        # interesting?
+        self._debug_log(self.transport.get_write_buffer_size())
+
+    def resume_writing(self):
+        # interesting?
+        self._debug_log(self.transport.get_write_buffer_size())
+
+    def _debug_log(self, s):
+        print("Client: {}".format(s), file=sys.stderr)
+
+    def connection_made(self, transport):
+        if hasattr(transport, 'serial'):
+            # hack - should be done at the transport
+            transport.serial.rts = False
+        self.transport = transport
+        self.parser = Parser(transport)
+        self.connection_made_future.set_result(self)
 
     def send_set_variables(self, vars):
         self.send_sampler_clear()
@@ -483,8 +506,8 @@ class Client(object):
         self.parser.send_message(msg_type, **kw)
         self.acked = False
 
-    def handle_transport_ready_for_read(self):
-        for msg in self.parser.iter_available_messages():
+    def data_received(self, data):
+        for msg in self.parser.iter_available_messages(data):
             self.handle_message(msg)
         # now send the first queued message
         if self.acked and len(self.queue) > 0:
@@ -570,8 +593,9 @@ class ClientToFake(asyncio.SubprocessProtocol):
         transport, protocol = yield from embedded_process_create
         print("ClientToFake: transport={}, protocol={}".format(transport, protocol))
         self.transport = TransportFed(transport.get_pipe_transport(0))
-        self.client = Client(eventloop=AsyncIOEventLoop(self.eventloop),
-                             transport=self.transport, add_reader=False)
+        # you need
+        raise NotImplementedError()
+        self.client = Client()
 
     def pipe_data_received(self, fd, data):
         print("ClientToFake: got data {!r}".format(data))
@@ -581,51 +605,8 @@ class ClientToFake(asyncio.SubprocessProtocol):
     def process_exited(self):
         print("subprocess has quit")
 
-        
-class ClientAsProtocol(asyncio.Protocol):
-    """
-    Not using add_reader; if this works fine, it will become the default, replacing Client,
-    and we will have a single Client, no more "ClientToFake", that will just be a method
-    creating the subprocess and returning a regular Client instance; all of this because
-    the windows implementation of asyncio does not support add_reader - but maybe it is cleaner
-    too? not sure. doesn't matter really.
-    """
 
-    def __init__(self, *args, **kw):
-        super(ClientAsProtocol, self).__init__(*args, **kw)
-        self.connection_made_future = asyncio.Future()
-    
-    def connection_made(self, transport):
-        self._debug_log("connection_made")
-        self.the_connection_transport = transport
-        transport.serial.rts = False
-        self.transport = TransportFed(transport)
-        self.client = Client(eventloop=AsyncIOEventLoop(asyncio.get_event_loop()),
-                             transport=self.transport, add_reader=False)
-        self.connection_made_future.set_result(self.client)
-
-    def data_received(self, data):
-        self.transport.feed_me(data)
-        self.client.handle_transport_ready_for_read()
-        
-    def connection_lost(self, exc):
-        # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
-        # this wouldn't happen - we wouldn't notice at this level. So quit?
-        self._debug_log("serial connection_lost")
-        # ?? asyncio.get_event_loop.stop()
-
-    def pause_writing(self):
-        # interesting?
-        self._debug_log(self.transport.get_write_buffer_size())
-
-    def resume_writing(self):
-        self._debug_log(self.transport.get_write_buffer_size())
-
-    def _debug_log(self, s):
-        print("ClientAsProtocol: {}".format(s), file=sys.stderr)
-        
-
-class FakeSineEmbedded(object):
+class FakeSineEmbedded(asyncio.Protocol):
     """
     Implement a simple embedded side. We don't care about the addresses,
     just fake a sinus on each address, starting at t=phase_ticks when requested,
@@ -651,17 +632,20 @@ class FakeSineEmbedded(object):
         # Sampling parameters
         'period_ticks', 'phase_ticks', 'size', 'address'])
 
-    def __init__(self, eventloop, transport):
-        self.parser = Parser(transport)
-        self.eventloop = eventloop
+    def __init__(self, *args, **kw):
+        super(FakeSineEmbedded, self).__init__(*args, **kw)
+        self.parser = None
         self.sines = []
         self.start_time = time()
         self.running = False
         self.ticks = 0
-        eventloop.add_reader(transport, self.handle_transport_ready_for_read)
+        self.eventloop = asyncio.get_event_loop()
 
-    def handle_transport_ready_for_read(self):
-        for msg in self.parser.iter_available_messages():
+    def connection_made(self, transport):
+        self.parser = Parser(transport)
+
+    def data_received(self, data):
+        for msg in self.parser.iter_available_messages(data):
             self.handle_message(msg)
 
     def handle_message(self, msg):
