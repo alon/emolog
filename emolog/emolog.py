@@ -759,7 +759,7 @@ async def make_serial_client(comport, baudrate):
     ## import asyncserial
     ## return asyncserial.AsyncSerial(comport, baudrate=baudrate)
     serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
-                                                  ClientAsProtocol, comport, baudrate=baudrate)
+                                                  Client, comport, baudrate=baudrate)
     client = await protocol.connection_made_future
     return client
 
