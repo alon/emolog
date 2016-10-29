@@ -461,7 +461,6 @@ class Client(asyncio.Protocol):
         for d in vars:
             self.sampler.register_variable(**d)
             self.send_sampler_register_variable(**d)
-        self.queue_or_send(SamplerStart)
 
     def send_sampler_clear(self):
         self.queue_or_send(SamplerClear)
