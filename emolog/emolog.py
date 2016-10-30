@@ -32,6 +32,7 @@ from math import sin
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
+
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header',
            'encode_version',
@@ -81,15 +82,20 @@ def emolog():
 # importing builds!
 lib = emolog()
 
+
 lib.emo_decode.restype = ctypes.c_int16
 
+
 ### Globals
+
 
 class EmoMessageTypes(object):
     pass
 
+
 emo_message_types = EmoMessageTypes()
 emo_message_type_to_str = {}
+
 
 with open('emo_message_t.h') as fd:
     lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
@@ -100,7 +106,9 @@ with open('emo_message_t.h') as fd:
         setattr(emo_message_types, short_name, value)
         emo_message_type_to_str[value] = short_name
 
+
 header_size = 8
+
 
 MAGIC_VALUES = list(map(ord, 'EM'))
 
@@ -470,7 +478,7 @@ class Client(asyncio.Protocol):
             # hack - should be done at the transport
             transport.serial.rts = False
         self.transport = transport
-        self.parser = Parser(transport)
+        self.parser = Parser(transport, debug=self.verbose)
         self.connection_made_future.set_result(self)
 
     async def send_set_variables(self, vars):
@@ -650,6 +658,7 @@ class FakeSineEmbedded(asyncio.Protocol):
 
     def __init__(self, *args, **kw):
         super(FakeSineEmbedded, self).__init__(*args, **kw)
+        self.verbose = True
         self.parser = None
         self.sines = []
         self.start_time = time()
@@ -658,7 +667,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         self.eventloop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
-        self.parser = Parser(transport)
+        self.parser = Parser(transport, debug=self.verbose)
 
     def data_received(self, data):
         for msg in self.parser.iter_available_messages(data):
@@ -768,6 +777,7 @@ class AsyncIOEventLoop(object):
 
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
+
 
 async def make_serial_client(comport, baudrate, protocol):
     import serial_asyncio
