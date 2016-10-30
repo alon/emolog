@@ -10,7 +10,7 @@ RemoteSystemsTempFiles
 tags
 project
 hello_world
-protocol_client/Debug
+protocol_embedded/Debug
 uart_echo
 *~
 .launches
