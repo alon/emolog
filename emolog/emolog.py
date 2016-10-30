@@ -64,7 +64,7 @@ else:
 def build_library():
     # chdir to path of module
     os.chdir(os.path.split(__file__)[0])
-    if not os.path.exists(LIBRARY_PATH) or os.stat(LIBRARY_PATH).st_mtime < os.stat('emolog.c').st_mtime:
+    if False: #bypass making the library  not os.path.exists(LIBRARY_PATH) or os.stat(LIBRARY_PATH).st_mtime < os.stat('emolog.c').st_mtime:
         ret = os.system("make {} 2>&1 > /dev/null".format(LIBRARY_PATH))
         assert ret == 0, "make failed with error code {}, see above.".format(ret)
     assert os.path.exists(LIBRARY_PATH)
