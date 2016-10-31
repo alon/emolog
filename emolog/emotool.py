@@ -7,21 +7,55 @@ import csv
 import struct
 import asyncio
 import argparse
+import string
 from socket import socketpair
 
 from dwarf import FileParser
 import emolog
 
 
+def with_errors(s):
+    # TODO - find a library for this? using error distance
+    yield s
+    #  deleted element
+    for i in range(0, len(s)):
+        yield s[:i] + s[i + 1:]
+    # rotated adjacent elements
+    for i in range(0, len(s) - 1):
+        yield s[:i] + s[i + 1] + s[i] + s[i + 2:]
+    if len(s) > 3:
+        # 26**3 is already ~ 1e5 is too much
+        return
+    # single complete alphabet typing errors - this is really large..
+    for i in range(0, len(s)):
+        for other in string.ascii_lowercase:
+            yield s[:i] + other + s[i + 1:]
+
+
 def getvars(filename, names, verbose):
     file_parser = FileParser(filename=filename)
-    print("names = {}".format(names))
     sampled_vars = {}
-    for v in file_parser.visit_interesting_vars_tree_leafs():
+    found = set()
+    elf_vars = list(file_parser.visit_interesting_vars_tree_leafs())
+    elf_var_names = [v.name for v in elf_vars]
+    lower_to_actual = {name.lower(): name for name in elf_var_names}
+    elf_var_names_set_lower = set(lower_to_actual.keys())
+    for v in elf_vars:
         if verbose:
             print("candidate {}".format(v.name))
         if v.name in names:
             sampled_vars[v.name] = v
+            found.add(v.name)
+    given = set(names)
+    if given != found:
+        print("Error: the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
+        elf_name_to_options = {name: set(with_errors(name)) for name in elf_var_names}
+        missing = {name: set(with_errors(name)) for name in given - found}
+        for name in given - found:
+            options = [elf_name for elf_name, elf_options in elf_name_to_options.items() if len(missing[name] & elf_options) > 0]
+            if len(options) > 0:
+                print("{} is close to {}".format(name, ", ".join(options)))
+        raise SystemExit
     print("Registering variables from {}".format(filename))
     for v in sampled_vars.values():
         print("   {}".format(v.get_full_name()))

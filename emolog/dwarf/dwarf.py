@@ -100,7 +100,6 @@ class VarDescriptor:
         if 'DW_AT_location' not in self.var_die.attributes:
             return None
         loc = self.var_die.attributes['DW_AT_location']
-        opcode = loc.value[0]
         if loc.form == 'DW_FORM_exprloc':
             return self._parse_address_exprloc(loc)
         elif loc.form == 'DW_FORM_block1':
@@ -112,6 +111,7 @@ class VarDescriptor:
         return 42
 
     def _parse_address_block1(self, loc):
+        opcode = loc.value[0]
         if len(loc.value) != 5 or opcode != DW_OP_addr:
             return self.ADDRESS_TYPE_UNSUPPORTED
         a, b, c, d = loc.value[1:]
