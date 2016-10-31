@@ -188,13 +188,37 @@ async def amain():
     await client.send_sampler_stop()
     await client.send_set_variables(variables)
     await client.send_sampler_start()
+    return client
+
+
+def windows_try_getch():
+    import msvcrt
+    if msvcrt.kbhit():
+        return msvcrt.getch()
+    return None # be explicit
+
+
+if sys.platform == 'win32':
+    try_getch_message = 'Press any key to exit'
+    try_getch = windows_try_getch
+else:
+    try_getch_message = "Press Ctrl-C to exit"
+    def try_getch():
+        return None
 
 
 async def amain_with_loop():
-    await amain()
-    # TODO? ctrl-c
-    while True:
-        await asyncio.sleep(0.1)
+    client = await amain()
+    print(try_getch_message)
+    try:
+        while True:
+            if try_getch():
+                break
+            await asyncio.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+    print("sending sampler stop")
+    await client.send_sampler_stop()
 
 
 def main():
