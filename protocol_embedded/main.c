@@ -151,7 +151,6 @@ void main(void)
         sampler_sample();
         ticks++;
         delay_ms(50);
-
     }
 }
 
