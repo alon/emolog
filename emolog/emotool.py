@@ -168,7 +168,7 @@ async def amain():
                     next_available(args.csv_filename, numbered=False))
     print("creating output {}".format(csv_filename))
     csv_fd = open(csv_filename, 'w+')
-    csv_obj = csv.writer(csv_fd)
+    csv_obj = csv.writer(csv_fd, lineterminator='\n')
     csv_obj.writerow(['timestamp'] + names)
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose)
     if args.fake_sine:
