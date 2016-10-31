@@ -34,9 +34,9 @@ how do I manage the tests.
 + [x] remove extra empty lines in CSV
 + [x] float convertion not working
 + [x] exit after fixed time implementation
-+ key press to exit instead of ctrl-c
++ [x] key press to exit instead of ctrl-c
++ [x] send sampler stop on clean exit
 + (cannot reproduce) why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
-+ send sampler stop on clean exit
 
 * Integration testing
 - Step A: Python embedded implementation [2/3]
