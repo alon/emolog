@@ -1,6 +1,7 @@
 import asyncio
 from io import BytesIO
 from socket import socketpair
+import struct
 
 import pytest
 
@@ -51,7 +52,7 @@ async def _client_test_helper(client, loop):
     await client.send_version()
     await client.send_sampler_stop()
     await client.send_sampler_clear()
-    await client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4)])
+    await client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4, _type=lambda s: struct.unpack('<l', s)[0])])
     await client.send_sampler_start()
     # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
     # worthy of checking. How will it affect serial?

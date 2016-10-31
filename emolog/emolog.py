@@ -301,11 +301,12 @@ def decode_emo_header(s):
 
 
 class RegisteredVariable(object):
-    def __init__(self, phase_ticks, period_ticks, address, size):
+    def __init__(self, phase_ticks, period_ticks, address, size, _type):
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
         self.address = address
         self.size = size
+        self._type = _type
 
 
 class VariableSampler(object):
@@ -315,18 +316,19 @@ class VariableSampler(object):
     def clear(self):
         self.table.clear()
 
-    def register_variable(self, phase_ticks, period_ticks, address, size):
+    def register_variable(self, phase_ticks, period_ticks, address, size, _type):
         self.table.append(RegisteredVariable(phase_ticks=phase_ticks,
                                              period_ticks=period_ticks,
                                              address=address,
-                                             size=size))
+                                             size=size,
+                                             _type=_type))
 
     def variables_from_ticks_and_payload(self, ticks, payload):
         variables = []
         offset = 0
         for row in self.table:
             if ticks % row.period_ticks == row.phase_ticks:
-                variables.append(payload[offset:offset + row.size])
+                variables.append(row._type(payload[offset:offset + row.size]))
                 offset += row.size
         return variables
 
@@ -486,7 +488,9 @@ class Client(asyncio.Protocol):
         self.sampler.clear()
         for d in vars:
             self.sampler.register_variable(**d)
-            await self.send_sampler_register_variable(**d)
+            d_rest = dict(d)
+            del d_rest['_type']
+            await self.send_sampler_register_variable(**d_rest)
 
     async def send_sampler_clear(self):
         await self.send_after_last(SamplerClear)

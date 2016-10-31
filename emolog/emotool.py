@@ -13,17 +13,17 @@ from dwarf import FileParser
 import emolog
 
 
-def getvars(filename, varparts, verbose):
+def getvars(filename, names, verbose):
     file_parser = FileParser(filename=filename)
-    print("varparts = {}".format(varparts))
-    sampled_vars = []
+    print("names = {}".format(names))
+    sampled_vars = {}
     for v in file_parser.visit_interesting_vars_tree_leafs():
         if verbose:
             print("candidate {}".format(v.name))
-        if v.name in varparts:
-            sampled_vars.append(v)
+        if v.name in names:
+            sampled_vars[v.name] = v
     print("Registering variables from {}".format(filename))
-    for v in sampled_vars:
+    for v in sampled_vars.values():
         print("   {}".format(v.get_full_name()))
     return sampled_vars
 
@@ -35,16 +35,6 @@ async def start_fake_sine():
     return wsock
 
 
-def unpack(x):
-    if len(x) == 4:
-        return struct.unpack('<i', x)[0]
-    elif len(x) == 2:
-        return struct.unpack('<h', x)[0]
-    elif len(x) == 1:
-        return ord(x)
-    return 0
-
-
 class EmoToolClient(emolog.Client):
     def __init__(self, csv, verbose):
         super(EmoToolClient, self).__init__(verbose=verbose)
@@ -52,7 +42,7 @@ class EmoToolClient(emolog.Client):
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
-        self.csv.writerow([time.time()] + [unpack(x) for x in msg.variables])
+        self.csv.writerow([time.time()] + msg.variables)
 
 
 def iterate(filename, initial, firstoption):
@@ -75,19 +65,49 @@ def next_available(filename, numbered):
             return filename
 
 
+def str_size_to_decoder(s, size):
+    if s == 'int':
+        if size == 4:
+            return lambda q: struct.unpack('<l', q)[0]
+        elif size == 2:
+            return lambda q: struct.unpack('<h', q)[0]
+        elif size == 1:
+            return ord
+    elif s == 'float':
+        if size == 4:
+            return lambda q: struct.unpack('<f', q)[0]
+    print("type names supported: int, float")
+    raise SystemExit
+
+
+def an_int(x):
+    try:
+        b = int(x)
+    except:
+        return False
+    return True
+
+
 async def amain():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake-sine', default=False, action='store_true', help='debug only - use a fake sine producing client')
     parser.add_argument('--serial', default=None, help='serial port to use')
     parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
-    parser.add_argument('--var-parts', default='sawtooth,sine', help='all vars including one of the strings will be shown')
-    parser.add_argument('--rate', type=int, default=1000, help='number of ticks to wait between samples')
+    parser.add_argument('--var', action='append', help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
     args = parser.parse_args()
-    sampled_vars = getvars(args.elf, args.var_parts.split(','), verbose=args.verbose)
-    var_dict = [dict(phase_ticks=0, period_ticks=args.rate, address=v.address, size=v.size) for v in sampled_vars]
+    split_vars = [[x.strip() for x in v.split(',')] for v in args.var]
+    for v, orig in zip(split_vars, args.var):
+        if len(v) != 4 or not an_int(v[2]) or not an_int(v[3]) or not v[1] in ['int', 'float']:
+            print("problem with '--var' argument {!r}".format(orig))
+            print("--var parameter must be a 4 element comma separated list of: <name>,[float|int],<period:int>,<phase:int>")
+            raise SystemExit
+    variables = {name: (lambda size: str_size_to_decoder(_type, size), int(ticks), int(phase)) for name, _type, ticks, phase in split_vars}
+    sampled_vars = getvars(args.elf, list(variables.keys()), verbose=args.verbose)
+    var_dict = [dict(phase_ticks=variables[name][2], period_ticks=variables[name][1],
+                     address=v.address, size=v.size, _type=variables[name][0](v.size)) for name, v in sampled_vars.items()]
     if len(var_dict) == 0:
         print("error - no variables set for sampling")
         raise SystemExit
