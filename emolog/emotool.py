@@ -128,10 +128,14 @@ async def amain():
     parser.add_argument('--serial', default=None, help='serial port to use')
     parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
-    parser.add_argument('--var', action='append', help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
+    parser.add_argument('--var', default=[], action='append', help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
+    parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
     args = parser.parse_args()
+    if args.varfile is not None:
+        with open(args.varfile) as fd:
+            args.var = args.var + fd.readlines()
     split_vars = [[x.strip() for x in v.split(',')] for v in args.var]
     for v, orig in zip(split_vars, args.var):
         if len(v) != 4 or not an_int(v[2]) or not an_int(v[3]) or not v[1] in ['int', 'float']:
