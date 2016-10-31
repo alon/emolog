@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 
 from elftools.elf.elffile import ELFFile
@@ -93,17 +94,26 @@ class VarDescriptor:
             return 0
         return self.parent.address + offset
 
+    ADDRESS_TYPE_UNSUPPORTED = '(Address Type Unsupported)'
+
     def _parse_location_attribute(self):
         if 'DW_AT_location' not in self.var_die.attributes:
             return None
         loc = self.var_die.attributes['DW_AT_location']
         opcode = loc.value[0]
-        if loc.form != 'DW_FORM_block1':
-            return "(Address Type Unsupported)"
-        if len(loc.value) != 5:
-            return "(Address Type Unsupported)"
-        if opcode != DW_OP_addr:
-            return "(Address Type Unsupported)"
+        if loc.form == 'DW_FORM_exprloc':
+            return self._parse_address_exprloc(loc)
+        elif loc.form == 'DW_FORM_block1':
+            return self._parse_address_block1(loc)
+        return self.ADDRESS_TYPE_UNSUPPORTED
+
+    def _parse_address_exprloc(self, loc):
+        print("WARNING: this is just for testing, not used for real ELFs - faking parsing address of type exprloc")
+        return 42
+
+    def _parse_address_block1(self, loc):
+        if len(loc.value) != 5 or opcode != DW_OP_addr:
+            return self.ADDRESS_TYPE_UNSUPPORTED
         a, b, c, d = loc.value[1:]
         return a + (b << 8) + (c << 16) + (d << 24)
 
@@ -121,13 +131,10 @@ class VarDescriptor:
 
     def is_interesting(self):
         # TODO: better criteria than the address?
-        if not isinstance(self.address, int):   # either an address was not specified or is not a fixed address in RAM (local var, const in flash memory, etc)
-            return False
-        if self.name.startswith('_'):   # various system variables
-            return False
-        if self.name in VarDescriptor.uninteresting_var_names:
-            return False
-        return True
+        return (
+            isinstance(self.address, int)       # either an address was not specified or is not a fixed address in RAM (local var, const in flash memory, etc)
+            and not self.name.startswith('_')   # various system variables
+            and not self.name in VarDescriptor.uninteresting_var_names)
 
     DW_TAG_class_type = 'DW_TAG_class_type'
     DW_TAG_const_type = 'DW_TAG_const_type'
