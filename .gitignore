@@ -19,3 +19,4 @@ venv
 .idea
 .cache
 *.so
+*.csv
