@@ -36,15 +36,16 @@ def dwarf_get_variables_by_name(filename, names, verbose):
     sampled_vars = {}
     found = set()
     elf_vars = list(file_parser.visit_interesting_vars_tree_leafs())
-    elf_var_names = [v.name for v in elf_vars]
+    elf_var_names = [v.get_full_name() for v in elf_vars]
     lower_to_actual = {name.lower(): name for name in elf_var_names}
     elf_var_names_set_lower = set(lower_to_actual.keys())
     for v in elf_vars:
+        v_name = v.get_full_name()
         if verbose:
-            print("candidate {}".format(v.name))
-        if v.name in names:
-            sampled_vars[v.name] = v
-            found.add(v.name)
+            print("candidate {}".format(v_name))
+        if v_name in names:
+            sampled_vars[v_name] = v
+            found.add(v_name)
     given = set(names)
     if given != found:
         print("Error: the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
