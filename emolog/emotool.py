@@ -140,6 +140,7 @@ async def amain():
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
+    parser.add_argument('--runtime', type=float, help='quit after given seconds')
     args = parser.parse_args()
     if args.varfile is not None:
         with open(args.varfile) as fd:
@@ -170,9 +171,14 @@ async def amain():
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
     csv_obj.writerow(['timestamp'] + names)
+    loop = asyncio.get_event_loop()
+    if args.runtime:
+        async def quit_after_runtime():
+            await asyncio.sleep(args.runtime)
+            raise SystemExit
+        loop.create_task(quit_after_runtime())
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose)
     if args.fake_sine:
-        loop = asyncio.get_event_loop()
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
     else:
@@ -187,7 +193,6 @@ async def amain():
 async def amain_with_loop():
     await amain()
     # TODO? ctrl-c
-    loop = asyncio.get_event_loop()
     while True:
         await asyncio.sleep(0.1)
 

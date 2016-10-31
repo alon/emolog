@@ -33,10 +33,10 @@ how do I manage the tests.
 + [x] use full_name
 + [x] remove extra empty lines in CSV
 + [x] float convertion not working
-+ why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
 + exit after fixed time implementation
 + key press to exit instead of ctrl-c
-+ default phase 0 if --var a,b,c ; default rate 1 if --var a,b
++ (cannot reproduce) why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
++ send sampler stop on clean exit
 
 * Integration testing
 - Step A: Python embedded implementation [2/3]
