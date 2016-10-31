@@ -311,9 +311,16 @@ class RegisteredVariable(object):
 class VariableSampler(object):
     def __init__(self):
         self.table = []
+        self.running = False
 
     def clear(self):
         self.table.clear()
+
+    def on_started(self):
+        self.running = True
+
+    def on_stopped(self):
+        self.running = False
 
     def register_variable(self, phase_ticks, period_ticks, address, size, _type):
         self.table.append(RegisteredVariable(phase_ticks=phase_ticks,
@@ -503,9 +510,11 @@ class Client(asyncio.Protocol):
 
     async def send_sampler_start(self):
         await self.send_after_last(SamplerStart)
+        self.sampler.on_started()
 
     async def send_sampler_stop(self):
         await self.send_after_last(SamplerStop)
+        self.sampler.on_stopped()
 
     async def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care
@@ -540,12 +549,12 @@ class Client(asyncio.Protocol):
                 print("Got Version: {}".format(msg.version))
             self.acked.set_result(True)
         elif isinstance(msg, SamplerSample):
-            # if we are stopped this is to be ignored?
-            msg.update_with_sampler(self.sampler)
-            self.received_samples += 1
-            if self.verbose:
-                print("Got Sample: {}".format(msg))
-            self.handle_sampler_sample(msg)
+            if self.sampler.running:
+                msg.update_with_sampler(self.sampler)
+                self.received_samples += 1
+                if self.verbose:
+                    print("Got Sample: {}".format(msg))
+                self.handle_sampler_sample(msg)
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=sys.stderr)
