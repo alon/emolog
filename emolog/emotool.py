@@ -167,8 +167,8 @@ async def amain_with_loop():
     await amain()
     # TODO? ctrl-c
     loop = asyncio.get_event_loop()
-    f = loop.create_future()
-    await f # just a way to wait indefinitely
+    while True:
+        await asyncio.sleep(0.1)
 
 
 def main():
