@@ -16,7 +16,6 @@ import emolog
 
 def with_errors(s):
     # TODO - find a library for this? using error distance
-    yield s
     #  deleted element
     for i in range(0, len(s)):
         yield s[:i] + s[i + 1:]
@@ -32,7 +31,7 @@ def with_errors(s):
             yield s[:i] + other + s[i + 1:]
 
 
-def getvars(filename, names, verbose):
+def dwarf_get_variables_by_name(filename, names, verbose):
     file_parser = FileParser(filename=filename)
     sampled_vars = {}
     found = set()
@@ -49,12 +48,14 @@ def getvars(filename, names, verbose):
     given = set(names)
     if given != found:
         print("Error: the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
-        elf_name_to_options = {name: set(with_errors(name)) for name in elf_var_names}
-        missing = {name: set(with_errors(name)) for name in given - found}
-        for name in given - found:
-            options = [elf_name for elf_name, elf_options in elf_name_to_options.items() if len(missing[name] & elf_options) > 0]
+        elf_name_to_options = {name: set(with_errors(name)) for name in elf_var_names_set_lower}
+        missing_lower = [name.lower() for name in given - found]
+        missing_lower_to_actual = {name.lower(): name for name in given - found}
+        missing_to_errors = {name: set(with_errors(name)) for name in missing_lower}
+        for name in missing_lower:
+            options = [elf_name for elf_name, elf_options in elf_name_to_options.items() if len(missing_to_errors[name] & elf_options) > 0]
             if len(options) > 0:
-                print("{} is close to {}".format(name, ", ".join(options)))
+                print("{} is close to {}".format(missing_lower_to_actual[name], ", ".join(lower_to_actual[x] for x in options)))
         raise SystemExit
     print("Registering variables from {}".format(filename))
     for v in sampled_vars.values():
@@ -148,19 +149,26 @@ async def amain():
             print("problem with '--var' argument {!r}".format(orig))
             print("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
-    variables = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    sampled_vars = getvars(args.elf, list(variables.keys()), verbose=args.verbose)
-    var_dict = [dict(phase_ticks=variables[name][1], period_ticks=variables[name][0],
-                     address=v.address, size=v.size, _type=str_size_to_decoder(v.get_type_str(), v.size)) for name, v in sampled_vars.items()]
-    if len(var_dict) == 0:
+    names = [name for name, ticks, phase in split_vars]
+    name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()), verbose=args.verbose)
+    if len(dwarf_variables) == 0:
         print("error - no variables set for sampling")
         raise SystemExit
+    variables = []
+    for name in names:
+        v = dwarf_variables[name]
+        period_ticks, phase_ticks = name_to_ticks_and_phase[name]
+        variables.append(dict(phase_ticks=phase_ticks, period_ticks=period_ticks,
+                              address=v.address, size=v.size,
+                              _type=str_size_to_decoder(v.get_type_str(), v.size)))
 
     csv_filename = (next_available('emo', numbered=True) if not args.csv_filename else
-                    next_available(csv_filename, numbered=False))
+                    next_available(args.csv_filename, numbered=False))
     print("creating output {}".format(csv_filename))
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd)
+    csv_obj.writerow(['timestamp'] + names)
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose)
     if args.fake_sine:
         loop = asyncio.get_event_loop()
@@ -171,7 +179,7 @@ async def amain():
                                                 protocol=lambda: client)
     await client.send_version()
     await client.send_sampler_stop()
-    await client.send_set_variables(var_dict)
+    await client.send_set_variables(variables)
     await client.send_sampler_start()
 
 

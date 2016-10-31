@@ -482,10 +482,10 @@ class Client(asyncio.Protocol):
         self.parser = Parser(transport, debug=self.verbose)
         self.connection_made_future.set_result(self)
 
-    async def send_set_variables(self, vars):
+    async def send_set_variables(self, variables):
         await self.send_sampler_clear()
         self.sampler.clear()
-        for d in vars:
+        for d in variables:
             self.sampler.register_variable(**d)
             d_rest = dict(d)
             del d_rest['_type']
