@@ -27,6 +27,16 @@ how do I manage the tests.
   + contains tests of the
 + embeddedsimulator.py - what was I thinking? srsly, what is it exactly? asyncio tester, it should do what the rountrip is, Step A.
 
+* session TODO
++ --varfile <filename> which parses just like consecutive --var parameters
++ take float/int from ELF
++ remove extra empty lines in CSV
++ why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
++ float convertion not working
++ exit after fixed time implementation
++ key press to exit instead of ctrl-c
++ default phase 0 if --var a,b,c ; default rate 1 if --var a,b
+
 * Integration testing
 - Step A: Python embedded implementation [2/3]
   - [X] Write python client to embedded communication [2/2]
