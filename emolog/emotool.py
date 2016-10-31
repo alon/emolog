@@ -101,17 +101,21 @@ def next_available(filename, numbered):
             return filename
 
 
+def decode_little_endian_float(s):
+    return struct.unpack('<f', s)[0]
+
+
 def str_size_to_decoder(s, size):
-    if s == 'int':
+    if s.endswith('int'): # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
         elif size == 2:
             return lambda q: struct.unpack('<h', q)[0]
         elif size == 1:
             return ord
-    elif s == 'float':
+    elif s.endswith('float'):
         if size == 4:
-            return lambda q: struct.unpack('<f', q)[0]
+            return decode_little_endian_float
     print("type names supported: int, float")
     raise SystemExit
 
@@ -140,14 +144,14 @@ async def amain():
             args.var = args.var + fd.readlines()
     split_vars = [[x.strip() for x in v.split(',')] for v in args.var]
     for v, orig in zip(split_vars, args.var):
-        if len(v) != 4 or not an_int(v[2]) or not an_int(v[3]) or not v[1] in ['int', 'float']:
+        if len(v) != 3 or not an_int(v[1]) or not an_int(v[2]):
             print("problem with '--var' argument {!r}".format(orig))
-            print("--var parameter must be a 4 element comma separated list of: <name>,[float|int],<period:int>,<phase:int>")
+            print("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
-    variables = {name: (lambda size: str_size_to_decoder(_type, size), int(ticks), int(phase)) for name, _type, ticks, phase in split_vars}
+    variables = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
     sampled_vars = getvars(args.elf, list(variables.keys()), verbose=args.verbose)
-    var_dict = [dict(phase_ticks=variables[name][2], period_ticks=variables[name][1],
-                     address=v.address, size=v.size, _type=variables[name][0](v.size)) for name, v in sampled_vars.items()]
+    var_dict = [dict(phase_ticks=variables[name][1], period_ticks=variables[name][0],
+                     address=v.address, size=v.size, _type=str_size_to_decoder(v.get_type_str(), v.size)) for name, v in sampled_vars.items()]
     if len(var_dict) == 0:
         print("error - no variables set for sampling")
         raise SystemExit
