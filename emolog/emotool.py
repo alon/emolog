@@ -167,6 +167,10 @@ async def amain():
 
     csv_filename = (next_available('emo', numbered=True) if not args.csv_filename else
                     next_available(args.csv_filename, numbered=False))
+    print("================")
+    print("Emotool starting")
+    print("================")
+    print("")
     print("creating output {}".format(csv_filename))
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
