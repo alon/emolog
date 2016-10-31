@@ -70,13 +70,15 @@ async def start_fake_sine():
 
 
 class EmoToolClient(emolog.Client):
-    def __init__(self, csv, verbose):
+    def __init__(self, csv, fd, verbose):
         super(EmoToolClient, self).__init__(verbose=verbose)
         self.csv = csv
+        self.fd = fd
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([time.time()] + msg.variables)
+        self.fd.flush()
 
 
 def iterate(filename, initial, firstoption):
@@ -152,8 +154,10 @@ async def amain():
 
     csv_filename = (next_available('emo', numbered=True) if not args.csv_filename else
                     next_available(csv_filename, numbered=False))
-    csv_obj = csv.writer(open(csv_filename, 'w+'))
-    client = EmoToolClient(csv=csv_obj, verbose=args.verbose)
+    print("creating output {}".format(csv_filename))
+    csv_fd = open(csv_filename, 'w+')
+    csv_obj = csv.writer(csv_fd)
+    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose)
     if args.fake_sine:
         loop = asyncio.get_event_loop()
         client_end = await start_fake_sine()
