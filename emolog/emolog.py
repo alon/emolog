@@ -30,7 +30,6 @@ import struct
 import sys
 from math import sin
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
 
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
