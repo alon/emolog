@@ -14,6 +14,9 @@
 #ifndef EMOLOG_H_
 #define EMOLOG_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 
@@ -234,5 +237,8 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  */
 int16_t emo_decode(const uint8_t *src, uint16_t size);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* EMOLOG_H_ */
