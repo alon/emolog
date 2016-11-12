@@ -803,7 +803,7 @@ async def make_serial_client(comport, baudrate, protocol):
     return client
 
 
-async def get_serial_client(comport=None, hint_description=None, baudrate=115200,
+async def get_serial_client(comport=None, hint_description=None, baudrate=1000000,
                             protocol=Client):
     import serial
     from serial.tools.list_ports import comports
