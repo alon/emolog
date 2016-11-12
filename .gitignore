@@ -11,6 +11,7 @@ tags
 project
 hello_world
 protocol_embedded/Debug
+emolog_embedded/Debug
 uart_echo
 *~
 .launches
