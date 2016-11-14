@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+
+"""
+
+DWARF parser minimal implementation.
+
+All references unless states otherwise are for:
+    DWARF v3, December 20, 2005
+
+"""
+
 import sys
 
 from elftools.elf.elffile import ELFFile
@@ -49,8 +59,8 @@ class FileParser:
             self.pretty_print(children=v.children, tab=tab + 1)
 
 
-DW_OP_plus_uconst = 0x23 # DWARF v3 page 20, December 20, 2005
-DW_OP_addr = 0x3 # Page 14
+DW_OP_plus_uconst = 0x23    # Page 20
+DW_OP_addr = 0x3            # Page 14
 
 
 class VarDescriptor:
