@@ -108,17 +108,18 @@ def decode_little_endian_float(s):
 
 
 def str_size_to_decoder(s, size):
-    if s.endswith('int'): # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
+    if s.endswith('float'):
+        if size == 4:
+            return decode_little_endian_float
+    else: # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
+        # Note: will support both int and enum
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
         elif size == 2:
             return lambda q: struct.unpack('<h', q)[0]
         elif size == 1:
             return ord
-    elif s.endswith('float'):
-        if size == 4:
-            return decode_little_endian_float
-    print("type names supported: int, float")
+    print("type names supported: int, float. looked for: {}, {}".format(s, size))
     raise SystemExit
 
 
