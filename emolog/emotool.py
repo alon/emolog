@@ -72,14 +72,15 @@ async def start_fake_sine():
 
 
 class EmoToolClient(emolog.Client):
-    def __init__(self, csv, fd, verbose):
+    def __init__(self, csv, fd, verbose, names):
         super(EmoToolClient, self).__init__(verbose=verbose)
         self.csv = csv
         self.fd = fd
+        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
-        self.csv.writerow([time.time()] + msg.variables)
+        self.csv.writerow([msg.seq, msg.ticks, time.clock() * 1000] + msg.variables)
         self.fd.flush()
 
 
@@ -176,14 +177,13 @@ async def amain():
     print("creating output {}".format(csv_filename))
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
-    csv_obj.writerow(['timestamp'] + names)
     loop = asyncio.get_event_loop()
     if args.runtime:
         async def quit_after_runtime():
             await asyncio.sleep(args.runtime)
             raise SystemExit
         loop.create_task(quit_after_runtime())
-    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose)
+    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names)
     if args.fake_sine:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
