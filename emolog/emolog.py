@@ -55,6 +55,8 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
 # use big endian ('>') once TI/CCS htons is working
 endianess = '<'
 
+error_file = sys.stdout # here to allow setting in the test to stderr
+
 
 if 'win' in sys.platform:
     LIBRARY_PATH = 'emolog.dll'
@@ -408,7 +410,7 @@ class Parser(object):
         while len(self.buf) > 0:
             msg, left_over_buf, error = emo_decode(self.buf)
             if error:
-                print(error, file=sys.stderr)
+                print(error, file=error_file)
             if self.debug_message_decoding:
                 if error:
                     print("decoding error, buf length {}, error: {}".format(
@@ -418,11 +420,11 @@ class Parser(object):
                 else:
                     print("decoded header of length {}, T {}, # {}, seq {}".format(
                         len(self.buf), msg.type, len(self.buf) - len(left_over_buf), msg.seq),
-            file=sys.stderr)
+            file=error_file)
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
                 print("communication error - skipped {} bytes".format(msg.skip),
-                      file=sys.stderr)
+                      file=error_file)
             elif isinstance(msg, MissingBytes):
                 break
             yield msg
@@ -436,7 +438,7 @@ class Parser(object):
         self.send_seq += 1
         encoded = command.encode()
         if self.debug_message_encoding:
-            print("sending: {}, encoded as {}".format(command, encoded), file=sys.stderr)
+            print("sending: {}, encoded as {}".format(command, encoded), file=error_file)
         self.transport.write(command.encode())
 
     def __str__(self):
@@ -479,7 +481,7 @@ class Client(asyncio.Protocol):
         self._debug_log(self.transport.get_write_buffer_size())
 
     def _debug_log(self, s):
-        print("Client: {}".format(s), file=sys.stderr)
+        print("Client: {}".format(s), file=error_file)
 
     def connection_made(self, transport):
         if hasattr(transport, 'serial'):
@@ -557,7 +559,7 @@ class Client(asyncio.Protocol):
                 self.handle_sampler_sample(msg)
         elif isinstance(msg, Ack):
             if msg.error != 0:
-                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=sys.stderr)
+                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=error_file)
             self.acked.set_result(True)
         else:
             print("ignoring a {}".format(msg))
