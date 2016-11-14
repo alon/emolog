@@ -19,7 +19,7 @@ extern "C" {
 #include "emolog.h"
 
 #define RX_BUF_SIZE			1024
-#define TX_BUF_SIZE			1024
+#define TX_BUF_SIZE			4096
 
 
 void comm_setup(void);
