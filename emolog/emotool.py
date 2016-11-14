@@ -141,6 +141,7 @@ async def amain():
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
+    parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     args = parser.parse_args()
     if args.varfile is not None:
         with open(args.varfile) as fd:
@@ -187,6 +188,7 @@ async def amain():
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
     else:
         client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint,
+                                                baudrate=args.baud,
                                                 protocol=lambda: client)
     await client.send_version()
     await client.send_sampler_stop()
