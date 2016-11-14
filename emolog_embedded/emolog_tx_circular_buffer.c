@@ -20,7 +20,28 @@ volatile int32_t tx_buf_write_pos = 0;	// points where a new byte should go
 static bool is_empty = true;
 
 
-bool tx_buf_put(unsigned char byte)
+bool tx_buf_put_bytes(const uint8_t *src, size_t len)
+{
+	if (tx_buf_bytes_free() < len) return false;
+
+	int32_t space_until_wrap_around = TX_BUF_SIZE - tx_buf_write_pos;
+	if (space_until_wrap_around >= len) // can put everything without wrap-around
+	{
+		memcpy(tx_buf + tx_buf_write_pos, src, len);
+		tx_buf_write_pos = (tx_buf_write_pos + len) % TX_BUF_SIZE;
+	}
+	else
+	{
+		memcpy(tx_buf + tx_buf_write_pos, src, space_until_wrap_around);
+		memcpy(tx_buf, src + space_until_wrap_around, len - space_until_wrap_around);
+		tx_buf_write_pos = space_until_wrap_around;
+	}
+	is_empty = false;
+	return true;
+}
+
+
+bool tx_buf_put_byte(unsigned char byte)
 {
 	if (tx_buf_is_full()) return false;
 

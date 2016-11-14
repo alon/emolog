@@ -42,7 +42,7 @@ void comm_consume_message(void);
  *   true - message queued
  *   false - message not queued, tx buffer full
  */
-bool comm_queue_message(uint8_t *src, size_t len);
+bool comm_queue_message(const uint8_t *src, size_t len);
 
 
 void uart0_interrupt(void);

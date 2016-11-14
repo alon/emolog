@@ -44,23 +44,16 @@ static unsigned char rx_buf[RX_BUF_SIZE];
 static volatile uint32_t rx_buf_pos = 0;
 
 
-bool comm_queue_message(uint8_t *src, size_t len)
+bool comm_queue_message(const uint8_t *src, size_t len)
 {
-	if (tx_buf_bytes_free() < len)
-	{
-		return false; // not enough space
-	}
-
 	bool ret;
-	int i;
-	for (i = 0; i < len; i++)
-	{
-		ret = tx_buf_put(src[i]);
-		assert(ret);	// should never fail to put all bytes since free space was checked
-	}
-	handle_uart_tx();
 
-	return true;
+	ret = tx_buf_put_bytes(src, len);
+	if (ret)
+	{
+		handle_uart_tx();
+	}
+	return ret;
 }
 
 
