@@ -27,6 +27,7 @@
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
+#include "inc/hw_uart.h"
 #include "driverlib/debug.h"
 #include "driverlib/gpio.h"
 #include "driverlib/interrupt.h"
@@ -140,13 +141,8 @@ void handle_uart_rx(void)
 // or from comm_queue_message() to get the initial transmission going
 void handle_uart_tx(void)
 {
-	int ret;
-	while (!tx_buf_is_empty() && UARTSpaceAvail(UART0_BASE))
+	while (!tx_buf_is_empty() && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
-		ret = UARTCharPutNonBlocking(UART0_BASE, tx_buf_get());
-		assert(ret);	// should always return true since we just checked there is space in the UART TX buffer
+		HWREG(UART0_BASE + UART_O_DR) = tx_buf_get();
 	}
 }
-
-
-
