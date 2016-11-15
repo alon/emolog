@@ -144,6 +144,6 @@ void handle_uart_tx(void)
 	unsigned len = tx_buf_len();
 	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
-		HWREG(UART0_BASE + UART_O_DR) = tx_buf_get();
+		HWREG(UART0_BASE + UART_O_DR) = tx_buf_get_unsafe();
 	}
 }

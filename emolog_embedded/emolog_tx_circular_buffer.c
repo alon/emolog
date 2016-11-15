@@ -52,11 +52,17 @@ bool tx_buf_put_byte(unsigned char byte)
 }
 
 
-int tx_buf_get(void)
+char tx_buf_get(void)
+{
+	if (tx_buf_is_empty()) return (char)-1;
+
+	return tx_buf_get_unsafe();
+}
+
+
+char tx_buf_get_unsafe(void)
 {
 	unsigned char res;
-
-	if (tx_buf_is_empty()) return -1;
 
 	res = tx_buf[tx_buf_read_pos];
 	tx_buf_read_pos = (tx_buf_read_pos + 1) % TX_BUF_SIZE;

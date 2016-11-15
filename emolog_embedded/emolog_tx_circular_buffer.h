@@ -16,7 +16,8 @@ bool tx_buf_put_byte(unsigned char byte);
 bool tx_buf_put_bytes(const uint8_t *src, size_t len);
 
 // returns -1 is buffer is empty, or one byte if not
-int tx_buf_get(void);
+char tx_buf_get(void);
+char tx_buf_get_unsafe(void);
 
 // returns space available in buffer, in bytes
 int tx_buf_bytes_free(void);
