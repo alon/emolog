@@ -568,6 +568,8 @@ class Client(asyncio.Protocol):
                 if self.verbose:
                     print("Got Sample: {}".format(msg))
                 self.handle_sampler_sample(msg)
+            else:
+                print("ignoring sample since PC sampler is not primed")
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=error_file)
