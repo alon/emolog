@@ -13,11 +13,13 @@
 #include "emolog_comm.h"
 
 
+// This is no longer an encapsulated circular buffer, it is used by emolog_comm as well. Should
+// be moved there and re-static-ed later.
 unsigned char tx_buf[TX_BUF_SIZE];
 
 volatile int32_t tx_buf_read_pos = 0;	// points at the first (the oldest) byte in the buffer
 volatile int32_t tx_buf_write_pos = 0;	// points where a new byte should go
-static bool is_empty = true;
+bool is_empty = true;
 
 
 bool tx_buf_put_bytes(const uint8_t *src, size_t len)

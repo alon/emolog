@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "emolog_comm.h"
+
 bool tx_buf_put_byte(unsigned char byte);
 bool tx_buf_put_bytes(const uint8_t *src, size_t len);
 
@@ -27,5 +29,10 @@ int tx_buf_len(void);
 
 bool tx_buf_is_empty(void);
 bool tx_buf_is_full(void);
+
+extern bool is_empty;
+extern volatile int32_t tx_buf_read_pos;
+extern volatile int32_t tx_buf_write_pos;
+extern unsigned char tx_buf[TX_BUF_SIZE];
 
 #endif /* EMOLOG_TX_CIRCULAR_BUFFER_H_ */
