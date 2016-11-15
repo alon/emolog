@@ -141,7 +141,8 @@ void handle_uart_rx(void)
 // or from comm_queue_message() to get the initial transmission going
 void handle_uart_tx(void)
 {
-	while (!tx_buf_is_empty() && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
+	unsigned len = tx_buf_len();
+	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
 		HWREG(UART0_BASE + UART_O_DR) = tx_buf_get();
 	}

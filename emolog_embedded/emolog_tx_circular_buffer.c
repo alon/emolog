@@ -71,7 +71,14 @@ int tx_buf_bytes_free(void)
 {
 	if (is_empty) return (TX_BUF_SIZE);
 
-	return ( (TX_BUF_SIZE - (tx_buf_write_pos - tx_buf_read_pos)) % TX_BUF_SIZE);
+	return (TX_BUF_SIZE - (tx_buf_write_pos - tx_buf_read_pos)) % TX_BUF_SIZE;
+}
+
+
+int tx_buf_len(void)
+{
+	if (is_empty) return 0;
+	return (tx_buf_write_pos - tx_buf_read_pos) % TX_BUF_SIZE;
 }
 
 
@@ -83,7 +90,5 @@ bool tx_buf_is_empty(void)
 
 bool tx_buf_is_full(void)
 {
-	return ( (tx_buf_read_pos == tx_buf_write_pos) && (is_empty == false));
+	return (tx_buf_read_pos == tx_buf_write_pos) && (is_empty == false);
 }
-
-

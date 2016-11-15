@@ -21,6 +21,9 @@ int tx_buf_get(void);
 // returns space available in buffer, in bytes
 int tx_buf_bytes_free(void);
 
+// returns size of data in buffer
+int tx_buf_len(void);
+
 bool tx_buf_is_empty(void);
 bool tx_buf_is_full(void);
 
