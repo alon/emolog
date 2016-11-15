@@ -269,11 +269,21 @@ class SkipBytes(object):
     def __init__(self, skip):
         self.skip = skip
 
+    def __str__(self):
+        return "Skip Bytes {0}".format(self.skip)
+
+    __repr__ = __str__
+
 
 class UnknownMessage(object):
     def __init__(self, type, buf):
         self.type = type
         self.buf = buf
+
+    def __str__(self):
+        return "Unknown Message type={0} buf={0}".format(self.type, self.byte)
+
+    __repr__ = __str__
 
 
 ### Code depending on lib
@@ -418,12 +428,13 @@ class Parser(object):
                 elif not hasattr(msg, 'type'):
                     print("decoded {}".format(msg))
                 else:
-                    print("decoded header of length {}, T {}, # {}, seq {}".format(
-                        len(self.buf), msg.type, len(self.buf) - len(left_over_buf), msg.seq),
-            file=error_file)
+                    print("decoded header: type {}, len {}, seq {} (buf #{})".format(
+                        emo_message_type_to_str[msg.type], len(self.buf) - len(left_over_buf), msg.seq,
+                        len(self.buf)), file=error_file)
+            parsed_buf = self.buf[:len(self.buf) - len(left_over_buf)]
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
-                print("communication error - skipped {} bytes".format(msg.skip),
+                print("communication error - skipped {} bytes: {0}".format(msg.skip, parsed_buf),
                       file=error_file)
             elif isinstance(msg, MissingBytes):
                 break
