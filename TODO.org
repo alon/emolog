@@ -39,9 +39,19 @@ how do I manage the tests.
 + (cannot reproduce) why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
 
 * 14/11/16 summary of left TODO
++ Two big todos
+  + [ ] verify that the recording matches reality
+    + there is packet loss (verified by jumps in tick count)
+    + [ ] get a timely indication of loop delta jump from 50us to anything larger (100us +)
+      + one way: record it in a variable that is monitored (num_jumps)
+  + [ ] understand why PC is sending packets to CLIENT and CLIENT is not responding
+    + when CLIENT is sending samples (20kHz, also less at 10kHz) it is missing messages from PC.
+    + [ ] add another UART side channel with prints of "got message X" on CLIENT and "TX buffer full" etc.
++ Small todo
+  + [ ] working clean exit that stops sampling
 + [x] check 10 seconds --> found fixed missing samples, rather than proportional (good).
 + [ ] baud rate above 6M doesn't work (check again since we fixed stuff, maybe it wasn't really the problem)
-+ [ ] optimize tx code. right now at 62us per tick (when transmitting 4 vars), have to be below ~40us.
++ [x] (optimized to 42us, more to do) optimize tx code. right now at 62us per tick (when transmitting 4 vars), have to be below ~40us.
   +   UART FIFO configuration (when does the UART ask for more bytes?)
 + [ ] sometimes client doesn't respond to sampler_register_variable - symptom is nothing happens on running emotool.bat
   + log shows garbage incoming instead of expected ACK
