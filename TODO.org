@@ -27,7 +27,7 @@ how do I manage the tests.
   + contains tests of the
 + embeddedsimulator.py - what was I thinking? srsly, what is it exactly? asyncio tester, it should do what the rountrip is, Step A.
 
-* session TODO
+* 31/10/16 session TODO
 + [x] --varfile <filename> which parses just like consecutive --var parameters
 + [x] take float/int from ELF
 + [x] use full_name
@@ -37,6 +37,14 @@ how do I manage the tests.
 + [x] key press to exit instead of ctrl-c
 + [x] send sampler stop on clean exit
 + (cannot reproduce) why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
+
+* 14/11/16 summary of left TODO
++ [x] check 10 seconds --> found fixed missing samples, rather than proportional (good).
++ [ ] baud rate above 6M doesn't work (check again since we fixed stuff, maybe it wasn't really the problem)
++ [ ] optimize tx code. right now at 62us per tick (when transmitting 4 vars), have to be below ~40us.
+  +   UART FIFO configuration (when does the UART ask for more bytes?)
++ [ ] sometimes client doesn't respond to sampler_register_variable - symptom is nothing happens on running emotool.bat
+  + log shows garbage incoming instead of expected ACK
 
 * Integration testing
 - Step A: Python embedded implementation [2/3]
