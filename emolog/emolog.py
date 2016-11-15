@@ -270,7 +270,7 @@ class SkipBytes(object):
         self.skip = skip
 
     def __str__(self):
-        return "Skip Bytes {0}".format(self.skip)
+        return "Skip Bytes {}".format(self.skip)
 
     __repr__ = __str__
 
@@ -281,7 +281,7 @@ class UnknownMessage(object):
         self.buf = buf
 
     def __str__(self):
-        return "Unknown Message type={0} buf={0}".format(self.type, self.byte)
+        return "Unknown Message type={} buf={}".format(self.type, self.byte)
 
     __repr__ = __str__
 
@@ -434,7 +434,7 @@ class Parser(object):
             parsed_buf = self.buf[:len(self.buf) - len(left_over_buf)]
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
-                print("communication error - skipped {} bytes: {0}".format(msg.skip, parsed_buf),
+                print("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf),
                       file=error_file)
             elif isinstance(msg, MissingBytes):
                 break
