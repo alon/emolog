@@ -255,7 +255,6 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
         return -1;
     }
 
-
     length = hdr->length;
 
     /* check enough bytes for payload */

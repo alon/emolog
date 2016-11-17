@@ -106,34 +106,37 @@ void handle_uart_rx(void)
     int16_t needed;
     uint16_t n;
 
+    if (message_available) {
+    	debug("EMOLOG_EMBEDDED: Unexpected bytes from PC before having processed last message\n");
+   	    return; // not our turn
+    }
+
     // Loop while there are characters in the receive FIFO.
-     while(UARTCharsAvail(UART0_BASE))
-     {
-         new_char = UARTCharGetNonBlocking(UART0_BASE);
-         if (rx_buf_pos >= sizeof(rx_buf)) {
-             continue; // buffer overflow
-         }
-         if (message_available) {
-             continue; // not our turn
-         }
-         rx_buf[rx_buf_pos++] = new_char;
-     }
+    while(UARTCharsAvail(UART0_BASE))
+    {
+        new_char = UARTCharGetNonBlocking(UART0_BASE);
+        if (rx_buf_pos >= sizeof(rx_buf)) {
+            debug("EMOLOG_EMBEDDED: RX Buffer Overflow! rx_buf_pos = %u, rx_buf = %u\n", rx_buf_pos, rx_buf);
+            continue; // buffer overflow
+        }
+        rx_buf[rx_buf_pos++] = new_char;
+    }
 
-     needed = -1;
-     while (needed < 0) {
-         needed = emo_decode(rx_buf, rx_buf_pos);
+    needed = -1;
+    while (needed < 0) {
+        needed = emo_decode(rx_buf, rx_buf_pos);
 
-         if (needed == 0) {
-             message_available = true;
-             break;
-         } else if (needed < 0) {
-             n = -needed;
-             memcpy(rx_buf, rx_buf + n, rx_buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
-             // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
-             rx_buf_pos -= n;
-         }
-     }
-     assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
+        if (needed == 0) {
+            message_available = true;
+            break;
+        } else if (needed < 0) {
+            n = -needed;
+            memcpy(rx_buf, rx_buf + n, rx_buf_pos - n); // buf: [garbage "-needed" bytes] [more-new-bytes buf_pos + "needed"]
+            // buf = 0; 0, 1, 2 - 1 = 1: copy from 1 1 byte to 0
+            rx_buf_pos -= n;
+        }
+    }
+    assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
 }
 
 
