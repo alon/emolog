@@ -242,6 +242,12 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     }
     hdr = (const emo_header *)src;
 
+    /* if we missed the header skip a byte, check again */
+    if (!header_check_start(hdr)) {
+        debug("EMOLOG: header check failed.\n");
+        return -1;
+    }
+
     /* check header integrity, if fail skip a byte */
     header_crc = crc8(src, EMO_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
@@ -249,11 +255,6 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
         return -1;
     }
 
-    /* if we missed the header skip a byte, check again */
-    if (!header_check_start(hdr)) {
-        debug("EMOLOG: header check failed.\n");
-        return -1;
-    }
 
     length = hdr->length;
 
