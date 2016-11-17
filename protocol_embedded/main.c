@@ -18,8 +18,7 @@
 
 #include <emolog.h>
 
-#include "comm.h"
-#include "sampler.h"
+#include <emolog_embedded.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846 // pedantic
@@ -70,67 +69,15 @@ void setup_led(void)
 void setup(void)
 {
     setup_clock();
-    comm_setup();
+    emolog_init();
     setup_led();
     ROM_IntMasterEnable();
 }
 
 
-// helpers
-
-void queue_ack(uint8_t reply_to_seq, emo_error_t error)
+emo_error_t handle_app_specific_message(emo_header* message)
 {
-    uint8_t buf_out[32];
-    uint16_t encoded_len;
-
-    encoded_len = emo_encode_ack(buf_out, reply_to_seq, error);
-    assert(encoded_len <= sizeof(buf_out));
-    comm_queue_message(buf_out, encoded_len);
-}
-
-
-void handle_message(emo_header *header)
-{
-    uint8_t buf_out[32];
-    uint16_t encoded_len;
-    emo_error_t error = EMO_ERROR_NONE;
-
-    switch (header->type) {
-    case EMO_MESSAGE_TYPE_VERSION: {
-        encoded_len = emo_encode_version(buf_out, header->seq);
-        comm_queue_message(buf_out, encoded_len);
-        break;
-    }
-    case EMO_MESSAGE_TYPE_PING: {
-        // TODO
-        break;
-    }
-    case EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE: {
-        emo_sampler_register_variable *m = (emo_sampler_register_variable *)header;
-        emo_sampler_register_variable_payload *p = &m->p;
-        error = sampler_register_variable(p->phase_ticks, p->period_ticks, p->address, p->size, header->seq);
-        break;
-    }
-    case EMO_MESSAGE_TYPE_SAMPLER_CLEAR: {
-        sampler_clear();
-        break;
-    }
-    case EMO_MESSAGE_TYPE_SAMPLER_START: {
-        sampler_start();
-        break;
-    }
-    case EMO_MESSAGE_TYPE_SAMPLER_STOP: {
-        sampler_stop();
-        break;
-    }
-    default: {
-        error = EMO_ERROR_UNEXPECTED_MESSAGE;
-    }
-    }
-
-    if (header->type != EMO_MESSAGE_TYPE_VERSION) {
-        queue_ack(header->seq, error);
-    }
+	return EMO_ERROR_UNEXPECTED_MESSAGE;
 }
 
 
@@ -143,12 +90,7 @@ void main(void)
         sawtooth = (sawtooth + 1) % 100;
         sine = 50.0 * sin(2 * M_PI * ((float)ticks / 100.0));
 
-        emo_header *header;
-        if ((header = comm_peek_message()) != NULL) {
-            handle_message(header);
-            comm_consume_message();
-        }
-        sampler_sample();
+        emolog_run_step();
         ticks++;
         delay_ms(50);
     }
