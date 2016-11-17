@@ -10,9 +10,12 @@ All references unless states otherwise are for:
 """
 
 import sys
+import logging
 
 from elftools.elf.elffile import ELFFile
 
+
+logger = logging.getLogger('dwarf')
 
 class FileParser:
     def __init__(self, filename):
@@ -20,7 +23,7 @@ class FileParser:
         self.read_dies_from_dwarf_file(filename)
 
         var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable'}
-        print("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
+        logger.debug("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
 
         self.var_descriptors = var_descriptors = []
         for offset, var_die in var_dies.items():
@@ -30,11 +33,11 @@ class FileParser:
         pass
 
     def read_dies_from_dwarf_file(self, filename):
-        print('Processing file:', filename)
+        logger.debug('Processing file: {}'.format(filename))
         with open(filename, 'rb') as f:
             elffile = ELFFile(f)
             if not elffile.has_dwarf_info():
-                print('ERROR: file has no DWARF info')
+                logger.error('file has no DWARF info')
                 return
 
             dwarfinfo = elffile.get_dwarf_info()
@@ -117,7 +120,7 @@ class VarDescriptor:
         return self.ADDRESS_TYPE_UNSUPPORTED
 
     def _parse_address_exprloc(self, loc):
-        print("WARNING: this is just for testing, not used for real ELFs - faking parsing address of type exprloc")
+        logger.warning("this is just for testing, not used for real ELFs - faking parsing address of type exprloc")
         return 42
 
     def _parse_address_block1(self, loc):

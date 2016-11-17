@@ -1,5 +1,11 @@
 #!/bin/env python
 
+import os
+os.environ['PYTHONASYNCIODEBUG'] = '1'
+import logging
+
+logging.getLogger('asyncio').setLevel(logging.DEBUG)
+
 import time
 import sys
 import os
@@ -9,9 +15,13 @@ import asyncio
 import argparse
 import string
 from socket import socketpair
+import logging
 
 from dwarf import FileParser
 import emolog
+
+
+logger = logging.getLogger()
 
 
 def with_errors(s):
@@ -39,16 +49,16 @@ def dwarf_get_variables_by_name(filename, names, verbose):
     elf_var_names = [v.get_full_name() for v in elf_vars]
     lower_to_actual = {name.lower(): name for name in elf_var_names}
     elf_var_names_set_lower = set(lower_to_actual.keys())
+    logger.debug('candidate variables found in ELF file:')
     for v in elf_vars:
         v_name = v.get_full_name()
-        if verbose:
-            print("candidate {}".format(v_name))
+        logger.debug("candidate {}".format(v_name))
         if v_name in names:
             sampled_vars[v_name] = v
             found.add(v_name)
     given = set(names)
     if given != found:
-        print("Error: the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
+        logger.error("the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
         elf_name_to_options = {name: set(with_errors(name)) for name in elf_var_names_set_lower}
         missing_lower = [name.lower() for name in given - found]
         missing_lower_to_actual = {name.lower(): name for name in given - found}
@@ -58,9 +68,9 @@ def dwarf_get_variables_by_name(filename, names, verbose):
             if len(options) > 0:
                 print("{} is close to {}".format(missing_lower_to_actual[name], ", ".join(lower_to_actual[x] for x in options)))
         raise SystemExit
-    print("Registering variables from {}".format(filename))
+    logger.info("Registering variables from {}".format(filename))
     for v in sampled_vars.values():
-        print("   {}".format(v.get_full_name()))
+        logger.info("   {}".format(v.get_full_name()))
     return sampled_vars
 
 
@@ -120,7 +130,7 @@ def str_size_to_decoder(s, size):
             return lambda q: struct.unpack('<h', q)[0]
         elif size == 1:
             return ord
-    print("type names supported: int, float. looked for: {}, {}".format(s, size))
+    logger.error("type names supported: int, float. looked for: {}, {}".format(s, size))
     raise SystemExit
 
 
@@ -130,6 +140,26 @@ def an_int(x):
     except:
         return False
     return True
+
+
+def setup_logging(filename):
+    logger.setLevel(logging.DEBUG)
+
+    fileHandler = logging.FileHandler(filename=filename)
+    fileHandler.setLevel(level=logging.DEBUG)
+    fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fileHandler.setFormatter(fileFormatter)
+
+    streamFormatter = logging.Formatter('%(message)s')
+    streamHandler = logging.StreamHandler()
+    streamHandler.setLevel(level=logging.INFO)
+    streamHandler.setFormatter(streamFormatter)
+
+    logger.addHandler(fileHandler)
+    logger.addHandler(streamHandler)
+
+    logger.debug('debug first')
+    logger.info('info first')
 
 
 async def amain():
@@ -142,23 +172,27 @@ async def amain():
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
+    parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     args = parser.parse_args()
+
+    setup_logging(args.log)
+
     if args.varfile is not None:
         with open(args.varfile) as fd:
             args.var = args.var + fd.readlines()
     split_vars = [[x.strip() for x in v.split(',')] for v in args.var]
     for v, orig in zip(split_vars, args.var):
         if len(v) != 3 or not an_int(v[1]) or not an_int(v[2]):
-            print("problem with '--var' argument {!r}".format(orig))
-            print("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
+            logger.error("problem with '--var' argument {!r}".format(orig))
+            logger.error("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
     dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()), verbose=args.verbose)
     if len(dwarf_variables) == 0:
-        print("error - no variables set for sampling")
+        logger.error("no variables set for sampling")
         raise SystemExit
     variables = []
     for name in names:
@@ -215,7 +249,9 @@ else:
 
 
 async def amain_with_loop():
+    print("before await amain")
     client = await amain()
+    print("after await amain")
     print(try_getch_message)
     try:
         while True:
@@ -223,9 +259,11 @@ async def amain_with_loop():
                 break
             await asyncio.sleep(0.1)
     except KeyboardInterrupt:
-        pass
-    print("sending sampler stop")
+        print("caught keyboard interrupt")
+        logger.info("caught keyboard interrupt")
+    logger.debug("sending sampler stop")
     await client.send_sampler_stop()
+    logger.debug('exit')
 
 
 def main():

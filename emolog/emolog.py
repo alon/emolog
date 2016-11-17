@@ -30,6 +30,7 @@ import struct
 import sys
 from math import sin
 from abc import ABCMeta, abstractmethod
+import logging
 
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
@@ -56,7 +57,7 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
 endianess = '<'
 
 
-error_file = sys.stdout # here to allow setting in the test to stderr
+logger = logging.getLogger('emolog')
 
 
 if 'win' in sys.platform:
@@ -421,22 +422,21 @@ class Parser(object):
         while len(self.buf) > 0:
             msg, left_over_buf, error = emo_decode(self.buf)
             if error:
-                print(error, file=error_file)
+                logger.error(error)
             if self.debug_message_decoding:
                 if error:
-                    print("decoding error, buf length {}, error: {}".format(
+                    logger.error("decoding error, buf length {}, error: {}".format(
                         len(self.buf), error))
                 elif not hasattr(msg, 'type'):
-                    print("decoded {}".format(msg))
+                    logger.debug("decoded {}".format(msg))
                 else:
-                    print("decoded header: type {}, len {}, seq {} (buf #{})".format(
+                    logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
                         emo_message_type_to_str[msg.type], len(self.buf) - len(left_over_buf), msg.seq,
-                        len(self.buf)), file=error_file)
+                        len(self.buf)))
             parsed_buf = self.buf[:len(self.buf) - len(left_over_buf)]
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
-                print("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf),
-                      file=error_file)
+                logger.error("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
             yield msg
@@ -450,7 +450,7 @@ class Parser(object):
         self.send_seq += 1
         encoded = command.encode()
         if self.debug_message_encoding:
-            print("sending: {}, encoded as {}".format(command, encoded), file=error_file)
+            logger.debug("sending: {}, encoded as {}".format(command, encoded))
         self.transport.write(command.encode())
 
     def __str__(self):
@@ -493,7 +493,7 @@ class Client(asyncio.Protocol):
         self._debug_log(self.transport.get_write_buffer_size())
 
     def _debug_log(self, s):
-        print("Client: {}".format(s), file=error_file)
+        logger.debug(s)
 
     def connection_made(self, transport):
         if hasattr(transport, 'serial'):
@@ -559,24 +559,22 @@ class Client(asyncio.Protocol):
 
     def handle_message(self, msg):
         if isinstance(msg, Version):
-            if self.verbose:
-                print("Got Version: {}".format(msg.version))
+            logger.debug("Got Version: {}".format(msg.version))
             self.acked.set_result(True)
         elif isinstance(msg, SamplerSample):
             if self.sampler.running:
                 msg.update_with_sampler(self.sampler)
                 self.received_samples += 1
-                if self.verbose:
-                    print("Got Sample: {}".format(msg))
+                logger.debug("Got Sample: {}".format(msg))
                 self.handle_sampler_sample(msg)
             else:
-                print("ignoring sample since PC sampler is not primed")
+                logger.debug("ignoring sample since PC sampler is not primed")
         elif isinstance(msg, Ack):
             if msg.error != 0:
-                print("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error), file=error_file)
+                logger.error("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
             self.acked.set_result(True)
         else:
-            print("ignoring a {}".format(msg))
+            logger.warn("ignoring a {}".format(msg))
 
     def handle_sampler_sample(self, msg):
         """
@@ -643,19 +641,19 @@ class ClientToFake(asyncio.SubprocessProtocol):
                                                                  program=self.subprocess_cmdline[0],
                                                                  *self.subprocess_cmdline[1:])
         transport, protocol = yield from embedded_process_create
-        print("ClientToFake: transport={}, protocol={}".format(transport, protocol))
+        logger.debug("ClientToFake: transport={}, protocol={}".format(transport, protocol))
         self.transport = TransportFed(transport.get_pipe_transport(0))
         # you need
         raise NotImplementedError()
         self.client = Client()
 
     def pipe_data_received(self, fd, data):
-        print("ClientToFake: got data {!r}".format(data))
+        logger.debug("ClientToFake: got data {!r}".format(data))
         self.transport.feed_me(data)
         self.client.handle_transport_ready_for_read()
 
     def process_exited(self):
-        print("subprocess has quit")
+        logger.debug("subprocess has quit")
 
 
 class FakeSineEmbedded(asyncio.Protocol):
