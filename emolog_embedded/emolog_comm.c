@@ -142,7 +142,7 @@ void handle_uart_rx(void)
 void handle_uart_tx(void)
 {
 	unsigned len = tx_buf_len();
-	char *read = tx_buf + tx_buf_read_pos;
+	unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
 	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
