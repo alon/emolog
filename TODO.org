@@ -45,7 +45,7 @@ how do I manage the tests.
     + [ ] get a timely indication of loop delta jump from 50us to anything larger (100us +)
       + one way: record it in a variable that is monitored (num_jumps)
   + [ ] understand why PC is sending packets to CLIENT and CLIENT is not responding
-    + when CLIENT is sending samples (20kHz, also less at 10kHz) it is missing messages from PC.
+    + [ ] when CLIENT is sending samples (20kHz, also less at 10kHz) it is missing messages from PC.
     + [ ] add another UART side channel with prints of "got message X" on CLIENT and "TX buffer full" etc.
 + Small todo
   + [ ] working clean exit that stops sampling
