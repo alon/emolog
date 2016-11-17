@@ -263,9 +263,6 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
         assert(ret > 0);
         return ret;
     }
-    debug("EMOLOG: about to check crc: expected len %lu >= got len %u (header len %lu)\n",
-          length + sizeof(emo_header), size, sizeof(emo_header));
-
 
     /* check crc for payload */
     payload = src + sizeof(emo_header);
