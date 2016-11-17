@@ -8,13 +8,6 @@
 #include "emolog.h"
 
 
-// TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
-#ifdef HOST_DEBUG
-#define debug printf
-#else
-#define debug(...)
-#endif
-
 static uint8_t s_seq = 0;
 
 /**
