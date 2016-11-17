@@ -1,8 +1,5 @@
 #include <assert.h>
 #include <string.h>
-#ifdef FOUND_HTONS_IN_CCS
-#include <arpa/inet.h>
-#endif
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -19,11 +16,6 @@
 #endif
 
 static uint8_t s_seq = 0;
-
-#ifndef FOUND_HTONS_IN_CCS
-#define htons(x) x
-#define ntohs(x) x
-#endif
 
 /**
  * TODO: store the crc table in flash instead of ram by putting it in a global?
@@ -137,7 +129,7 @@ void write_header(uint8_t *dest_u8, uint8_t type, uint16_t length, const uint8_t
     dest->start[0] = 'E';
     dest->start[1] = 'M';
     dest->type = type;
-    dest->length = htons(length);
+    dest->length = length;
     dest->seq = s_seq++;
     dest->payload_crc = crc8(payload, length);
     dest->header_crc = crc8((uint8_t *)dest, EMO_HEADER_NO_CRC_SIZE);
@@ -270,8 +262,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
         return -1;
     }
 
-    /* convert length to local format */
-    length = ntohs(hdr->length);
+    length = hdr->length;
 
     /* check enough bytes for payload */
     if (length > size - sizeof(emo_header)) {

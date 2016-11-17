@@ -52,8 +52,9 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'AsyncIOEventLoop',
            ]
 
-# use big endian ('>') once TI/CCS htons is working
+
 endianess = '<'
+
 
 error_file = sys.stdout # here to allow setting in the test to stderr
 
