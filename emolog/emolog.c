@@ -269,11 +269,13 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     payload = src + sizeof(emo_header);
     payload_crc = crc8(payload, length);
     if (payload_crc != hdr->payload_crc) {
-        /* we know the length is correct, since the header passed crc, so
-         * skip the whole message (including payload) */
+        /* Two options here:
+         * 1. The payload bytes are really payload, and had some bit errors
+         * 2. What we consider the payload bytes are actually the start of the next message, and the
+         *    real payload of this packet was lost (UART HW didn't parse it).
+         * Therefore, the only safe thing to do is try to parse after the header. */
         debug("EMOLOG: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
-        ret = -sizeof(emo_header) - length;
-        assert(ret < 0);
+        ret = -(int16_t)sizeof(emo_header);
         return ret;
     }
 
