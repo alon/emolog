@@ -436,7 +436,7 @@ class Parser(object):
             parsed_buf = self.buf[:len(self.buf) - len(left_over_buf)]
             self.buf = left_over_buf
             if isinstance(msg, SkipBytes):
-                logger.error("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
+                logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
             yield msg
@@ -469,6 +469,7 @@ class Client(asyncio.Protocol):
     """
 
     def __init__(self, verbose=False):
+        self._futures = set()
         self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
@@ -476,7 +477,25 @@ class Client(asyncio.Protocol):
         self.acked.set_result(True)
         self.parser = None
         self.transport = None
-        self.connection_made_future = asyncio.Future()
+        self.connection_made_future = self.add_future()
+
+    def exit_gracefully(self):
+        self.cancel_all_futures()
+        self.serial.abort()
+
+    def cancel_all_futures(self):
+        for f in self._futures:
+            f.cancel()
+        self._futures.clear()
+
+    def add_future(self):
+        f = asyncio.Future()
+        self._futures.add(f)
+        return f
+
+    def set_future_result(self, future, result):
+        future.set_result(result)
+        self._futures.remove(future)
 
     def connection_lost(self, exc):
         # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
@@ -501,7 +520,7 @@ class Client(asyncio.Protocol):
             transport.serial.rts = False
         self.transport = transport
         self.parser = Parser(transport, debug=self.verbose)
-        self.connection_made_future.set_result(self)
+        self.set_future_result(self.connection_made_future, self)
 
     async def send_set_variables(self, variables):
         await self.send_sampler_clear()
@@ -551,7 +570,7 @@ class Client(asyncio.Protocol):
 
     def send_message(self, msg_type, **kw):
         self.parser.send_message(msg_type, **kw)
-        self.acked = asyncio.Future()
+        self.acked = self.add_future()
 
     def data_received(self, data):
         for msg in self.parser.iter_available_messages(data):
@@ -560,7 +579,7 @@ class Client(asyncio.Protocol):
     def handle_message(self, msg):
         if isinstance(msg, Version):
             logger.debug("Got Version: {}".format(msg.version))
-            self.acked.set_result(True)
+            self.set_future_result(self.acked, True)
         elif isinstance(msg, SamplerSample):
             if self.sampler.running:
                 msg.update_with_sampler(self.sampler)
@@ -572,9 +591,9 @@ class Client(asyncio.Protocol):
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 logger.error("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-            self.acked.set_result(True)
+            self.set_future_result(self.acked, True)
         else:
-            logger.warn("ignoring a {}".format(msg))
+            logger.debug("ignoring a {}".format(msg))
 
     def handle_sampler_sample(self, msg):
         """
@@ -814,6 +833,7 @@ async def make_serial_client(comport, baudrate, protocol):
     serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
                                                   protocol, comport, baudrate=baudrate)
     client = await protocol.connection_made_future
+    client.serial = serial # TODO - nicer way
     return client
 
 

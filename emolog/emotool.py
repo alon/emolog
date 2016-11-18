@@ -1,12 +1,11 @@
 #!/bin/env python
 
-import os
-os.environ['PYTHONASYNCIODEBUG'] = '1'
-import logging
+#import os
+#os.environ['PYTHONASYNCIODEBUG'] = '1'
+#import logging
+#logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
-logging.getLogger('asyncio').setLevel(logging.DEBUG)
-
-import time
+from time import clock # more accurate on windows, vs time.time on linux
 import sys
 import os
 import csv
@@ -90,7 +89,7 @@ class EmoToolClient(emolog.Client):
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
-        self.csv.writerow([msg.seq, msg.ticks, time.clock() * 1000] + msg.variables)
+        self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
         self.fd.flush()
 
 
@@ -212,11 +211,22 @@ async def amain():
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
     loop = asyncio.get_event_loop()
+    quit_task = None
     if args.runtime:
         async def quit_after_runtime():
-            await asyncio.sleep(args.runtime)
-            raise SystemExit
-        loop.create_task(quit_after_runtime())
+            start = clock()
+            while True:
+                if try_getch():
+                    break
+                await asyncio.sleep(0.1)
+                if clock() - start > args.runtime:
+                    break
+            for task in asyncio.Task.all_tasks():
+                logger.warn('canceling task {}'.format(task))
+                task.cancel()
+            logger.warn('cancelling futures of client')
+            client.cancel_all_futures()
+        quit_task = quit_after_runtime()
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names)
     if args.fake_sine:
         client_end = await start_fake_sine()
@@ -225,11 +235,13 @@ async def amain():
         client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint,
                                                 baudrate=args.baud,
                                                 protocol=lambda: client)
+    # TODO - if one of these is never acked we get a hung process, and ctrl-c will complain
+    # that the above task quit_after_runtime was never awaited
     await client.send_version()
     await client.send_sampler_stop()
     await client.send_set_variables(variables)
     await client.send_sampler_start()
-    return client
+    return client, quit_task
 
 
 def windows_try_getch():
@@ -249,18 +261,16 @@ else:
 
 
 async def amain_with_loop():
-    print("before await amain")
-    client = await amain()
-    print("after await amain")
+    client, quit_task = await amain()
     print(try_getch_message)
     try:
-        while True:
-            if try_getch():
-                break
-            await asyncio.sleep(0.1)
+        await quit_task
     except KeyboardInterrupt:
         print("caught keyboard interrupt")
         logger.info("caught keyboard interrupt")
+    except Exception as e:
+        print("got exception {}".format(e))
+    client.exit_gracefully()
     logger.debug("sending sampler stop")
     await client.send_sampler_stop()
     logger.debug('exit')
