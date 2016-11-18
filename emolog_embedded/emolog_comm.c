@@ -98,7 +98,8 @@ bool tx_buf_put_bytes(const uint8_t *src, size_t len)
 int tx_buf_len(void)
 {
 	if (is_empty) return 0;
-	return (tx_buf_write_pos - tx_buf_read_pos) % TX_BUF_SIZE;
+	int ret = (tx_buf_write_pos - tx_buf_read_pos) % TX_BUF_SIZE;
+	return ret == 0 ? TX_BUF_SIZE : ret;
 }
 
 
