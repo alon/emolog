@@ -37,6 +37,7 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
+#include "../../pump_drive_tiva/Hardware.h"
 
 #define RX_BUF_SIZE			1024
 #define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
@@ -148,9 +149,11 @@ void uart0_interrupt(void)
 {
     uint32_t status;
 
+    set_yellow_led(ON);
     status = UARTIntStatus(UART0_BASE, true);
     UARTIntClear(UART0_BASE, status);     		// Clear all asserted interrupts for the UART
 
+    IntDisable(INT_UART0);
     if (status & UART_INT_TX){
     	handle_uart_tx();
     }
@@ -158,6 +161,8 @@ void uart0_interrupt(void)
     if (status & (UART_INT_RX | UART_INT_RT )){
     	handle_uart_rx();
     }
+    IntEnable(INT_UART0);
+    set_yellow_led(OFF);
 }
 
 
