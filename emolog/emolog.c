@@ -1,10 +1,6 @@
 #include <assert.h>
 #include <string.h>
 
-#ifdef DEBUG
-#include <stdio.h>
-#endif
-
 #include "emolog.h"
 
 
@@ -136,9 +132,12 @@ void write_message(uint8_t *dest, uint8_t type, uint16_t length, const uint8_t *
 }
 
 
+#define MAGIC_FIRST 'E'
+#define MAGIC_SECOND 'M'
+
 int header_check_start(const emo_header *header)
 {
-    return header->start[0] == 'E' && header->start[1] == 'M';
+    return header->start[0] == MAGIC_FIRST && header->start[1] == MAGIC_SECOND;
 }
 
 
@@ -163,6 +162,7 @@ uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_tick
     write_message(dest, EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_sampler_register_variable);
 }
+
 
 #define EMPTY_MESSAGE_ENCODER(suffix, msg_type)             \
 uint16_t emo_encode_ ## suffix(uint8_t *dest)                \
@@ -235,6 +235,15 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     int16_t ret;
     uint16_t length;
 
+    /*
+    if (size < 1)
+    {
+        return 1;
+    }
+
+    if (size < 2 && src[0] != )
+*/
+
     if (size < sizeof(emo_header)) {
         ret = sizeof(emo_header) - size;
         assert(ret > 0);
@@ -250,6 +259,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
 
     /* check header integrity, if fail skip a byte */
     header_crc = crc8(src, EMO_HEADER_NO_CRC_SIZE);
+    //debug("EMO_HEADER_NO_CRC_SIZE = %d\n", EMO_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
         debug("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;

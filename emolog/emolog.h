@@ -239,6 +239,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size);
 
 // TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
 #ifdef HOST_DEBUG
+    #include <stdio.h>
     #define debug printf
 #elif defined(CLIENT_DEBUG)
     #include "utils/uartstdio.h"
