@@ -223,5 +223,8 @@ void handle_uart_tx(void)
 		written++;
 	}
 	tx_buf_read_pos = (tx_buf_read_pos + written) % TX_BUF_SIZE;
-	if (tx_buf_read_pos == tx_buf_write_pos) is_empty = true;
+	if (tx_buf_read_pos == tx_buf_write_pos) {
+		is_empty = true;
+		tx_buf_read_pos = tx_buf_write_pos = 0;
+	}
 }
