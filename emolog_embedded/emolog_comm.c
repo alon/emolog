@@ -109,11 +109,13 @@ bool comm_queue_message(const uint8_t *src, size_t len)
 {
 	bool ret;
 
+	IntDisable(INT_UART0);
 	ret = tx_buf_put_bytes(src, len);
 	if (ret)
 	{
 		handle_uart_tx();
 	}
+	IntEnable(INT_UART0);
 	return ret;
 }
 
