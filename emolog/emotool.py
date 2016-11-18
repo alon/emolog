@@ -86,11 +86,15 @@ class EmoToolClient(emolog.Client):
         self.csv = csv
         self.fd = fd
         self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
+        self.last_ticks = None
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
         self.fd.flush()
+        if self.last_ticks is not None and msg.ticks - self.last_ticks != 1:
+            print("ticks jump {:6} -> {:6} [{:6}]".format(self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
+        self.last_ticks = msg.ticks
 
 
 def iterate(filename, initial, firstoption):
@@ -178,6 +182,7 @@ async def amain():
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--silent', default=True, action='store_true', help='turn off logs. only way to get good performance under windows')
+    parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     args = parser.parse_args()
 
     setup_logging(args.log, args.silent)
@@ -229,7 +234,11 @@ async def amain():
                 logger.warn('canceling task {}'.format(task))
                 task.cancel()
             logger.warn('cancelling futures of client')
-            client.cancel_all_futures()
+            #client.cancel_all_futures()
+            if not args.no_cleanup:
+                logger.debug("sending sampler stop")
+                await client.send_sampler_stop()
+            client.exit_gracefully()
         quit_task = quit_after_runtime()
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names)
     if args.fake_sine:
@@ -274,10 +283,6 @@ async def amain_with_loop():
         logger.info("caught keyboard interrupt")
     except Exception as e:
         print("got exception {}".format(e))
-    client.exit_gracefully()
-    logger.debug("sending sampler stop")
-    await client.send_sampler_stop()
-    logger.debug('exit')
 
 
 def main():
