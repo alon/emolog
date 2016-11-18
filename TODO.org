@@ -64,6 +64,15 @@ how do I manage the tests.
     + UART: ?
     + change crt8 to crt16 to ensure we recognize all the errors
     + errors happen only initially after registering new variables and starting sampler. ignore first 0.5~0.2 seconds
++ did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
++ graceful exit: refactor to something cleaner?
++ ticks counter of sampler should be identical to system ticks. this way, missing control-loop deadline will be easy to detect. 
++ counter for missed control-loop deadlines (possibly instead of the above).
++ why can't we use a higher baud rate than 6M?
++ make a list of amount of data that needs to be transfered
++ play with FTDI driver settings, to reduce effect of the FTDI buffer overflow
++ way to flush FTDI buffer that was mentioned in an appnote: tie RTS to DTR or something like that. look into it.
++ last resort: FTDI D2XX drivers instead of VCP
 
 
 
