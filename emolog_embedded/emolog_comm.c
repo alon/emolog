@@ -215,6 +215,11 @@ void handle_uart_tx(void)
 	unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
 
+	if (len == 0)
+	{
+		return;
+	}
+
 	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
 		HWREG(UART0_BASE + UART_O_DR) = *read;
