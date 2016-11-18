@@ -35,7 +35,6 @@
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.GCC.716004936" name="Enable support for GCC extensions (DEPRECATED) (--gcc)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.GCC" value="true" valueType="boolean"/>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.DEFINE.551116740" name="Pre-define NAME (--define, -D)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.DEFINE" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="ccs=&quot;ccs&quot;"/>
-									<listOptionValue builtIn="false" value="CLIENT_DEBUG"/>
 									<listOptionValue builtIn="false" value="PART_TM4C1294KCPDT"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.LITTLE_ENDIAN.262172302" name="Little endian code [See 'General' page to edit] (--little_endian, -me)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_15.12.compilerID.LITTLE_ENDIAN" value="true" valueType="boolean"/>
@@ -61,7 +60,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="error_273|crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
