@@ -70,21 +70,13 @@ int tx_buf_bytes_free(void)
 }
 
 
-bool tx_buf_is_empty(void)
-{
-	return is_empty;
-}
-
-
-bool tx_buf_is_full(void)
-{
-	return (tx_buf_read_pos == tx_buf_write_pos) && (is_empty == false);
-}
-
-
 bool tx_buf_put_bytes(const uint8_t *src, size_t len)
 {
-	if (tx_buf_bytes_free() < len) return false;
+	if (tx_buf_bytes_free() < len)
+	{
+		debug("tx_buf_put_bytes: tx buffer full: %d < %d\n", tx_buf_bytes_free(), len);
+		return false;
+	}
 
 	int32_t space_until_wrap_around = TX_BUF_SIZE - tx_buf_write_pos;
 	if (space_until_wrap_around >= len) // can put everything without wrap-around
@@ -97,18 +89,6 @@ bool tx_buf_put_bytes(const uint8_t *src, size_t len)
 		memcpy(tx_buf, src + space_until_wrap_around, len - space_until_wrap_around);
 	}
 	tx_buf_write_pos = (tx_buf_write_pos + len) % TX_BUF_SIZE;
-	is_empty = false;
-	return true;
-}
-
-
-bool tx_buf_put_byte(unsigned char byte)
-{
-	if (tx_buf_is_full()) return false;
-
-	tx_buf[tx_buf_write_pos] = byte;
-	tx_buf_write_pos = (tx_buf_write_pos + 1) % TX_BUF_SIZE;
-
 	is_empty = false;
 	return true;
 }
