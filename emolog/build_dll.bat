@@ -1,1 +1,2 @@
-gcc -shared -DHOST_DEBUG -o emolog.dll emolog.c
+rem -DHOST_DEBUG 
+gcc -shared -o emolog.dll emolog.c
