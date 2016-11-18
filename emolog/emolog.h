@@ -237,6 +237,9 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  */
 int16_t emo_decode(const uint8_t *src, uint16_t size);
 
+// comment out to disable debugging prints
+#define CLIENT_DEBUG
+
 // TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
 #ifdef HOST_DEBUG
     #include <stdio.h>

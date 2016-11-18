@@ -282,4 +282,3 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     /* home free, a valid message */
     return 0;
 }
-
