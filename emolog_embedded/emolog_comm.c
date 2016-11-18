@@ -37,13 +37,93 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
-#include "emolog_tx_circular_buffer.h"
+
+#define RX_BUF_SIZE			1024
+#define TX_BUF_SIZE			5586
+
 
 static volatile bool message_available = false;
 
 static unsigned char rx_buf[RX_BUF_SIZE];
 static volatile uint32_t rx_buf_pos = 0;
 
+
+/**
+ *  Circular Transmit buffer
+ */
+
+
+// This is no longer an encapsulated circular buffer, it is used by emolog_comm as well. Should
+// be moved there and re-static-ed later.
+static unsigned char tx_buf[TX_BUF_SIZE];
+
+static volatile int32_t tx_buf_read_pos = 0;	// points at the first (the oldest) byte in the buffer
+static volatile int32_t tx_buf_write_pos = 0;	// points where a new byte should go
+static bool is_empty = true;
+
+
+int tx_buf_bytes_free(void)
+{
+	if (is_empty) return (TX_BUF_SIZE);
+
+	return (TX_BUF_SIZE - (tx_buf_write_pos - tx_buf_read_pos)) % TX_BUF_SIZE;
+}
+
+
+bool tx_buf_is_empty(void)
+{
+	return is_empty;
+}
+
+
+bool tx_buf_is_full(void)
+{
+	return (tx_buf_read_pos == tx_buf_write_pos) && (is_empty == false);
+}
+
+
+bool tx_buf_put_bytes(const uint8_t *src, size_t len)
+{
+	if (tx_buf_bytes_free() < len) return false;
+
+	int32_t space_until_wrap_around = TX_BUF_SIZE - tx_buf_write_pos;
+	if (space_until_wrap_around >= len) // can put everything without wrap-around
+	{
+		memcpy(tx_buf + tx_buf_write_pos, src, len);
+	}
+	else
+	{
+		memcpy(tx_buf + tx_buf_write_pos, src, space_until_wrap_around);
+		memcpy(tx_buf, src + space_until_wrap_around, len - space_until_wrap_around);
+	}
+	tx_buf_write_pos = (tx_buf_write_pos + len) % TX_BUF_SIZE;
+	is_empty = false;
+	return true;
+}
+
+
+bool tx_buf_put_byte(unsigned char byte)
+{
+	if (tx_buf_is_full()) return false;
+
+	tx_buf[tx_buf_write_pos] = byte;
+	tx_buf_write_pos = (tx_buf_write_pos + 1) % TX_BUF_SIZE;
+
+	is_empty = false;
+	return true;
+}
+
+
+int tx_buf_len(void)
+{
+	if (is_empty) return 0;
+	return (tx_buf_write_pos - tx_buf_read_pos) % TX_BUF_SIZE;
+}
+
+
+/**
+ * Communication
+ */
 
 bool comm_queue_message(const uint8_t *src, size_t len)
 {
@@ -147,6 +227,7 @@ void handle_uart_tx(void)
 	unsigned len = tx_buf_len();
 	unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
+
 	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
 		HWREG(UART0_BASE + UART_O_DR) = *read;
