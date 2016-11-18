@@ -1,11 +1,11 @@
 #!/bin/env python
 
-#import os
-#os.environ['PYTHONASYNCIODEBUG'] = '1'
-#import logging
-#logging.getLogger('asyncio').setLevel(logging.DEBUG)
+# import os
+# os.environ['PYTHONASYNCIODEBUG'] = '1'
+# import logging
+# logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
-from time import clock # more accurate on windows, vs time.time on linux
+from time import clock  # more accurate on windows, vs time.time on linux
 import sys
 import os
 import csv
@@ -18,7 +18,6 @@ import logging
 
 from dwarf import FileParser
 import emolog
-
 
 logger = logging.getLogger()
 
@@ -63,9 +62,11 @@ def dwarf_get_variables_by_name(filename, names, verbose):
         missing_lower_to_actual = {name.lower(): name for name in given - found}
         missing_to_errors = {name: set(with_errors(name)) for name in missing_lower}
         for name in missing_lower:
-            options = [elf_name for elf_name, elf_options in elf_name_to_options.items() if len(missing_to_errors[name] & elf_options) > 0]
+            options = [elf_name for elf_name, elf_options in elf_name_to_options.items() if
+                       len(missing_to_errors[name] & elf_options) > 0]
             if len(options) > 0:
-                print("{} is close to {}".format(missing_lower_to_actual[name], ", ".join(lower_to_actual[x] for x in options)))
+                print("{} is close to {}".format(missing_lower_to_actual[name],
+                                                 ", ".join(lower_to_actual[x] for x in options)))
         raise SystemExit
     logger.info("Registering variables from {}".format(filename))
     for v in sampled_vars.values():
@@ -81,19 +82,20 @@ async def start_fake_sine():
 
 
 class EmoToolClient(emolog.Client):
-    def __init__(self, csv, fd, verbose, names):
-        super(EmoToolClient, self).__init__(verbose=verbose)
+    def __init__(self, csv, fd, verbose, names, dump, min_ticks):
+        super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
         self.csv = csv
         self.fd = fd
         self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
         self.last_ticks = None
+        self.min_ticks = min_ticks
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
         self.fd.flush()
-        if self.last_ticks is not None and msg.ticks - self.last_ticks != 1:
-            print("ticks jump {:6} -> {:6} [{:6}]".format(self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
+        if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
+            print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
         self.last_ticks = msg.ticks
 
 
@@ -125,7 +127,7 @@ def str_size_to_decoder(s, size):
     if s.endswith('float'):
         if size == 4:
             return decode_little_endian_float
-    else: # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
+    else:  # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
         # Note: will support both int and enum
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
@@ -169,20 +171,25 @@ def setup_logging(filename, silent):
 
 
 async def amain():
-    parser = argparse.ArgumentParser(description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
-    parser.add_argument('--fake-sine', default=False, action='store_true', help='debug only - use a fake sine producing client')
+    parser = argparse.ArgumentParser(
+        description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
+    parser.add_argument('--fake-sine', default=False, action='store_true',
+                        help='debug only - use a fake sine producing client')
     parser.add_argument('--serial', default=None, help='serial port to use')
     parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
-    parser.add_argument('--var', default=[], action='append', help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
+    parser.add_argument('--var', default=[], action='append',
+                        help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
     parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
-    parser.add_argument('--silent', default=True, action='store_true', help='turn off logs. only way to get good performance under windows')
+    parser.add_argument('--silent', default=True, action='store_true',
+                        help='turn off logs. only way to get good performance under windows')
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
+    parser.add_argument('--dump')
     args = parser.parse_args()
 
     setup_logging(args.log, args.silent)
@@ -234,13 +241,16 @@ async def amain():
                 logger.warn('canceling task {}'.format(task))
                 task.cancel()
             logger.warn('cancelling futures of client')
-            #client.cancel_all_futures()
+            # client.cancel_all_futures()
             if not args.no_cleanup:
                 logger.debug("sending sampler stop")
                 await client.send_sampler_stop()
             client.exit_gracefully()
+
         quit_task = quit_after_runtime()
-    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names)
+    min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
+    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names, dump=args.dump,
+                           min_ticks = min_ticks)
     if args.fake_sine:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
@@ -248,6 +258,8 @@ async def amain():
         client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint,
                                                 baudrate=args.baud,
                                                 protocol=lambda: client)
+    client.serial.serial.flushInput()
+    client.serial.serial.flushOutput()
     # TODO - if one of these is never acked we get a hung process, and ctrl-c will complain
     # that the above task quit_after_runtime was never awaited
     await client.send_version()
@@ -261,7 +273,7 @@ def windows_try_getch():
     import msvcrt
     if msvcrt.kbhit():
         return msvcrt.getch()
-    return None # be explicit
+    return None  # be explicit
 
 
 if sys.platform == 'win32':
@@ -269,6 +281,8 @@ if sys.platform == 'win32':
     try_getch = windows_try_getch
 else:
     try_getch_message = "Press Ctrl-C to exit"
+
+
     def try_getch():
         return None
 
