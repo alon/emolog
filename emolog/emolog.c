@@ -235,15 +235,6 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     int16_t ret;
     uint16_t length;
 
-    /*
-    if (size < 1)
-    {
-        return 1;
-    }
-
-    if (size < 2 && src[0] != )
-*/
-
     if (size < sizeof(emo_header)) {
         ret = sizeof(emo_header) - size;
         assert(ret > 0);
@@ -253,7 +244,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
 
     /* if we missed the header skip a byte, check again */
     if (!header_check_start(hdr)) {
-        debug("EMOLOG: header check failed.\n");
+        debug("EMOLOG: header magic wrong, skipping a byte.\n");
         return -1;
     }
 
@@ -268,9 +259,9 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     length = hdr->length;
 
     /* check enough bytes for payload */
-    if (length > size - sizeof(emo_header)) {
+    if (size < length + sizeof(emo_header)) {
         ret = length + sizeof(emo_header) - size;
-        assert(ret > 0);
+        assert(0 < ret);
         return ret;
     }
 
