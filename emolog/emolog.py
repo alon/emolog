@@ -29,6 +29,7 @@ import ctypes
 import os
 import struct
 import sys
+from time import clock
 from math import sin
 from abc import ABCMeta, abstractmethod
 import logging
@@ -469,7 +470,7 @@ class Client(asyncio.Protocol):
      - TODO
     """
 
-    def __init__(self, verbose=False):
+    def __init__(self, verbose=False, dump=None):
         self._futures = set()
         self.verbose = verbose
         self.sampler = VariableSampler()
@@ -480,6 +481,14 @@ class Client(asyncio.Protocol):
         self.transport = None
         self.connection_made_future = self.add_future()
         self.stopped = False
+        if dump:
+            self.dump = open(dump, 'wb')
+        else:
+            self.dump = None
+
+    def dump_buf(self, buf):
+        self.dump.write(struct.pack('<fI', clock(), len(buf)) + buf)
+        #self.dump.flush()
 
     def exit_gracefully(self):
         self.stopped = True
@@ -582,6 +591,8 @@ class Client(asyncio.Protocol):
     def data_received(self, data):
         if self.stopped:
             return
+        if self.dump:
+            self.dump_buf(data)
         for msg in self.parser.iter_available_messages(data):
             self.handle_message(msg)
 
@@ -840,7 +851,7 @@ async def make_serial_client(comport, baudrate, protocol):
     ## import asyncserial
     ## return asyncserial.AsyncSerial(comport, baudrate=baudrate)
     serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
-                                                  protocol, comport, baudrate=baudrate)
+                                                  protocol, comport, baudrate=baudrate, rtscts=True)
     client = await protocol.connection_made_future
     client.serial = serial # TODO - nicer way
     return client

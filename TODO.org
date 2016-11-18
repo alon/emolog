@@ -56,6 +56,17 @@ how do I manage the tests.
 + [ ] sometimes client doesn't respond to sampler_register_variable - symptom is nothing happens on running emotool.bat
   + log shows garbage incoming instead of expected ACK
 
+* 18/11/16 TODO
++ [ ] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently.
++ Error handling
+  + situation: when using higher baudrate with high capacity we get multiple errors. We know because our crc8 alerts us.  + possible improvements:
+    + hardware: improve it, improve signal to noise. Not easy, not sure this is the culprit
+    + UART: ?
+    + change crt8 to crt16 to ensure we recognize all the errors
+    + errors happen only initially after registering new variables and starting sampler. ignore first 0.5~0.2 seconds
+
+
+
 * Integration testing
 - Step A: Python embedded implementation [2/3]
   - [X] Write python client to embedded communication [2/2]
