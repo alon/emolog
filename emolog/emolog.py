@@ -22,6 +22,7 @@ API otherwise, plus helpers.
 
 import asyncio
 from asyncio import Future
+from asyncio.futures import InvalidStateError
 from collections import namedtuple
 from time import time
 import ctypes
@@ -478,8 +479,10 @@ class Client(asyncio.Protocol):
         self.parser = None
         self.transport = None
         self.connection_made_future = self.add_future()
+        self.stopped = False
 
     def exit_gracefully(self):
+        self.stopped = True
         self.cancel_all_futures()
         self.serial.abort()
 
@@ -494,8 +497,12 @@ class Client(asyncio.Protocol):
         return f
 
     def set_future_result(self, future, result):
-        future.set_result(result)
-        self._futures.remove(future)
+        try:
+            future.set_result(result)
+        except InvalidStateError:
+            pass # silently swallow error, means a double set_result
+        if future in self._futures:
+            self._futures.remove(future)
 
     def connection_lost(self, exc):
         # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
@@ -573,6 +580,8 @@ class Client(asyncio.Protocol):
         self.acked = self.add_future()
 
     def data_received(self, data):
+        if self.stopped:
+            return
         for msg in self.parser.iter_available_messages(data):
             self.handle_message(msg)
 

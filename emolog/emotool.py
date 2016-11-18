@@ -141,8 +141,11 @@ def an_int(x):
     return True
 
 
-def setup_logging(filename):
-    logger.setLevel(logging.DEBUG)
+def setup_logging(filename, silent):
+    if silent:
+        logger.setLevel(logging.ERROR)
+    else:
+        logger.setLevel(logging.DEBUG)
 
     fileHandler = logging.FileHandler(filename=filename)
     fileHandler.setLevel(level=logging.DEBUG)
@@ -174,9 +177,10 @@ async def amain():
     parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
+    parser.add_argument('--silent', default=True, action='store_true', help='turn off logs. only way to get good performance under windows')
     args = parser.parse_args()
 
-    setup_logging(args.log)
+    setup_logging(args.log, args.silent)
 
     if args.varfile is not None:
         with open(args.varfile) as fd:
