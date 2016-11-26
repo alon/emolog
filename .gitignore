@@ -23,3 +23,4 @@ venv
 *.csv
 *.log
 emotool.bat
+*.dump
