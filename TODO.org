@@ -57,7 +57,7 @@ how do I manage the tests.
   + log shows garbage incoming instead of expected ACK
 
 * 18/11/16 TODO
-+ [ ] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently.
++ [ ] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently (~50Hz so the time from last sample of it to the end of transmissions is negligible). it will be added explicitly to the vars list. 
 + Error handling
   + situation: when using higher baudrate with high capacity we get multiple errors. We know because our crc8 alerts us.  + possible improvements:
     + hardware: improve it, improve signal to noise. Not easy, not sure this is the culprit
