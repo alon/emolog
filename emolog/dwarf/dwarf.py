@@ -22,7 +22,7 @@ class FileParser:
         self.all_dies = {}
         self.read_dies_from_dwarf_file(filename)
 
-        var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable'}
+        var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable' and 'DW_AT_type' in die.attributes}
         logger.debug("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
 
         self.var_descriptors = var_descriptors = []
@@ -147,6 +147,7 @@ class VarDescriptor:
         return (
             isinstance(self.address, int)       # either an address was not specified or is not a fixed address in RAM (local var, const in flash memory, etc)
             and not self.name.startswith('_')   # various system variables
+            and not self.name.startswith('$')   # not sure when these pop up but they are not interesting
             and not self.name in VarDescriptor.uninteresting_var_names)
 
     DW_TAG_class_type = 'DW_TAG_class_type'
