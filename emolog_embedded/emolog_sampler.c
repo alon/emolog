@@ -108,7 +108,5 @@ emo_error_t sampler_start(void)
 	sampler_running = true;
 	sampler_ticks = 0;
 
-	debug("start: tx buf read %d write %d\n", tx_buf_read_pos, tx_buf_write_pos);
-
 	return EMO_ERROR_NONE;
 }
