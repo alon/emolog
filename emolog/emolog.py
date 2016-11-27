@@ -533,7 +533,7 @@ class Client(asyncio.Protocol):
     def connection_made(self, transport):
         if hasattr(transport, 'serial'):
             # hack - should be done at the transport
-            transport.serial.rts = False
+            transport.serial.rts = True
         self.transport = transport
         self.parser = Parser(transport, debug=self.verbose)
         self.set_future_result(self.connection_made_future, self)
