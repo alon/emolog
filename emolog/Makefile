@@ -1,5 +1,5 @@
 # -DHOST_DEBUG
-CFLAGS=-I. -ggdb -Wall -m64
+CFLAGS=-I. -ggdb -Wall -m64 -DEMOLOG_HOST
 
 ifeq ($(OS),Windows_NT)
 LIBPREFIX=
