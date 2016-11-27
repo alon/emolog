@@ -40,8 +40,8 @@
 #include "../../pump_drive_tiva/Hardware.h"
 
 #define RX_BUF_SIZE			1024
-#define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
-
+// #define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
+#define TX_BUF_SIZE			32768
 
 static volatile bool message_available = false;
 
@@ -61,6 +61,8 @@ static unsigned char tx_buf[TX_BUF_SIZE];
 volatile uint32_t tx_buf_read_pos = 0;	// points at the first (the oldest) byte in the buffer
 volatile uint32_t tx_buf_write_pos = 0;	// points where a new byte should go
 static bool is_empty = true;
+
+volatile uint32_t tx_buf_level = 0; 		// TEMP: for tracking buffer fill status through Emolog
 
 
 int tx_buf_bytes_free(void)
@@ -215,6 +217,8 @@ void handle_uart_tx(void)
 	unsigned len = tx_buf_len();
 	unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
+
+	tx_buf_level = len; // TEMP (or if keeping it, replace len with tx_buf_level)
 
 	if (len == 0)
 	{
