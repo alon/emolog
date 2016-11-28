@@ -22,6 +22,5 @@ venv
 *.so
 *.csv
 *.log
-emotool.bat
 *.dump
 *.pure
