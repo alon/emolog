@@ -186,7 +186,7 @@ async def amain():
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
-    parser.add_argument('--verbose', default=False, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
+    parser.add_argument('--verbose', default=True, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
@@ -298,8 +298,6 @@ else:
 
 async def amain_with_loop():
     client, quit_task = await amain()
-    print(quit_task)
-    print(try_getch_message)
     try:
         await quit_task
     except KeyboardInterrupt:
