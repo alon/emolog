@@ -81,6 +81,13 @@ how do I manage the tests.
 
 24 - next meeting
 
+* 28.11.2016
++ [ ] good error message when com port not found "is emolog cable connected?"
++ [ ] no error message on normal operation - error received from proactor loop, see commit 897665
++ [ ] reduce cpu on cycle. current hog - sampler_sample
++ [ ] calculate bandwidth based on vars and print it
++ [ ] 
+
 
 * Integration testing
 - Step A: Python embedded implementation [2/3]
