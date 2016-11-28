@@ -493,7 +493,8 @@ class Client(asyncio.Protocol):
     def exit_gracefully(self):
         self.stopped = True
         self.cancel_all_futures()
-        self.serial.abort()
+        if hasattr(self, 'serial'):
+            self.serial.abort()
 
     def cancel_all_futures(self):
         for f in self._futures:

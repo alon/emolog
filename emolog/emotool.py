@@ -74,10 +74,14 @@ def dwarf_get_variables_by_name(filename, names, verbose):
     return sampled_vars
 
 
-async def start_fake_sine():
+async def start_fake_sine(port=None):
     loop = asyncio.get_event_loop()
-    rsock, wsock = socketpair()
-    await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
+    if port is None:
+        rsock, wsock = socketpair()
+        await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
+    else:
+        wsock = None
+        await loop.create_server(emolog.FakeSineEmbedded, '127.0.0.1', port)
     return wsock
 
 
@@ -188,6 +192,7 @@ async def amain():
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
+    parser.add_argument('--port', type=int, help='connect to local TCP port instead of serial port, will be default')
     args = parser.parse_args()
 
     setup_logging(args.log, args.silent)
@@ -225,39 +230,45 @@ async def amain():
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
     loop = asyncio.get_event_loop()
-    quit_task = None
-    if args.runtime:
-        async def quit_after_runtime():
-            start = clock()
-            while True:
-                if try_getch():
-                    break
-                await asyncio.sleep(0.1)
-                if clock() - start > args.runtime:
-                    break
-            for task in asyncio.Task.all_tasks():
-                logger.warn('canceling task {}'.format(task))
-                task.cancel()
-            logger.warn('cancelling futures of client')
-            # client.cancel_all_futures()
-            if not args.no_cleanup:
-                logger.debug("sending sampler stop")
-                await client.send_sampler_stop()
-            client.exit_gracefully()
 
-        quit_task = quit_after_runtime()
+    async def quit_after_runtime():
+        start = clock()
+        dt = 0.1 if args.runtime is not None else 1.0
+        while True:
+            if try_getch():
+                break
+            await asyncio.sleep(0.1)
+            if args.runtime is not None and clock() - start > args.runtime:
+                break
+        for task in asyncio.Task.all_tasks():
+            logger.warn('canceling task {}'.format(task))
+            task.cancel()
+        logger.warn('cancelling futures of client')
+        # client.cancel_all_futures()
+        if not args.no_cleanup:
+            logger.debug("sending sampler stop")
+            await client.send_sampler_stop()
+        client.exit_gracefully()
+
+    quit_task = quit_after_runtime()
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
-    if args.fake_sine:
+    if args.fake_sine and not args.port:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
+    elif args.port:
+        client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', args.port)
+        assert client2 is client
     else:
+        if args.fake_sine:
+            await start_fake_sine(args.port)
         client = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint,
                                                 baudrate=args.baud,
                                                 protocol=lambda: client)
-    client.serial.serial.flushInput()
-    client.serial.serial.flushOutput()
+    if hasattr(client, 'serial'):
+        client.serial.serial.flushInput()
+        client.serial.serial.flushOutput()
     # TODO - if one of these is never acked we get a hung process, and ctrl-c will complain
     # that the above task quit_after_runtime was never awaited
     await client.send_version()
@@ -287,6 +298,7 @@ else:
 
 async def amain_with_loop():
     client, quit_task = await amain()
+    print(quit_task)
     print(try_getch_message)
     try:
         await quit_task
