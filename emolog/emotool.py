@@ -182,12 +182,10 @@ async def amain():
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
-    parser.add_argument('--verbose', default=False, action='store_true', help='turn on verbose logging')
+    parser.add_argument('--verbose', default=False, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, help='quit after given seconds')
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
-    parser.add_argument('--silent', default=True, action='store_true',
-                        help='turn off logs. only way to get good performance under windows')
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
     args = parser.parse_args()
@@ -205,7 +203,7 @@ async def amain():
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()), verbose=args.verbose)
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()), verbose=not args.silent)
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
@@ -249,7 +247,7 @@ async def amain():
 
         quit_task = quit_after_runtime()
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
-    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=args.verbose, names=names, dump=args.dump,
+    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
     if args.fake_sine:
         client_end = await start_fake_sine()
