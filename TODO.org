@@ -1,122 +1,42 @@
-* protocol_client
-- sampler
-- sending non blocking
- - DMA: not yet. Use a sendComplete Interrupt
-- use CRC hardware (twice, header and payload)
-
-- Later
-- DMA to serial
-- test CRC hardware performance vs on cpu
 
 
-* Misc Notes
-** Client Architecture
-Reading: do everything in interrupt, nak/ack
-** Layers:
-| App: Embedded / Client |
-| Protocol               |
-|                        |
++ [ ] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
+  + could it confuse the sampler decoder (which uses ticks to determine which variables are in the packet), when there are misses?
 
-* Testing at large
-how do I manage the tests.
-+ tests subdirectory for all tests, just for ordering
-+ test_library.py
-  + contains low level tests of emolog
-+ test_protocol_roundtrip.py
-  + bad name?
-  + contains tests of the
-+ embeddedsimulator.py - what was I thinking? srsly, what is it exactly? asyncio tester, it should do what the rountrip is, Step A.
++ [ ] retries for commands sent from PC to embedded.
+  + timeout on each wait-for-ack. can be short (1 sec or less)
+  + limited number of retries (~5)
+  + exit if no response even after all the retries
+  + consider that some commands may have been received the 1st time, and just the ACK was corrupted, so resending the command might have adverse effects in some cases (e.g. Register Variable commands).
 
-* 31/10/16 session TODO
-+ [x] --varfile <filename> which parses just like consecutive --var parameters
-+ [x] take float/int from ELF
-+ [x] use full_name
-+ [x] remove extra empty lines in CSV
-+ [x] float convertion not working
-+ [x] exit after fixed time implementation
-+ [x] key press to exit instead of ctrl-c
-+ [x] send sampler stop on clean exit
-+ (cannot reproduce) why do we get sometimes 0 vars, sometimes 1, sometimes 2 (reruns with embedded not reset in between)
++ [ ] need bottom-line indication of successful ending (to be displayed to user). successful means:
+  + no ticks jumps
+  + no main-loop deadline misses (50us) (may be included in "no ticks jumps" after changing the ticks to be real wall-clock ticks)
 
-* 14/11/16 summary of left TODO
-+ Two big todos
-  + [ ] verify that the recording matches reality
-    + there is packet loss (verified by jumps in tick count)
-    + [ ] get a timely indication of loop delta jump from 50us to anything larger (100us +)
-      + one way: record it in a variable that is monitored (num_jumps)
-  + [ ] understand why PC is sending packets to CLIENT and CLIENT is not responding
-    + [ ] when CLIENT is sending samples (20kHz, also less at 10kHz) it is missing messages from PC.
-    + [ ] add another UART side channel with prints of "got message X" on CLIENT and "TX buffer full" etc.
-+ Small todo
-  + [ ] working clean exit that stops sampling
-+ [x] check 10 seconds --> found fixed missing samples, rather than proportional (good).
-+ [ ] baud rate above 6M doesn't work (check again since we fixed stuff, maybe it wasn't really the problem)
-+ [x] (optimized to 42us, more to do) optimize tx code. right now at 62us per tick (when transmitting 4 vars), have to be below ~40us.
-  +   UART FIFO configuration (when does the UART ask for more bytes?)
-+ [ ] sometimes client doesn't respond to sampler_register_variable - symptom is nothing happens on running emotool.bat
-  + log shows garbage incoming instead of expected ACK
++ [ ] verify that the recording matches reality. possibly Logic Analyzer recording vs. our recording.
 
-* 18/11/16 TODO
 + [ ] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently (~50Hz so the time from last sample of it to the end of transmissions is negligible). it will be added explicitly to the vars list. 
-+ Error handling
-  + situation: when using higher baudrate with high capacity we get multiple errors. We know because our crc8 alerts us.  + possible improvements:
-    + hardware: improve it, improve signal to noise. Not easy, not sure this is the culprit
-    + UART: ?
-    + change crt8 to crt16 to ensure we recognize all the errors
-    + errors happen only initially after registering new variables and starting sampler. ignore first 0.5~0.2 seconds
-+ did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
-+ graceful exit: refactor to something cleaner?
-+ ticks counter of sampler should be identical to system ticks. this way, missing control-loop deadline will be easy to detect. 
-+ counter for missed control-loop deadlines (possibly instead of the above).
-+ [x] guy why can't we use a higher baud rate than 6M? 
-+ [x] guy make a list of amount of data that needs to be transfered
-+ [x] guy play with FTDI driver settings, to reduce effect of the FTDI buffer overflow
-+ guy,alon way to flush FTDI buffer that was mentioned in an appnote: tie RTS to DTR or something like that. look into it.
-+ alon last resort: FTDI D2XX drivers instead of VCP
-+ postprocessing
+  + is this still needed, considering that no missing ticks means no tx buffer overflow occured? 
+
++ [ ] did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
+
++ [ ] postprocessing
   + excel part
   + python
     + step times. other csv.; 
 
++ [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
 
-24 - next meeting
-
-* 28.11.2016
-+ [ ] good error message when com port not found "is emolog cable connected?"
 + [ ] no error message on normal operation - error received from proactor loop, see commit 897665
-+ [ ] reduce cpu on cycle. current hog - sampler_sample
+
++ [ ] good error message when com port not found: "is emolog cable connected?"
+
 + [ ] calculate bandwidth based on vars and print it
-+ [ ] 
 
 
-* Integration testing
-- Step A: Python embedded implementation [2/3]
-  - [X] Write python client to embedded communication [2/2]
-    - [X] Write Embedded protocol application layer
-    - [X] Fix FakeSineEmbedded
-      - it registers a transport which is a pipe
-      - handles the messages
-      - produces samples of sines
-  - [X] Python tester, automated, no GUI
-  - [ ] Python GUI with python sine embedded
-  - will just return a sinus for every registered variable, with rising frequency
-  - The source can say whatever it wants (source being the client figuring out the addresses)
-  - Enables writing the full GUI to show these sinuses, uses the real protocol so guranteed to work later.
-  - Just possible problems:
-    - ELF parser incorrect, addresses are wrong - we can debug with TI debugger
+* LATER
+  + [ ] graceful exit: refactor to something cleaner?
+  + [ ] DMA to serial
+  + [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
+  + [ ] GUI
 
-- Possible middle step: Use a C program compiled to ELF but on the PC
-  - enables debugging without hardware
-  - can use the real ELF parser
-  - Possible problems:
-    - ELF DWARF info generated by gcc for x64 not the same as that generated by TI compiler for ARM
-
-Step B: test with a TI application
-- use a C program compiled for the TI running on the TI
-- same as production software, just a toy program
-- uses the same compiler, same protocol
-- can check actual speed. Attempt to raise the speed to see the limit
-
-* Client changelist [0/1]
-** TODO only work with asyncio and protocols. Since I know it works with serial + qt, and at worst for serial I can introduce a subprocess (asyncio works fine with that under windows with proactor)
-** 
