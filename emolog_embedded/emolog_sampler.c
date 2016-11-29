@@ -15,6 +15,8 @@
 
 #include "emolog_comm.h"
 
+#include "../../pump_drive_tiva/Hardware.h" // TEMP for debugging
+
 
 bool sampler_running = false;
 static unsigned sampler_ticks = 0;  // TODO: do we want to unify
@@ -42,6 +44,8 @@ void sampler_sample(void)
 	uint8_t buf[512];
 	unsigned index;
 
+	set_red_led(ON); // TEMP
+
 	if (!sampler_running) {
 		return;
 	}
@@ -54,11 +58,16 @@ void sampler_sample(void)
 			emo_encode_sampler_sample_add_var(buf, (const uint8_t*)row->address, row->size);
 		}
 	}
+	set_aux_gpio_1(ON); // TEMP
 	if (num_encoded_vars > 0) {
 		encoded_len = emo_encode_sampler_sample_end(buf, sampler_ticks);
 		comm_queue_message(buf, encoded_len);
 	}
+	set_aux_gpio_1(OFF); // TEMP
+
 	sampler_ticks++;
+
+	set_red_led(OFF); // TEMP
 }
 
 
