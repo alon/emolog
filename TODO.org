@@ -68,9 +68,9 @@ how do I manage the tests.
 + graceful exit: refactor to something cleaner?
 + ticks counter of sampler should be identical to system ticks. this way, missing control-loop deadline will be easy to detect. 
 + counter for missed control-loop deadlines (possibly instead of the above).
-+ guy why can't we use a higher baud rate than 6M?
-+ guy make a list of amount of data that needs to be transfered
-+ guy play with FTDI driver settings, to reduce effect of the FTDI buffer overflow
++ [x] guy why can't we use a higher baud rate than 6M? 
++ [x] guy make a list of amount of data that needs to be transfered
++ [x] guy play with FTDI driver settings, to reduce effect of the FTDI buffer overflow
 + guy,alon way to flush FTDI buffer that was mentioned in an appnote: tie RTS to DTR or something like that. look into it.
 + alon last resort: FTDI D2XX drivers instead of VCP
 + postprocessing
