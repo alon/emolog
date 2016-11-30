@@ -131,6 +131,8 @@ class VarDescriptor:
         return a + (b << 8) + (c << 16) + (d << 24)
 
     def get_type_die(self, die):
+        if 'DW_AT_type' not in die.attributes:
+            return "No type die"
         type_attr = die.attributes['DW_AT_type']
         if type_attr.form == 'DW_FORM_ref_addr':
             type_die_offset = type_attr.value  # store offset is absolute offset in the DWARF info
@@ -230,7 +232,7 @@ class VarDescriptor:
         all_but_last, last = self.visit_type_chain()
         if last.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'}:
             assert last.has_children
-            return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member']
+            return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member' and 'DW_AT_type' in v.attributes]
         return []
 
     def get_full_name(self):
