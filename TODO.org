@@ -33,6 +33,9 @@
 
 + [ ] calculate bandwidth based on vars and print it
 
++ [ ] auto detect serial port
+  + [ ] add "auto" to --serial and make it default
+  + [ ] look for the correct USB HW ID's: VID = 0403, PID = 6010 (that's the FT2232H chip). will avoid false-detection of another FTDI USB-serial which is not based on that chip, such as the one we use for debug outputs from the pump driver board. there will be 2 matches for these VID&PID, take the lower COM port (or alternately, with MI = 0).
 
 * LATER
   + [ ] graceful exit: refactor to something cleaner?
