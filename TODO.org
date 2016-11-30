@@ -1,6 +1,6 @@
 
 
-+ [ ] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
++ [x] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
   + could it confuse the sampler decoder (which uses ticks to determine which variables are in the packet), when there are misses?
 
 + [ ] retries for commands sent from PC to embedded.
