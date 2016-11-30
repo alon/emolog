@@ -19,7 +19,6 @@
 
 
 bool sampler_running = false;
-static unsigned sampler_ticks = 0;  // TODO: do we want to unify
 
 
 #define MAX_VARS 128
@@ -36,36 +35,37 @@ typedef struct row_t {
 static row_t sampler_table[MAX_VARS];
 static unsigned sampler_table_size = 0;
 
+static uint32_t start_ticks = 0;
 
-void sampler_sample(void)
+void sampler_sample(uint32_t ticks)
 {
 	unsigned num_encoded_vars = 0;
 	uint16_t encoded_len;
 	uint8_t buf[512];
 	unsigned index;
+	uint32_t relative_ticks = ticks - start_ticks;
 
 	set_red_led(ON); // TEMP
 
 	if (!sampler_running) {
+		set_red_led(OFF); // TEMP
 		return;
 	}
 
 	emo_encode_sampler_sample_start(buf);
 	for (index = 0 ; index < sampler_table_size ; ++index) {
 		row_t *row = &sampler_table[index];
-		if (sampler_ticks % row->period_ticks == row->phase_ticks) {
+		if (relative_ticks % row->period_ticks == row->phase_ticks) {
 			num_encoded_vars++;
 			emo_encode_sampler_sample_add_var(buf, (const uint8_t*)row->address, row->size);
 		}
 	}
 	set_aux_gpio_1(ON); // TEMP
 	if (num_encoded_vars > 0) {
-		encoded_len = emo_encode_sampler_sample_end(buf, sampler_ticks);
+		encoded_len = emo_encode_sampler_sample_end(buf, relative_ticks);
 		comm_queue_message(buf, encoded_len);
 	}
 	set_aux_gpio_1(OFF); // TEMP
-
-	sampler_ticks++;
 
 	set_red_led(OFF); // TEMP
 }
@@ -105,17 +105,13 @@ void sampler_stop(void)
 }
 
 
-extern uint32_t tx_buf_read_pos; // temp
-extern uint32_t tx_buf_write_pos;
-
-
-emo_error_t sampler_start(void)
+emo_error_t sampler_start(uint32_t ticks)
 {
 	if (sampler_table_size == 0) {
 		return EMO_ERROR_SAMPLER_TABLE_EMPTY;
 	}
 	sampler_running = true;
-	sampler_ticks = 0;
+	start_ticks = ticks;
 
 	return EMO_ERROR_NONE;
 }

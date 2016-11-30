@@ -13,8 +13,10 @@
 #include "emolog_sampler.h"
 #include "emolog.h"
 
+#include "../../pump_drive_tiva/Hardware.h" // TEMP for debugging
 
-void emolog_handle_message(emo_header* header);
+
+void emolog_handle_message(emo_header* header, uint32_t ticks);
 void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 
 
@@ -25,20 +27,20 @@ void emolog_init(void)
 }
 
 
-void emolog_run_step(void)
+void emolog_run_step(uint32_t ticks)
 {
 	emo_header *header;
 
+	sampler_sample(ticks);
+
 	if ((header = comm_peek_message()) != NULL) {
-		emolog_handle_message(header);
+		emolog_handle_message(header, ticks);
 		comm_consume_message();
 	}
-
-	sampler_sample();
 }
 
 
-void emolog_handle_message(emo_header* header)
+void emolog_handle_message(emo_header* header, uint32_t ticks)
 {
 	uint8_t buf_out[32];
 	uint16_t encoded_len;
@@ -71,7 +73,7 @@ void emolog_handle_message(emo_header* header)
 	}
 	case EMO_MESSAGE_TYPE_SAMPLER_START: {
 		debug("got Sampler Start message.\n");
-		sampler_start();
+		sampler_start(ticks);
 		break;
 	}
 	case EMO_MESSAGE_TYPE_SAMPLER_STOP: {
