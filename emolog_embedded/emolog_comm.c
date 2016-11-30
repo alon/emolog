@@ -62,7 +62,7 @@ volatile uint32_t tx_buf_read_pos = 0;	// points at the first (the oldest) byte 
 volatile uint32_t tx_buf_write_pos = 0;	// points where a new byte should go
 static bool is_empty = true;
 
-volatile uint32_t tx_buf_level = 0; 		// TEMP: for tracking buffer fill status through Emolog
+volatile uint32_t tx_buf_level = 0; 		// for tracking buffer fill status through Emolog
 
 
 int tx_buf_bytes_free(void)
@@ -214,23 +214,23 @@ void handle_uart_rx(void)
 // or from comm_queue_message() to get the initial transmission going
 void handle_uart_tx(void)
 {
-	unsigned len = tx_buf_len();
 	unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
 
-	tx_buf_level = len; // TEMP (or if keeping it, replace len with tx_buf_level)
+	tx_buf_level = tx_buf_len();
 
-	if (len == 0)
+	if (tx_buf_level == 0)
 	{
 		return;
 	}
 
-	while (len-- > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
+	while (tx_buf_level > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
 		HWREG(UART0_BASE + UART_O_DR) = *read;
 		read++;
 		if (read >= tx_buf + TX_BUF_SIZE) read = tx_buf;
 		written++;
+		tx_buf_level--;
 	}
 	tx_buf_read_pos = (tx_buf_read_pos + written) % TX_BUF_SIZE;
 	if (tx_buf_read_pos == tx_buf_write_pos) {
