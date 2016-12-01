@@ -11,8 +11,11 @@ import threading
 import socket
 import logging
 import signal
+from argparse import ArgumentParser
 
 import colorama
+
+import serial_util
 
 
 log = logging.getLogger('serial2tcp')
@@ -98,7 +101,6 @@ class Redirector:
             self.thread_read.join()
 
 if __name__ == '__main__':
-    from optparse import OptionParser
     ser = serial.Serial()
 
     descr = 'WARNING: You have to allow connections only from the addresses' \
@@ -110,27 +112,30 @@ if __name__ == '__main__':
     usage = "USAGE: %prog [options]\n\nSimple Serial to Network (TCP/IP)" \
             "redirector."
 
-    parser = OptionParser(usage=usage, version='%prog 0.5.1', description=descr)
-    parser.add_option("-p", "--port", dest="serial",
-                      help="Serial port, a number, defualt = '/dev/tty0'", type=str, default='/dev/tty0')
-    parser.add_option("-b", "--baud", dest="baudrate",
+    parser = ArgumentParser(usage=usage, description=descr)
+    parser.add_argument("-p", "--port", dest="serial",
+                      help="Serial port, a number, defualt = '/dev/tty0'", type=str, default='auto')
+    parser.add_argument("-b", "--baud", dest="baudrate",
                       help="Baudrate, default 115200", default=115200, type=int)
-    parser.add_option("-r", "--rtscts", dest="rtscts",
+    parser.add_argument("-r", "--rtscts", dest="rtscts",
                       help="Enable RTS/CTS flow control (default off)", action='store_true', default=False)
-    parser.add_option("-x", "--xonxoff", dest="xonxoff",
+    parser.add_argument("-x", "--xonxoff", dest="xonxoff",
                       help="Enable software flow control (default off)", action='store_true', default=False)
-    parser.add_option("-P", "--localport", dest="port",
+    parser.add_argument("-P", "--localport", dest="port",
                       help="TCP/IP port on which to run the server (default 9100)", type=int, default=9100)
-    parser.add_option("-l", "--listen", dest="listen",
+    parser.add_argument("-l", "--listen", dest="listen",
                       help="Listen address on which to run the server (default '127.0.0.1')", type=str, default='127.0.0.1')
-    parser.add_option(
+    parser.add_argument(
         '--access-list', dest='acl', type=str, default="127.0.0.1",
         help="List of IP addresses e.g '127.0.0.1, 192.168.0.2'")
-    parser.add_option(
+    parser.add_argument(
         '--verbose', dest='verbose', action='store_true', default=False,
         help='Be verbose')
 
-    (options, args) = parser.parse_args()
+    options = parser.parse_args()
+
+    if options.serial == 'auto':
+        options.serial = serial_util.find_serial()
 
     ser.port = options.serial
     ser.baudrate = options.baudrate
