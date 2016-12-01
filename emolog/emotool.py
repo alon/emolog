@@ -5,7 +5,7 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
-from time import clock  # more accurate on windows, vs time.time on linux
+from time import sleep, clock  # more accurate on windows, vs time.time on linux
 import sys
 import os
 import csv
@@ -94,6 +94,7 @@ class EmoToolClient(emolog.Client):
         self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
         self.last_ticks = None
         self.min_ticks = min_ticks
+        self.client = self # ugly reference for KeboardInterrupt handling
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
@@ -176,9 +177,24 @@ def setup_logging(filename, silent):
 
 
 def start_subprocess(serial, baudrate, port):
-    return subprocess.Popen(['python', 'serial2tcp', '-r', '-b', str(baudrate),
-                             '-p', str(serial), '-P', str(port)])
-
+    """
+    Block until serial2tcp is ready to accept a connection
+    """
+    p = subprocess.Popen(['python', 'serial2tcp.py', '-r', '-b', str(baudrate),
+                             '-p', str(serial), '-P', str(port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    line = None
+    while line != 'Waiting for connection...':
+        sleep(0.1)
+        line = p.stdout.readline().strip()
+        if b'CRITICAL' in line:
+            print("oh noes! error talking to serial:\n{}".format(line))
+            raise SystemExit
+        if p.returncode is not None: # process exited, something is wrong
+            print("process exited! returncode {}".format(t.returncode))
+            raise SystemExit
+        if line != b'':
+            print("got {}".format(repr(line)))
+    return p
 
 async def start_transport(args, client, serial_process):
     loop = asyncio.get_event_loop()
@@ -195,22 +211,39 @@ async def start_transport(args, client, serial_process):
     elif args.port:
         client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', args.port)
         assert client2 is client
-    else:
-        if args.fake_sine:
-            await start_fake_sine(args.port)
-        client2 = await emolog.get_serial_client(comport=args.serial, hint_description=args.serial_hint,
-                                                baudrate=args.baud,
-                                                protocol=lambda: client)
-        assert client2 is client
+    elif args.fake_sine:
+        await start_fake_sine(args.port)
+
+
+args = None
+serial_process = [None]
+
+
+async def cleanup(client):
+    for task in asyncio.Task.all_tasks():
+        logger.warn('canceling task {}'.format(task))
+        task.cancel()
+    if not hasattr(client, 'transport'):
+        return
+    client.transport.close()
+    logger.warn('cancelling futures of client')
+    # client.cancel_all_futures()
+    if not args.no_cleanup:
+        logger.debug("sending sampler stop")
+        await client.send_sampler_stop()
+    if serial_process[0] is not None:
+        serial_process[0].terminate() # note: under windows kill & terminate are one and the same
+    client.exit_gracefully()
 
 
 async def amain():
+    global args
+    global serial_process
     parser = argparse.ArgumentParser(
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake-sine', default=False, action='store_true',
                         help='debug only - use a fake sine producing client')
     parser.add_argument('--serial', default='auto', help='serial port to use')
-    parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
@@ -261,43 +294,37 @@ async def amain():
     csv_fd = open(csv_filename, 'w+')
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
     loop = asyncio.get_event_loop()
-    serial_process = [None]
 
     async def quit_after_runtime():
         start = clock()
         dt = 0.1 if args.runtime is not None else 1.0
+        if try_getch_message:
+            print(try_getch_message)
         while True:
             if try_getch():
                 break
             await asyncio.sleep(0.1)
             if args.runtime is not None and clock() - start > args.runtime:
                 break
-        for task in asyncio.Task.all_tasks():
-            logger.warn('canceling task {}'.format(task))
-            task.cancel()
-        logger.warn('cancelling futures of client')
-        # client.cancel_all_futures()
-        if not args.no_cleanup:
-            logger.debug("sending sampler stop")
-            await client.send_sampler_stop()
-        if serial_process[0] is not None:
-            serial_process[0].terminate() # note: under windows kill & terminate are one and the same
-        client.exit_gracefully()
+        await cleanup(client)
 
     quit_task = quit_after_runtime()
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
-    if hasattr(client, 'serial'):
-        client.serial.serial.flushInput()
-        client.serial.serial.flushOutput()
     # TODO - if one of these is never acked we get a hung process, and ctrl-c will complain
     # that the above task quit_after_runtime was never awaited
+    print("about to send version")
     await client.send_version()
+    print("about to send sampler stop")
     await client.send_sampler_stop()
+    print("about to send sampler set variables")
     await client.send_set_variables(variables)
+    print("about to send sampler start")
     await client.send_sampler_start()
+    print("client initiated, starting to log data at rate TBD")
+    sys.stdout.flush()
     return client, quit_task
 
 
@@ -321,20 +348,22 @@ else:
 
 async def amain_with_loop():
     client, quit_task = await amain()
-    try:
-        await quit_task
-    except KeyboardInterrupt:
-        print("caught keyboard interrupt")
-        logger.info("caught keyboard interrupt")
-    except Exception as e:
-        print("got exception {}".format(e))
+    await quit_task
 
 
 def main():
-    if sys.platform == 'win32':
-        asyncio.set_event_loop(asyncio.ProactorEventLoop())
+    #if sys.platform == 'win32':
+    #    asyncio.set_event_loop(asyncio.ProactorEventLoop())
 
-    asyncio.get_event_loop().run_until_complete(amain_with_loop())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(amain_with_loop())
+    try:
+        loop.run_until_complete(amain_with_loop())
+    except KeyboardInterrupt:
+        print("exiting on user ctrl-c")
+    except Exception as e:
+        print("got exception {!r}".format(e))
+    loop.run_until_complete(cleanup(getattr(EmoToolClient, 'client', None)))
 
 
 if __name__ == '__main__':

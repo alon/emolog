@@ -1,5 +1,3 @@
-#!/home/alon/cometme-wp/workspace_v6_1/venv35-emolog/bin/python3
-
 #(C)2002-2003 Chris Liechti <cliechti@gmx.net>
 #redirect data from a TCP/IP connection to a serial port and vice versa
 #requires Python 2.2 'cause socket.sendall is used
@@ -19,10 +17,10 @@ import serial_util
 
 
 log = logging.getLogger('serial2tcp')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.ERROR)
 formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.ERROR)
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
@@ -157,6 +155,10 @@ if __name__ == '__main__':
         log.fatal("Could not open serial port %s: %s" % (ser.portstr, e))
         sys.exit(1)
 
+    # TODO: necessary?
+    ser.flushInput()
+    ser.flushOutput()
+
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.bind((options.listen, options.port))
     srv.listen(1)
@@ -173,7 +175,7 @@ if __name__ == '__main__':
 
     while 1:
         try:
-            log.info("Waiting for connection...")
+            print("Waiting for connection...")
             connection, addr = srv.accept()
             address, port = addr
             log.info('Connecting with tcp://{0}:{1}'.format(address, port))

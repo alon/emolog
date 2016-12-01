@@ -14,7 +14,10 @@ def find_serial():
         raise SystemExit
     if len(available) > 1:
         # pick the lowest interface in multiple interface devices
-        device = min([(x.device_path.split('/')[:-1], x) for x in available])[1]
+        if hasattr(available[0], 'device_path'):
+            device = min([(x.device_path.split('/')[:-1], x) for x in available])[1]
+        else:
+            device = min([(x.device, x) for x in available])[1]
     else:
         device = available[0]
     comport = device.device
