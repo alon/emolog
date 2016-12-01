@@ -209,7 +209,7 @@ async def amain():
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake-sine', default=False, action='store_true',
                         help='debug only - use a fake sine producing client')
-    parser.add_argument('--serial', default=None, help='serial port to use')
+    parser.add_argument('--serial', default='auto', help='serial port to use')
     parser.add_argument('--serial-hint', default='stellaris', help='usb description for serial port to filter on')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
