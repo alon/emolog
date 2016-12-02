@@ -30,6 +30,7 @@ class FileParser:
             var_descriptors.append(VarDescriptor(self.all_dies, var_die, None))
 
         self.interesting_vars = interesting_vars = [v for v in var_descriptors if v.is_interesting()]
+
         pass
 
     def read_dies_from_dwarf_file(self, filename):
@@ -241,12 +242,15 @@ class VarDescriptor:
         return self.parent.get_full_name() + '.' + self.name
 
     def get_decl_file(self):
-        # TODO: this is oversimplifying, it reports only the main file of the compilation unit.
-        # TODO: if the variable is in a non-main file (such as a .h file) it will probably not be reported correctly.
-        # TODO: the correct way is to read the DW_AT_decl_file attribute, it's an index to a table of files in
-        # TODO: the compilation unit. the table is MAYBE the one in cu.dwarfinfo.line_program_for_CU(cu).header.file_entry
-        # TODO: but the indexes don't match... perhaps zero-based instead of starting at 1...? check this.
-        return self.var_die.cu.get_top_DIE().attributes['DW_AT_name'].value.decode('utf-8')
+        # TODO: not sure if this is fully correct. two file name get methods are currently implemented.
+        # TODO: when one doesn't work, we use the other. this is obviously not the best approach.
+        # TODO: understand what is the definitive way to get the file name and implemnent it...
+        if 'DW_AT_name' in self.var_die.cu.get_top_DIE().attributes:
+            return self.var_die.cu.get_top_DIE().attributes['DW_AT_name'].value.decode('utf-8')
+        else:
+            cu = self.var_die.cu
+            files = cu.dwarfinfo.line_program_for_CU(cu).header.file_entry
+            return files[0]['name'].decode('utf-8')
 
     def get_decl_line(self):
         if 'DW_AT_decl_line' not in self.var_die.attributes:
