@@ -2,8 +2,6 @@
 
 + [ ] ctrl-c and anykey must always work. Also we have a problem were we are stuck, not sure if after recording or before. 50% of runs (2/4)
 
-+ [ ] press any key doesn't work
-
 + [ ] retries for commands sent from PC to embedded.
   + timeout on the whole initial initialization flow (1 second)
     + guranteed to bring us to a steady state
@@ -16,33 +14,44 @@
 
 + [ ] no error message on normal operation - error received from proactor loop, see commit 897665
 
-+ [ ] postprocessing
-  + excel part
-  + python
-    + step times. other csv.; 
++ postprocessing:
+  [x] clean up data (remove unneeded columns, add time column)
+  [ ] temp ugly enum parsing (to be replaced with proper enum parsing at the emotool level later)
+  [x] crop data to only full motor cycles
+  [x] derive step times and velocity
+  [ ] divide data into cycles
+  [ ] add statistics
+    [ ] cycle time average
+    [ ] travel range average
+    [ ] velocity average
+    [ ] time per direction average
+    [ ] velocity average per direction
+    [ ] current average
+    [ ] flow rate average
+    [ ] step time average, std
+    [ ] constant-velocity section step time average, std (section is defined as excluding first n steps (~3) and all steps from motor cutoff)
+    [ ] all of the above but for each half-cycle instead of averages? i.e. a separate Excel tab with a table, each row is a half-cycle, columns are as above
+    [ ] another tab: for each position and direction, step time average & std, velocity average & std, current avg & std
+  [ ] steps table like the old logger? 
+  [ ] export to Excel
+  [ ] graphs:
+    [ ] position, velocity, motor state (or better: only mark motor on / off sections), current
+    [ ] what else? or just combine everything to one graph and add checkmarks for series on/off (see below)
+  [ ] VBA code to change graph x range conveniently (start time, stop time input fields)
+  [ ] VBA code to add or remove series from the graph (checkmarks)? maybe there's a better approach?
+
 
 + [ ] verify that the recording matches reality. possibly Logic Analyzer recording vs. our recording.
 
 + [ ] calculate bandwidth based on vars and print it
 
-+ [X] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
-  + could it confuse the sampler decoder (which uses ticks to determine which variables are in the packet), when there are misses?
-
-+ [X] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently (~50Hz so the time from last sample of it to the end of transmissions is negligible). it will be added explicitly to the vars list.
-  + we implemented tracking of the buffer size.
-  + we also have an everything-ok indication via no missing packets.
-  + is this still needed, considering that no missing ticks means no tx buffer overflow occured? 
-
-+ [X] good error message when com port not found: "is emolog cable connected?"
-
-+ [X] auto detect serial port
-  + [X] add "auto" to --serial and make it default
-  + [X] look for the correct USB HW ID's: VID = 0403, PID = 6010 (that's the FT2232H chip). will avoid false-detection of another FTDI USB-serial which is not based on that chip, such as the one we use for debug outputs from the pump driver board. there will be 2 matches for these VID&PID, take the lower COM port (or alternately, with MI = 0).
 
 * LATER
-+ [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
-+ [ ] graceful exit: refactor to something cleaner?
-+ [ ] DMA to serial
-+ [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
-+ [ ] GUI
+  [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
+  [ ] add enum type parsing. enumerators are children of the type-die (currently unused). we'll probably have to change how the type is decided on and parsed in emotool.
+  [ ] signed vs. unsigned int parsing
+  [ ] graceful exit: refactor to something cleaner?
+  [ ] DMA to serial
+  [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
+  [ ] GUI
 
