@@ -105,7 +105,7 @@ if __name__ == '__main__':
             'NOTICE: This service supports only ' \
             'one tcp connection per instance.'
 
-    usage = "USAGE: %prog [options]\n\nSimple Serial to Network (TCP/IP)" \
+    usage = "USAGE: %(prog)s [options]\n\nSimple Serial to Network (TCP/IP)" \
             "redirector."
 
     parser = ArgumentParser(usage=usage, description=descr)
@@ -149,7 +149,7 @@ if __name__ == '__main__':
             timeout=1
             )
     except serial.SerialException as e:
-        log.fatal("Could not open serial port %s: %s" % (ser.portstr, e))
+        log.fatal("Could not open serial port %s: %s" % (options.serial, e))
         sys.exit(1)
 
     # TODO: necessary?
