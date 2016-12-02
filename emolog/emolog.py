@@ -493,8 +493,6 @@ class Client(asyncio.Protocol):
     def exit_gracefully(self):
         self.stopped = True
         self.cancel_all_futures()
-        if hasattr(self, 'serial'):
-            self.serial.abort()
 
     def cancel_all_futures(self):
         for f in self._futures:
@@ -532,9 +530,6 @@ class Client(asyncio.Protocol):
         logger.debug(s)
 
     def connection_made(self, transport):
-        if hasattr(transport, 'serial'):
-            # hack - should be done at the transport
-            transport.serial.rts = True
         self.transport = transport
         self.parser = Parser(transport, debug=self.verbose)
         self.set_future_result(self.connection_made_future, self)
@@ -843,39 +838,4 @@ class AsyncIOEventLoop(object):
 
     def call_later(self, dt, callback):
         self.loop.call_later(dt, callback)
-
-
-async def make_serial_client(comport, baudrate, protocol):
-    import serial_asyncio
-    # TODO: test asyncserial also with the Protocol+Transport scheme.
-    # But polling (pyserial-async latest) good enough I think, start with that
-    ## import asyncserial
-    ## return asyncserial.AsyncSerial(comport, baudrate=baudrate)
-    serial, protocol = await serial_asyncio.create_serial_connection(asyncio.get_event_loop(),
-                                                  protocol, comport, baudrate=baudrate, rtscts=True)
-    client = await protocol.connection_made_future
-    client.serial = serial # TODO - nicer way
-    return client
-
-
-async def get_serial_client(comport=None, hint_description=None, baudrate=1000000,
-                            protocol=Client):
-    import serial
-    from serial.tools.list_ports import comports
-
-    if comport is None:
-        available = comports()
-        if len(available) == 0:
-            print("no com ports available - is board powered and connected?")
-            raise SystemExit
-        if hint_description is not None:
-            hint_description = hint_description.lower()
-            available = [x for x in available if hint_description in x.description.lower()]
-        if len(available) == 0:
-            print("no com port matching hint available - is board powered and connected?")
-            raise SystemExit
-        if len(available) > 1:
-            print("picking the first out of available {}".format(','.join([x.device for x in available])))
-        comport = available[0].device
-    return await make_serial_client(comport, baudrate=baudrate, protocol=protocol)
 
