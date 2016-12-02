@@ -2,6 +2,8 @@
 
 + [ ] ctrl-c and anykey must always work. Also we have a problem were we are stuck, not sure if after recording or before. 50% of runs (2/4)
 
++ [ ] press any key doesn't work
+
 + [ ] retries for commands sent from PC to embedded.
   + timeout on the whole initial initialization flow (1 second)
     + guranteed to bring us to a steady state
