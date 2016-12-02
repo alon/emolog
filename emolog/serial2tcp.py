@@ -99,8 +99,6 @@ class Redirector:
             self.thread_read.join()
 
 if __name__ == '__main__':
-    ser = serial.Serial()
-
     descr = 'WARNING: You have to allow connections only from the addresses' \
             'in the "--allow-list" option. e.g.' \
             '--allow-list="10.0.0.1, 172.16.0.1, 192.168.0.1"\n' \
@@ -135,22 +133,21 @@ if __name__ == '__main__':
     if options.serial == 'auto':
         options.serial = serial_util.find_serial()
 
-    ser.port = options.serial
-    ser.baudrate = options.baudrate
-    ser.rtscts = options.rtscts
-    ser.xonxoff = options.xonxoff
-
     verbose = options.verbose
 
     access_list = set([ip.strip(" ") for ip in options.acl.split(',')])
 
-    #required so that the reader thread can exit
-    ser.timeout = 1
-
     log.info("TCP/IP to Serial redirector (Ctrl-C to quit)")
 
     try:
-        ser.open()
+        ser = serial.Serial(
+            port=options.serial,
+            baudrate=options.baudrate,
+            rtscts=options.rtscts,
+            xonxoff=options.xonxoff,
+            #required so that the reader thread can exit
+            timeout=1
+            )
     except serial.SerialException as e:
         log.fatal("Could not open serial port %s: %s" % (ser.portstr, e))
         sys.exit(1)
