@@ -1,45 +1,46 @@
 
 
-+ [x] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
-  + could it confuse the sampler decoder (which uses ticks to determine which variables are in the packet), when there are misses?
++ [ ] ctrl-c and anykey must always work. Also we have a problem were we are stuck, not sure if after recording or before. 50% of runs (2/4)
 
 + [ ] retries for commands sent from PC to embedded.
-  + timeout on each wait-for-ack. can be short (1 sec or less)
+  + timeout on the whole initial initialization flow (1 second)
+    + guranteed to bring us to a steady state
   + limited number of retries (~5)
   + exit if no response even after all the retries
-  + consider that some commands may have been received the 1st time, and just the ACK was corrupted, so resending the command might have adverse effects in some cases (e.g. Register Variable commands).
+  + [ ] did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
 
 + [ ] need bottom-line indication of successful ending (to be displayed to user). successful means:
-  + no ticks jumps
   + no main-loop deadline misses (50us) (may be included in "no ticks jumps" after changing the ticks to be real wall-clock ticks)
 
-+ [ ] verify that the recording matches reality. possibly Logic Analyzer recording vs. our recording.
-
-+ [ ] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently (~50Hz so the time from last sample of it to the end of transmissions is negligible). it will be added explicitly to the vars list. 
-  + is this still needed, considering that no missing ticks means no tx buffer overflow occured? 
-
-+ [ ] did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
++ [ ] no error message on normal operation - error received from proactor loop, see commit 897665
 
 + [ ] postprocessing
   + excel part
   + python
     + step times. other csv.; 
 
-+ [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
-
-+ [ ] no error message on normal operation - error received from proactor loop, see commit 897665
-
-+ [ ] good error message when com port not found: "is emolog cable connected?"
++ [ ] verify that the recording matches reality. possibly Logic Analyzer recording vs. our recording.
 
 + [ ] calculate bandwidth based on vars and print it
+
++ [X] sampler ticks value should use main ticks counter, not internal counter (need to be able to count on the logged ticks to be real wall-clock time rather than subjective). This will also identify main-loop deadline misses, they will manifest as ticks jumps in the output CSV. 
+  + could it confuse the sampler decoder (which uses ticks to determine which variables are in the packet), when there are misses?
+
++ [X] Implement TX buffer overflow notification for sample messages by having a variable track that and sampling that variable infrequently (~50Hz so the time from last sample of it to the end of transmissions is negligible). it will be added explicitly to the vars list.
+  + we implemented tracking of the buffer size.
+  + we also have an everything-ok indication via no missing packets.
+  + is this still needed, considering that no missing ticks means no tx buffer overflow occured? 
+
++ [X] good error message when com port not found: "is emolog cable connected?"
 
 + [X] auto detect serial port
   + [X] add "auto" to --serial and make it default
   + [X] look for the correct USB HW ID's: VID = 0403, PID = 6010 (that's the FT2232H chip). will avoid false-detection of another FTDI USB-serial which is not based on that chip, such as the one we use for debug outputs from the pump driver board. there will be 2 matches for these VID&PID, take the lower COM port (or alternately, with MI = 0).
 
 * LATER
-  + [ ] graceful exit: refactor to something cleaner?
-  + [ ] DMA to serial
-  + [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
-  + [ ] GUI
++ [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
++ [ ] graceful exit: refactor to something cleaner?
++ [ ] DMA to serial
++ [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
++ [ ] GUI
 
