@@ -51,8 +51,6 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'SamplerStart',
            'SamplerStop',
            'SamplerEnd',
-           'SocketToFile',
-           'AsyncIOEventLoop',
            ]
 
 
@@ -491,7 +489,7 @@ class Client(asyncio.Protocol):
 
     def reset_ack(self):
         self.ack = Future()
-        self.ack.set_result(True)
+        self.set_future_result(self.ack, True)
 
     def dump_buf(self, buf):
         self.dump.write(struct.pack('<fI', clock(), len(buf)) + buf)
@@ -513,7 +511,7 @@ class Client(asyncio.Protocol):
             async def set_result_after_timeout():
                 await asyncio.sleep(timeout)
                 try:
-                    f.set_result(timeout_result)
+                    self.set_future_result(f, timeout_result)
                 except:
                     pass
             asyncio.get_event_loop().create_task(set_result_after_timeout())
@@ -600,8 +598,9 @@ class Client(asyncio.Protocol):
 
     async def await_ack(self):
         await self.ack
-        if self.ack.result() == self.ACK_TIMEOUT:
-            self.reset_ack()
+        is_timeout = self.ack.result() == self.ACK_TIMEOUT
+        self.reset_ack()
+        if is_timeout:
             raise AckTimeout()
 
     def send_message(self, msg_type, **kw):
@@ -609,7 +608,6 @@ class Client(asyncio.Protocol):
         self.ack = self.add_future(timeout=1.0, timeout_result=self.ACK_TIMEOUT)
 
     def data_received(self, data):
-        #print("stopped: {} ; data: #{}".format(self.stopped, len(data)))
         if self.stopped:
             return
         if self.dump:
@@ -823,44 +821,3 @@ def ctypes_mem_from_size_and_val(val, size):
     elif size == 1:
         return ctypes.c_int8(val)
     raise Exception("unknown size {}".format(size))
-
-
-class SocketToFile(object):
-    """
-    Glue class to match a socket.socket to the file
-    API used by Parser
-    """
-    def __init__(self, socket):
-        self.socket = socket
-        socket.setblocking(False)
-
-    def read(self, n=None):
-        if n is None:
-            n = 1024
-        try:
-            return self.socket.recv(n)
-        except BlockingIOError:
-            return b''
-
-    def write(self, s):
-        return self.socket.send(s)
-
-
-class AsyncIOEventLoop(object):
-    """
-    Glue class to match the expected eventloop API of FakeSineEmbedded
-    and Client to the asyncio native library of python.
-    """
-    def __init__(self, loop):
-        self.loop = loop
-
-    def add_reader(self, fdlike, callback):
-        if isinstance(fdlike, SocketToFile):
-            fd = fdlike.socket
-        else:
-            fd = fdlike
-        self.loop.add_reader(fd.fileno(), callback) # 'fileno()' is not needed for asyncio, but is for QEventLoop from quamash
-
-    def call_later(self, dt, callback):
-        self.loop.call_later(dt, callback)
-

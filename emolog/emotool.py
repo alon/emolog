@@ -209,13 +209,12 @@ def cancel_outstanding_tasks():
 
 
 async def cleanup(client):
-    if not hasattr(client, 'transport'):
+    if hasattr(client, 'transport'):
         cancel_outstanding_tasks()
         return
     if not args.no_cleanup:
         logger.error("sending sampler stop")
         await client.send_sampler_stop()
-        await client.ack
     client.exit_gracefully()
     client.transport.close()
     if serial_process[0] is not None:
