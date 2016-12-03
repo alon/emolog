@@ -217,6 +217,22 @@ def cancel_outstanding_tasks():
         task.cancel()
 
 
+def windows_try_getch():
+    import msvcrt
+    if msvcrt.kbhit():
+        return msvcrt.getch()
+    return None  # be explicit
+
+
+if sys.platform == 'win32':
+    try_getch_message = 'Press any key to exit'
+    try_getch = windows_try_getch
+else:
+    try_getch_message = "Press Ctrl-C to exit"
+    def try_getch():
+        return None
+
+
 async def cleanup(client):
     if hasattr(client, 'transport'):
         cancel_outstanding_tasks()
@@ -233,9 +249,8 @@ async def cleanup(client):
         else:
             p.terminate()
 
-async def amain():
-    global args
-    global serial_process
+
+def parse_args():
     parser = argparse.ArgumentParser(
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake-sine', default=False, action='store_true',
@@ -252,14 +267,14 @@ async def amain():
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    setup_logging(args.log, args.silent)
 
-    if args.varfile is not None:
-        with open(args.varfile) as fd:
-            args.var = args.var + fd.readlines()
-    split_vars = [[x.strip() for x in v.split(',')] for v in args.var]
+def read_elf_variables(vars, varfile):
+    if varfile is not None:
+        with open(varfile) as fd:
+            vars = vars + fd.readlines()
+    split_vars = [[x.strip() for x in v.split(',')] for v in vars]
     for v, orig in zip(split_vars, args.var):
         if len(v) != 3 or not an_int(v[1]) or not an_int(v[2]):
             logger.error("problem with '--var' argument {!r}".format(orig))
@@ -278,6 +293,17 @@ async def amain():
         variables.append(dict(phase_ticks=phase_ticks, period_ticks=period_ticks,
                               address=v.address, size=v.size,
                               _type=str_size_to_decoder(v.get_type_str(), v.size)))
+    return names, variables
+
+
+async def amain():
+    global args
+    global serial_process
+    args = parse_args()
+
+    setup_logging(args.log, args.silent)
+
+    names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
 
     csv_filename = (next_available('emo', numbered=True) if not args.csv_filename else
                     next_available(args.csv_filename, numbered=False))
@@ -286,13 +312,11 @@ async def amain():
     print("================")
     print("")
     print("output file: {}".format(csv_filename))
-    loop = asyncio.get_event_loop()
 
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
-    # that the above task quit_after_runtime was never awaited
     logger.debug("about to send version")
     await client.send_version()
     retries = max_retries = 3
@@ -327,21 +351,6 @@ async def amain():
         if args.runtime is not None and clock() - start > args.runtime:
             break
     logger.debug("stopped at {}".format(clock()))
-
-def windows_try_getch():
-    import msvcrt
-    if msvcrt.kbhit():
-        return msvcrt.getch()
-    return None  # be explicit
-
-
-if sys.platform == 'win32':
-    try_getch_message = 'Press any key to exit'
-    try_getch = windows_try_getch
-else:
-    try_getch_message = "Press Ctrl-C to exit"
-    def try_getch():
-        return None
 
 
 def main():
