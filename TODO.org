@@ -1,18 +1,4 @@
-
-
-+ [ ] ctrl-c and anykey must always work. Also we have a problem were we are stuck, not sure if after recording or before. 50% of runs (2/4)
-
-+ [ ] retries for commands sent from PC to embedded.
-  + timeout on the whole initial initialization flow (1 second)
-    + guranteed to bring us to a steady state
-  + limited number of retries (~5)
-  + exit if no response even after all the retries
-  + [ ] did the no-start-if-already-transmitting problem go away? (how?). test this. suggested solution: retries on sampler_stop etc.
-
-+ [ ] need bottom-line indication of successful ending (to be displayed to user). successful means:
-  + no main-loop deadline misses (50us) (may be included in "no ticks jumps" after changing the ticks to be real wall-clock ticks)
-
-+ [ ] no error message on normal operation - error received from proactor loop, see commit 897665
++ [ ] ACK of last sampler_stop is received by serial2tp and pushed to socket but ignored by emotool.py ; investigate
 
 + postprocessing:
   [x] clean up data (remove unneeded columns, add time column)
@@ -47,6 +33,8 @@
 
 
 * LATER
+  [ ] in the main process, determinisitically (without sleep) wait for subprocess to be ready to accept socket connection
+  [ ] check if we can go back to support logging (i.e. does run without --silent still causes buffer overflows?)
   [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
   [ ] add enum type parsing. enumerators are children of the type-die (currently unused). we'll probably have to change how the type is decided on and parsed in emotool.
   [ ] signed vs. unsigned int parsing
