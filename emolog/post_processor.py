@@ -113,6 +113,6 @@ def save_to_excel(data):
 
     writer.save()
 
+
 if __name__ == '__main__':
     post_process("motor_run_example.csv")
-

@@ -50,7 +50,6 @@ class Redirector:
         while self.alive:
             try:
                 #read one, blocking
-                #log.debug("serial read")
                 data = self.serial.read(1)
                 #look if there is more
                 n = self.serial.inWaiting()
@@ -59,8 +58,6 @@ class Redirector:
                     data = data + self.serial.read(n)
                 if data:
                     #send it over TCP
-                    #log.debug("socket write: writing {} bytes".format(len(data)))
-                    #if data[:2] == 'EM': log.debug("{}serial read{}: got bytes {!r} {}".format(RED_START, RED_END, data[:100]))
                     self.socket.sendall(data)
             except socket.error as msg:
                 log.error(msg)
@@ -75,7 +72,6 @@ class Redirector:
                 data = self.socket.recv(1024)
                 if not data:
                     break
-                #log.debug("socket read: read {}: {!r}".format(len(data), data))
                 self.serial.write(data)  # get a bunch of bytes and send them
             except socket.error as msg:
                 log.error(repr(msg))
