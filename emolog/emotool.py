@@ -181,7 +181,7 @@ def start_subprocess(serial, baudrate, port):
     Block until serial2tcp is ready to accept a connection
     """
     p = Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
-                            baudrate, serial, port))
+                            baudrate, serial, port).split())
     sleep(0.5)
     return p
 
