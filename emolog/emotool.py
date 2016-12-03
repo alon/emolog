@@ -87,16 +87,24 @@ async def start_fake_sine():
 g_client = [None]
 
 class EmoToolClient(emolog.Client):
-    def __init__(self, csv, fd, verbose, names, dump, min_ticks):
+    def __init__(self, csv_filename, verbose, names, dump, min_ticks):
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
-        self.csv = csv
-        self.fd = fd
-        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
+        self.csv = None
+        self.csv_filename = csv_filename
         self.last_ticks = None
         self.min_ticks = min_ticks
+        self.names = names
         g_client[0] = self # ugly reference for KeboardInterrupt handling
 
+    def initialize_file(self):
+        if self.csv:
+            return
+        self.fd = open(self.csv_filename, 'w+')
+        self.csv = csv.writer(self.fd, lineterminator='\n')
+        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+
     def handle_sampler_sample(self, msg):
+        self.initialize_file()
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
         self.fd.flush()
@@ -159,17 +167,18 @@ def setup_logging(filename, silent):
     else:
         logger.setLevel(logging.DEBUG)
 
-    fileHandler = logging.FileHandler(filename=filename)
-    fileHandler.setLevel(level=logging.DEBUG)
-    fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fileHandler.setFormatter(fileFormatter)
+    if filename:
+        fileHandler = logging.FileHandler(filename=filename)
+        fileHandler.setLevel(level=logging.DEBUG)
+        fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fileHandler.setFormatter(fileFormatter)
+        logger.addHandler(fileHandler)
 
     streamFormatter = logging.Formatter('%(message)s')
     streamHandler = logging.StreamHandler()
     streamHandler.setLevel(level=logging.INFO)
     streamHandler.setFormatter(streamFormatter)
 
-    logger.addHandler(fileHandler)
     logger.addHandler(streamHandler)
 
     logger.debug('debug first')
@@ -182,7 +191,7 @@ def start_subprocess(serial, baudrate, port):
     """
     p = Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
                             baudrate, serial, port).split())
-    sleep(0.5)
+    sleep(0.1)
     return p
 
 
@@ -222,7 +231,6 @@ async def cleanup(client):
         if hasattr(p, 'send_ctrl_c'):
             p.send_ctrl_c()
         else:
-            sleep(0.3)
             p.terminate()
 
 async def amain():
@@ -239,7 +247,7 @@ async def amain():
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv-filename', default=None, help='name of csv output file')
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
-    parser.add_argument('--log', default='out.log', help='log messages and other debug/info logs here')
+    parser.add_argument('--log', default=None, help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
@@ -277,13 +285,11 @@ async def amain():
     print("Emotool starting")
     print("================")
     print("")
-    print("creating output {}".format(csv_filename))
-    csv_fd = open(csv_filename, 'w+')
-    csv_obj = csv.writer(csv_fd, lineterminator='\n')
+    print("output file: {}".format(csv_filename))
     loop = asyncio.get_event_loop()
 
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
-    client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=not args.silent, names=names, dump=args.dump,
+    client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
     # that the above task quit_after_runtime was never awaited
