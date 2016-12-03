@@ -17,10 +17,10 @@ import serial_util
 
 
 log = logging.getLogger('serial2tcp')
-log.setLevel(logging.ERROR)
+log.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 ch = logging.StreamHandler()
-ch.setLevel(logging.ERROR)
+ch.setLevel(logging.DEBUG)
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
@@ -45,26 +45,22 @@ class Redirector:
         self.thread_read.start()
         self.writer()
 
-    def verbose_log(self, s):
-        if verbose:
-            print(s)
-
     def reader(self):
         """loop forever and copy serial->socket"""
         while self.alive:
             try:
                 #read one, blocking
+                #log.debug("serial read")
                 data = self.serial.read(1)
                 #look if there is more
                 n = self.serial.inWaiting()
-                if len(data) > 0:
-                    self.verbose_log("{}serial read{}: got 1 byte and {} more ready".format(RED_START, RED_END, n))
                 if n:
                     #and get as much as possible
                     data = data + self.serial.read(n)
                 if data:
                     #send it over TCP
-                    self.verbose_log("socket write: writing {} bytes".format(len(data)))
+                    #log.debug("socket write: writing {} bytes".format(len(data)))
+                    #if data[:2] == 'EM': log.debug("{}serial read{}: got bytes {!r} {}".format(RED_START, RED_END, data[:100]))
                     self.socket.sendall(data)
             except socket.error as msg:
                 log.error(msg)
@@ -76,11 +72,10 @@ class Redirector:
         """loop forever and copy socket->serial"""
         while self.alive:
             try:
-                self.verbose_log("socket read: waiting for data")
                 data = self.socket.recv(1024)
                 if not data:
                     break
-                self.verbose_log("socket read: read {} bytes, writing to serial".format(len(data)))
+                #log.debug("socket read: read {}: {!r}".format(len(data), data))
                 self.serial.write(data)  # get a bunch of bytes and send them
             except socket.error as msg:
                 log.error(repr(msg))
@@ -124,16 +119,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--access-list', dest='acl', type=str, default="127.0.0.1",
         help="List of IP addresses e.g '127.0.0.1, 192.168.0.2'")
-    parser.add_argument(
-        '--verbose', dest='verbose', action='store_true', default=False,
-        help='Be verbose')
 
     options = parser.parse_args()
 
     if options.serial == 'auto':
         options.serial = serial_util.find_serial()
-
-    verbose = options.verbose
 
     access_list = set([ip.strip(" ") for ip in options.acl.split(',')])
 
@@ -170,25 +160,24 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    while 1:
+    try:
+        print("Waiting for connection...")
+        connection, addr = srv.accept()
+        address, port = addr
+        log.info('Connecting with tcp://{0}:{1}'.format(address, port))
+        if address in access_list:
+            #enter console->serial loop
+            r = Redirector(ser, connection)
+            r.shortcut()
+        else:
+            log.error('Address {0} not in access list.'.format(address))
+    except socket.error as msg:
+        log.error(msg)
+    finally:
         try:
-            print("Waiting for connection...")
-            connection, addr = srv.accept()
-            address, port = addr
-            log.info('Connecting with tcp://{0}:{1}'.format(address, port))
-            if address in access_list:
-                #enter console->serial loop
-                r = Redirector(ser, connection)
-                r.shortcut()
-            else:
-                log.error('Address {0} not in access list.'.format(address))
-        except socket.error as msg:
-            log.error(msg)
-        finally:
-            try:
-                connection.close()
-                log.info('Disconnecting')
-            except NameError:
-                pass
-            except Exception as e:
-                log.warning(repr(e))
+            connection.close()
+            log.info('Disconnecting')
+        except NameError:
+            pass
+        except Exception as e:
+            log.warning(repr(e))

@@ -15,7 +15,10 @@ import argparse
 import string
 from socket import socketpair
 import logging
-import subprocess
+from subprocess import Popen
+import random
+
+#import winctrlc
 
 from dwarf import FileParser
 import emolog
@@ -75,16 +78,13 @@ def dwarf_get_variables_by_name(filename, names, verbose):
     return sampled_vars
 
 
-async def start_fake_sine(port=None):
+async def start_fake_sine():
     loop = asyncio.get_event_loop()
-    if port is None:
-        rsock, wsock = socketpair()
-        await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
-    else:
-        wsock = None
-        await loop.create_server(emolog.FakeSineEmbedded, '127.0.0.1', port)
+    rsock, wsock = socketpair()
+    await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
     return wsock
 
+g_client = [None]
 
 class EmoToolClient(emolog.Client):
     def __init__(self, csv, fd, verbose, names, dump, min_ticks):
@@ -94,7 +94,7 @@ class EmoToolClient(emolog.Client):
         self.csv.writerow(['sequence', 'ticks', 'timestamp'] + names)
         self.last_ticks = None
         self.min_ticks = min_ticks
-        self.client = self # ugly reference for KeboardInterrupt handling
+        g_client[0] = self # ugly reference for KeboardInterrupt handling
 
     def handle_sampler_sample(self, msg):
         # todo - decode variables (integer/float) in emolog VariableSampler
@@ -180,61 +180,51 @@ def start_subprocess(serial, baudrate, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
-    p = subprocess.Popen(['python', 'serial2tcp.py', '-r', '-b', str(baudrate),
-                             '-p', str(serial), '-P', str(port)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    line = None
-    while line != 'Waiting for connection...':
-        sleep(0.1)
-        line = p.stdout.readline().strip()
-        if b'CRITICAL' in line:
-            print("oh noes! error talking to serial:\n{}".format(line))
-            raise SystemExit
-        if p.returncode is not None: # process exited, something is wrong
-            print("process exited! returncode {}".format(t.returncode))
-            raise SystemExit
-        if line != b'':
-            print("got {}".format(repr(line)))
+    p = Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
+                            baudrate, serial, port))
+    sleep(0.5)
     return p
+
 
 async def start_transport(args, client, serial_process):
     loop = asyncio.get_event_loop()
-    if not args.direct:
-        serial_process[0] = start_subprocess(serial=args.serial, baudrate=args.baud, port=args.port)
-        print("TODO - wait for socket availability")
-        #await asyncio.sleep(0.5)
-        client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', args.port)
-        assert client2 is client
-        return
-    if args.fake_sine and not args.port:
+    if args.fake_sine:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
-    elif args.port:
-        client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', args.port)
-        assert client2 is client
-    elif args.fake_sine:
-        await start_fake_sine(args.port)
+        return
+    port = random.randint(10000, 50000)
+    serial_process[0] = start_subprocess(serial=args.serial, baudrate=args.baud, port=port)
+    client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', port)
+    assert client2 is client
 
 
 args = None
 serial_process = [None]
 
 
-async def cleanup(client):
+def cancel_outstanding_tasks():
     for task in asyncio.Task.all_tasks():
         logger.warn('canceling task {}'.format(task))
         task.cancel()
-    if not hasattr(client, 'transport'):
-        return
-    client.transport.close()
-    logger.warn('cancelling futures of client')
-    # client.cancel_all_futures()
-    if not args.no_cleanup:
-        logger.debug("sending sampler stop")
-        await client.send_sampler_stop()
-    if serial_process[0] is not None:
-        serial_process[0].terminate() # note: under windows kill & terminate are one and the same
-    client.exit_gracefully()
 
+
+async def cleanup(client):
+    if not hasattr(client, 'transport'):
+        cancel_outstanding_tasks()
+        return
+    if not args.no_cleanup:
+        logger.error("sending sampler stop")
+        await client.send_sampler_stop()
+        await client.ack
+    client.exit_gracefully()
+    client.transport.close()
+    if serial_process[0] is not None:
+        p = serial_process[0]
+        if hasattr(p, 'send_ctrl_c'):
+            p.send_ctrl_c()
+        else:
+            sleep(0.3)
+            p.terminate()
 
 async def amain():
     global args
@@ -255,8 +245,6 @@ async def amain():
     parser.add_argument('--baud', default=1000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
-    parser.add_argument('--direct', default=False, action='store_true', help='DEBUG access serial port directly without subprocess')
-    parser.add_argument('--port', type=int, default=38080, help='connect to local TCP port instead of serial port, will be default')
     args = parser.parse_args()
 
     setup_logging(args.log, args.silent)
@@ -295,38 +283,45 @@ async def amain():
     csv_obj = csv.writer(csv_fd, lineterminator='\n')
     loop = asyncio.get_event_loop()
 
-    async def quit_after_runtime():
-        start = clock()
-        dt = 0.1 if args.runtime is not None else 1.0
-        if try_getch_message:
-            print(try_getch_message)
-        while True:
-            if try_getch():
-                break
-            await asyncio.sleep(0.1)
-            if args.runtime is not None and clock() - start > args.runtime:
-                break
-        await cleanup(client)
-
-    quit_task = quit_after_runtime()
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv=csv_obj, fd=csv_fd, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks = min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
-    # TODO - if one of these is never acked we get a hung process, and ctrl-c will complain
     # that the above task quit_after_runtime was never awaited
     print("about to send version")
     await client.send_version()
-    print("about to send sampler stop")
-    await client.send_sampler_stop()
-    print("about to send sampler set variables")
-    await client.send_set_variables(variables)
-    print("about to send sampler start")
-    await client.send_sampler_start()
-    print("client initiated, starting to log data at rate TBD")
+    retries = max_retries = 3
+    while retries > 0:
+        try:
+            print("about to send sampler stop")
+            await client.send_sampler_stop()
+            print("about to send sampler set variables")
+            await client.send_set_variables(variables)
+            print("about to send sampler start")
+            await client.send_sampler_start()
+            print("client initiated, starting to log data at rate TBD")
+            break
+        except emolog.AckTimeout:
+            retries -= 1
+            print("retry {}".format(max_retries - retries))
+    if retries == 0:
+        print("failed to initialize board, exiting.")
+        raise SystemExit
     sys.stdout.flush()
-    return client, quit_task
 
+    dt = 0.1 if args.runtime is not None else 1.0
+    if args.runtime:
+        start = clock()
+        print("running for {} seconds (start = {}".format(args.runtime, start))
+    if try_getch_message:
+        print(try_getch_message)
+    while True:
+        if try_getch():
+            break
+        await asyncio.sleep(dt)
+        if args.runtime is not None and clock() - start > args.runtime:
+            break
+    print("stopped at {}".format(clock()))
 
 def windows_try_getch():
     import msvcrt
@@ -346,24 +341,18 @@ else:
         return None
 
 
-async def amain_with_loop():
-    client, quit_task = await amain()
-    await quit_task
-
-
 def main():
     #if sys.platform == 'win32':
     #    asyncio.set_event_loop(asyncio.ProactorEventLoop())
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(amain_with_loop())
     try:
-        loop.run_until_complete(amain_with_loop())
+        loop.run_until_complete(amain())
     except KeyboardInterrupt:
         print("exiting on user ctrl-c")
     except Exception as e:
         print("got exception {!r}".format(e))
-    loop.run_until_complete(cleanup(getattr(EmoToolClient, 'client', None)))
+    loop.run_until_complete(cleanup(g_client[0]))
 
 
 if __name__ == '__main__':

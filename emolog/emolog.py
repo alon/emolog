@@ -453,12 +453,16 @@ class Parser(object):
         encoded = command.encode()
         if self.debug_message_encoding:
             logger.debug("sending: {}, encoded as {}".format(command, encoded))
-        self.transport.write(command.encode())
+        self.transport.write(encoded)
 
     def __str__(self):
         return '<Parser: #{}: {!r}'.format(len(self.buf), self.buf)
 
     __repr__ = __str__
+
+
+class AckTimeout(Exception):
+    pass
 
 
 class Client(asyncio.Protocol):
@@ -475,8 +479,7 @@ class Client(asyncio.Protocol):
         self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
-        self.acked = Future()
-        self.acked.set_result(True)
+        self.reset_ack()
         self.parser = None
         self.transport = None
         self.connection_made_future = self.add_future()
@@ -485,6 +488,10 @@ class Client(asyncio.Protocol):
             self.dump = open(dump, 'wb')
         else:
             self.dump = None
+
+    def reset_ack(self):
+        self.ack = Future()
+        self.ack.set_result(True)
 
     def dump_buf(self, buf):
         self.dump.write(struct.pack('<fI', clock(), len(buf)) + buf)
@@ -499,9 +506,17 @@ class Client(asyncio.Protocol):
             f.cancel()
         self._futures.clear()
 
-    def add_future(self):
+    def add_future(self, timeout=None, timeout_result=None):
         f = asyncio.Future()
         self._futures.add(f)
+        if timeout is not None:
+            async def set_result_after_timeout():
+                await asyncio.sleep(timeout)
+                try:
+                    f.set_result(timeout_result)
+                except:
+                    pass
+            asyncio.get_event_loop().create_task(set_result_after_timeout())
         return f
 
     def set_future_result(self, future, result):
@@ -520,11 +535,11 @@ class Client(asyncio.Protocol):
 
     def pause_writing(self):
         # interesting?
-        self._debug_log(self.transport.get_write_buffer_size())
+        print("PAUSE WRITING {}".format(self.transport.get_write_buffer_size()))
 
     def resume_writing(self):
         # interesting?
-        self._debug_log(self.transport.get_write_buffer_size())
+        print("RESUME WRITING {}".format(self.transport.get_write_buffer_size()))
 
     def _debug_log(self, s):
         logger.debug(s)
@@ -544,21 +559,21 @@ class Client(asyncio.Protocol):
             await self.send_sampler_register_variable(**d_rest)
 
     async def send_sampler_clear(self):
-        await self.send_after_last(SamplerClear)
+        await self.send_and_ack(SamplerClear)
 
     async def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
-        await self.send_after_last(SamplerRegisterVariable,
+        await self.send_and_ack(SamplerRegisterVariable,
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size)
 
     async def send_sampler_clear(self):
-        await self.send_after_last(SamplerClear)
+        await self.send_and_ack(SamplerClear)
 
     async def send_sampler_start(self):
-        await self.send_after_last(SamplerStart)
+        await self.send_and_ack(SamplerStart)
         self.sampler.on_started()
 
     async def send_sampler_stop(self):
-        await self.send_after_last(SamplerStop)
+        await self.send_and_ack(SamplerStop)
         self.sampler.on_stopped()
 
     async def send_version(self):
@@ -566,8 +581,7 @@ class Client(asyncio.Protocol):
         # anyway
         await self.send_after_last(Version)
 
-    async def stop(self):
-        await self.send_after_last(SamplerStop)
+    ACK_TIMEOUT = 'ACK_TIMEOUT'
 
     async def send_after_last(self, msg_type, **kw):
         """
@@ -577,14 +591,25 @@ class Client(asyncio.Protocol):
         importantly the embedded has a tiny 16 byte buffer so it cannot
         handle more than a message at a time.
         """
-        await self.acked
+        await self.await_ack()
         self.send_message(msg_type, **kw)
+
+    async def send_and_ack(self, msg_type, **kw):
+        await self.send_after_last(msg_type, **kw)
+        await self.await_ack()
+
+    async def await_ack(self):
+        await self.ack
+        if self.ack.result() == self.ACK_TIMEOUT:
+            self.reset_ack()
+            raise AckTimeout()
 
     def send_message(self, msg_type, **kw):
         self.parser.send_message(msg_type, **kw)
-        self.acked = self.add_future()
+        self.ack = self.add_future(timeout=1.0, timeout_result=self.ACK_TIMEOUT)
 
     def data_received(self, data):
+        #print("stopped: {} ; data: #{}".format(self.stopped, len(data)))
         if self.stopped:
             return
         if self.dump:
@@ -595,7 +620,7 @@ class Client(asyncio.Protocol):
     def handle_message(self, msg):
         if isinstance(msg, Version):
             logger.debug("Got Version: {}".format(msg.version))
-            self.set_future_result(self.acked, True)
+            self.set_future_result(self.ack, True)
         elif isinstance(msg, SamplerSample):
             if self.sampler.running:
                 msg.update_with_sampler(self.sampler)
@@ -607,7 +632,7 @@ class Client(asyncio.Protocol):
         elif isinstance(msg, Ack):
             if msg.error != 0:
                 logger.error("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-            self.set_future_result(self.acked, True)
+            self.set_future_result(self.ack, True)
         else:
             logger.debug("ignoring a {}".format(msg))
 
