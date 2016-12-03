@@ -31,8 +31,6 @@ class FileParser:
 
         self.interesting_vars = interesting_vars = [v for v in var_descriptors if v.is_interesting()]
 
-        pass
-
     def read_dies_from_dwarf_file(self, filename):
         logger.debug('Processing file: {}'.format(filename))
         with open(filename, 'rb') as f:
@@ -195,6 +193,13 @@ class VarDescriptor:
             for child in self.children:
                 yield from child.visit_leafs()
 
+    def get_enum_dict(self):
+        all_but_last, last_cur_type = self.visit_type_chain()
+        assert last_cur_type.tag == 'DW_TAG_enumeration_type'
+        return {c.attributes['DW_AT_name'].value.decode('utf-8'):
+                    c.attributes['DW_AT_const_value'].value
+                for c in last_cur_type.iter_children()}
+
     def get_type_str(self):
         type_str = []
         all_but_last, last_cur_type = self.visit_type_chain()
@@ -205,6 +210,8 @@ class VarDescriptor:
                 type_str.append(cur_type.tag)
 
         if 'DW_AT_name' in last_cur_type.attributes:
+            if last_cur_type.tag == 'DW_TAG_enumeration_type':
+                type_str.append('enum')
             type_str.append(last_cur_type.attributes['DW_AT_name'].value.decode('utf-8'))
         else:
             type_str.append('(unnamed variable)')

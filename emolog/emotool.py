@@ -141,8 +141,24 @@ def decode_little_endian_float(s):
     return struct.unpack('<f', s)[0]
 
 
-def str_size_to_decoder(s, size):
-    if s.endswith('float'):
+def return_enum_decoder(size):
+    if size == 4:
+        return lambda q: struct.unpack('<l', q)[0]
+    elif size == 2:
+        return lambda q: struct.unpack('<h', q)[0]
+    return ord
+
+
+def variable_to_decoder(v):
+    type_name = v.get_type_str()
+    size = v.size
+    if type_name.startswith('enum '):
+        name_to_val = v.get_enum_dict()
+        max_unsigned_val = 1 << (size * 8)
+        val_to_name = {v % max_unsigned_val: k for k, v in name_to_val.items()}
+        enum_decoder = return_enum_decoder(size)
+        return lambda q: val_to_name[enum_decoder(q)]
+    elif type_name.endswith('float'):
         if size == 4:
             return decode_little_endian_float
     else:  # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
@@ -299,7 +315,7 @@ def read_elf_variables(vars, varfile):
         period_ticks, phase_ticks = name_to_ticks_and_phase[name]
         variables.append(dict(phase_ticks=phase_ticks, period_ticks=period_ticks,
                               address=v.address, size=v.size,
-                              _type=str_size_to_decoder(v.get_type_str(), v.size)))
+                              _type=variable_to_decoder(v)))
     return names, variables
 
 
