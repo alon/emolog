@@ -17,10 +17,10 @@ import serial_util
 
 
 log = logging.getLogger('serial2tcp')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.CRITICAL)
 formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.CRITICAL)
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
@@ -161,7 +161,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
-        print("Waiting for connection...")
         connection, addr = srv.accept()
         address, port = addr
         log.info('Connecting with tcp://{0}:{1}'.format(address, port))

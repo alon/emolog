@@ -287,22 +287,22 @@ async def amain():
                            min_ticks = min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
     # that the above task quit_after_runtime was never awaited
-    print("about to send version")
+    logger.debug("about to send version")
     await client.send_version()
     retries = max_retries = 3
     while retries > 0:
         try:
-            print("about to send sampler stop")
+            logger.debug("about to send sampler stop")
             await client.send_sampler_stop()
-            print("about to send sampler set variables")
+            logger.debug("about to send sampler set variables")
             await client.send_set_variables(variables)
-            print("about to send sampler start")
+            logger.debug("about to send sampler start")
             await client.send_sampler_start()
-            print("client initiated, starting to log data at rate TBD")
+            logger.debug("client initiated, starting to log data at rate TBD")
             break
         except emolog.AckTimeout:
             retries -= 1
-            print("retry {}".format(max_retries - retries))
+            logger.debug("retry {}".format(max_retries - retries))
     if retries == 0:
         print("failed to initialize board, exiting.")
         raise SystemExit
@@ -311,7 +311,7 @@ async def amain():
     dt = 0.1 if args.runtime is not None else 1.0
     if args.runtime:
         start = clock()
-        print("running for {} seconds (start = {}".format(args.runtime, start))
+        logger.debug("running for {} seconds (start = {}".format(args.runtime, start))
     if try_getch_message:
         print(try_getch_message)
     while True:
@@ -320,7 +320,7 @@ async def amain():
         await asyncio.sleep(dt)
         if args.runtime is not None and clock() - start > args.runtime:
             break
-    print("stopped at {}".format(clock()))
+    logger.debug("stopped at {}".format(clock()))
 
 def windows_try_getch():
     import msvcrt
@@ -334,8 +334,6 @@ if sys.platform == 'win32':
     try_getch = windows_try_getch
 else:
     try_getch_message = "Press Ctrl-C to exit"
-
-
     def try_getch():
         return None
 
@@ -350,7 +348,7 @@ def main():
     except KeyboardInterrupt:
         print("exiting on user ctrl-c")
     except Exception as e:
-        print("got exception {!r}".format(e))
+        logger.debug("got exception {!r}".format(e))
     loop.run_until_complete(cleanup(g_client[0]))
 
 
