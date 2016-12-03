@@ -234,12 +234,15 @@ else:
 
 
 async def cleanup(client):
-    if hasattr(client, 'transport'):
+    if not hasattr(client, 'transport'):
         cancel_outstanding_tasks()
         return
     if not args.no_cleanup:
-        logger.error("sending sampler stop")
-        await client.send_sampler_stop()
+        logger.debug("sending sampler stop")
+        try:
+            await client.send_sampler_stop()
+        except:
+            pass
     client.exit_gracefully()
     client.transport.close()
     if serial_process[0] is not None:

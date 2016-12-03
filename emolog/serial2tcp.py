@@ -57,6 +57,7 @@ class Redirector:
                     #and get as much as possible
                     data = data + self.serial.read(n)
                 if data:
+                    #if b'EM\x03' in data: print("probably an ACK")
                     #send it over TCP
                     self.socket.sendall(data)
             except socket.error as msg:
@@ -88,6 +89,7 @@ class Redirector:
         if self.alive:
             self.alive = False
             self.thread_read.join()
+
 
 if __name__ == '__main__':
     descr = 'WARNING: You have to allow connections only from the addresses' \

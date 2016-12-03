@@ -579,6 +579,7 @@ class Client(asyncio.Protocol):
         # anyway
         await self.send_after_last(Version)
 
+    ACK_TIMEOUT_SECONDS = 1.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
 
     async def send_after_last(self, msg_type, **kw):
@@ -605,7 +606,7 @@ class Client(asyncio.Protocol):
 
     def send_message(self, msg_type, **kw):
         self.parser.send_message(msg_type, **kw)
-        self.ack = self.add_future(timeout=1.0, timeout_result=self.ACK_TIMEOUT)
+        self.ack = self.add_future(timeout=self.ACK_TIMEOUT_SECONDS, timeout_result=self.ACK_TIMEOUT)
 
     def data_received(self, data):
         if self.stopped:
