@@ -94,6 +94,8 @@ class EmoToolClient(emolog.Client):
         self.last_ticks = None
         self.min_ticks = min_ticks
         self.names = names
+        self.samples_received = 0
+        self.ticks_lost = 0
         g_client[0] = self # ugly reference for KeboardInterrupt handling
 
     def initialize_file(self):
@@ -108,8 +110,10 @@ class EmoToolClient(emolog.Client):
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
         self.fd.flush()
+        self.samples_received += 1
         if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
             print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
+            self.ticks_lost += msg.ticks - self.last_ticks - self.min_ticks
         self.last_ticks = msg.ticks
 
 
@@ -354,6 +358,7 @@ async def amain():
         if args.runtime is not None and clock() - start > args.runtime:
             break
     logger.debug("stopped at {}".format(clock()))
+    print("exiting\nsamples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
 
 def main():
