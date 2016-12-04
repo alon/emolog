@@ -21,8 +21,9 @@ def post_process(csv_file):
     data = data.set_index('Ticks')
     data = only_full_cycles(data)
     data = add_time_column(data)
-    data = data.join(calc_step_times_and_vel(data), how ='left')
+    data = data.join(calc_step_times_and_vel(data), how='left')
     data = reorder_columns(data)
+    data = interpolate_missing_data(data)
 
     end = time.time()
     print("processing time: {}".format(end-start))
@@ -60,17 +61,19 @@ def remove_unneeded_columns(data):
 
 
 def only_full_cycles(data):
-    start_i = data.first_valid_index()
-    end_i = data.last_valid_index()
-    first_dir = data['Actual dir'][start_i]
-    last_dir = data['Actual dir'][end_i]
-    while data['Actual dir'][start_i] == first_dir:
-        start_i += 1
-    while data['Actual dir'][end_i] == last_dir:
-        end_i -= 1
+    cycle_start_indexes = data[data['Actual dir'].diff() != 0].index
+    start_i = cycle_start_indexes[1]
 
+    # the end of the last valid cycle, is one valid index before the start of the last (incomplete) cycle
+    end_i = cycle_start_indexes[-1]     # start of the last, incomplete cycle
+    end_i = data.index[data.index.get_loc(cycle_start_indexes[-1]) - 1] # move one valid index before it
+
+    series = pd.Series(data=np.arange(1, len(cycle_start_indexes)), index=cycle_start_indexes[1:])
+    data['Half cycle'] = series
+    data['Half cycle'].fillna(method='ffill', inplace=True)
     data = data[start_i: end_i]
     data.index -= data.first_valid_index()
+
     return data
 
 
@@ -83,9 +86,11 @@ def calc_step_times_and_vel(data):
     # TODO this assumes no tick jumps, confirm working or fix for data that includes jumps
     pos = data['Position']
     pos_change_indexes = (pos[pos.diff() != 0].index - 1).tolist()
+    # pos_change_indexes = pos[pos.diff() != 0].index
+
     pos_change_indexes.append(pos.last_valid_index())
     step_times = np.diff(pos_change_indexes)
-    ret = pd.DataFrame(data = step_times, index = pos_change_indexes[1:], columns = ['Step time'])
+    ret = pd.DataFrame(data=step_times, index=pos_change_indexes[1:], columns=['Step time'])
     ret['Step time'] *= tick_time_ms
     ret = ret.reindex(index=data.index, method='backfill')
     ret['Velocity'] = step_size_mm / ret['Step time']
@@ -100,19 +105,29 @@ def reorder_columns(data):
     return data
 
 
+def interpolate_missing_data(data):
+    # TODO: instead of hard-coding columns to interpolate, consider analyzing where it's needed (or just everywhere?)
+    cols_to_interpolate = ['Last flow rate lpm', 'Temp ext']
+    data.loc[:, cols_to_interpolate] = data.loc[:, cols_to_interpolate].fillna(method='ffill')
+    return data
+
+
 def save_to_excel(data):
-    data = data[0:5000] # TEMP since it's taking so long...
+    #data = data[1:5000] # TEMP since it's taking so long...
     shutil.copy(template_filename, output_filename)
 
+    # use xlsxwriter, fast but can't use the template
+    #writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
+
+    # use openpyxl, slow but uses the template
     book = openpyxl.load_workbook(output_filename)
     writer = pd.ExcelWriter(output_filename, engine='openpyxl')
     writer.book = book
     writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
 
     data.to_excel(excel_writer=writer, sheet_name='Data')
-
     writer.save()
 
-
 if __name__ == '__main__':
-    post_process("motor_run_example.csv")
+    post_process("motor_run_example original.csv")
+
