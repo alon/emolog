@@ -22,9 +22,13 @@ import random
 
 from dwarf import FileParser
 import emolog
+import post_processor
 
 logger = logging.getLogger()
 
+# TODO instead of hard coding, get from args
+# results_folder = 'C:\\Comet-ME Pump Drive\\run logs'      # for Noam's laptop
+results_folder = 'D:\\Projects\\Comet ME Pump Drive\\run logs'        # for Guy's laptop
 
 def with_errors(s):
     # TODO - find a library for this? using error distance
@@ -133,8 +137,8 @@ def iterate(filename, initial, firstoption):
 def next_available(filename, numbered):
     filenames = iterate(filename, 1, filename if numbered is None else None)
     for filename in filenames:
-        if not os.path.exists(filename):
-            return filename
+        if not os.path.exists(results_folder + '\\' + filename):
+            return results_folder + '\\' + filename
 
 
 def decode_little_endian_float(s):
@@ -338,7 +342,7 @@ async def amain():
 
     min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
-                           min_ticks = min_ticks)
+                           min_ticks=min_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
     logger.debug("about to send version")
     await client.send_version()
@@ -374,7 +378,12 @@ async def amain():
         if args.runtime is not None and clock() - start > args.runtime:
             break
     logger.debug("stopped at {}".format(clock()))
-    print("exiting\nsamples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
+    print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
+    print("Running post processor (this may take some time)...")
+    post_processor.post_process(csv_filename)
+    print("Post processing done.")
+
+
 
 
 def main():

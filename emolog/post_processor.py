@@ -9,14 +9,12 @@ import matplotlib.pyplot as plt # TEMP
 tick_time_ms = 0.05     # 50 us = 0.05 ms
 step_size_mm = 4.0
 template_filename = "results template.xlsx"
-output_filename = "example output.xlsx"
 
-def post_process(csv_file):
+def post_process(csv_filename):
     start = time.time()
 
-    data = pd.read_csv(csv_file)
+    data = pd.read_csv(csv_filename)
     data = clean_column_names(data)
-    data = parse_enum_columns(data)
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
     data = only_full_cycles(data)
@@ -29,11 +27,13 @@ def post_process(csv_file):
     print("processing time: {}".format(end-start))
 
     start = time.time()
-    save_to_excel(data)
+    save_to_excel(data, csv_filename)
     end = time.time()
     print("save to excel time: {}".format(end-start))
 
 
+
+friendly_col_names = {} # TODO
 
 def clean_column_names(data):
     data.columns = [remove_prefix(c, 'controller.state.') for c in data.columns]
@@ -48,20 +48,14 @@ def remove_prefix(x, prefix):
     return x
 
 
-def parse_enum_columns(data):
-    # TODO: to be replaced with temp enum parser and later with emotool full enum parser
-    data.loc[data['Required dir'] == 255, 'Required dir'] = -1
-    data.loc[data['Actual dir'] == 255, 'Actual dir'] = -1
-    return data
-
-
 def remove_unneeded_columns(data):
     data.drop(['Sequence', 'Timestamp'], inplace=True, axis=1)
     return data
 
 
 def only_full_cycles(data):
-    cycle_start_indexes = data[data['Actual dir'].diff() != 0].index
+    dir_numeric = data['Actual dir'].replace(['UP', 'DOWN'], [1, -1])
+    cycle_start_indexes = data[dir_numeric.diff() != 0].index
     start_i = cycle_start_indexes[1]
 
     # the end of the last valid cycle, is one valid index before the start of the last (incomplete) cycle
@@ -78,7 +72,7 @@ def only_full_cycles(data):
 
 
 def add_time_column(data):
-    data['Time'] = data.index * tick_time_ms
+    data['Time [ms]'] = data.index * tick_time_ms
     return data
 
 
@@ -90,16 +84,16 @@ def calc_step_times_and_vel(data):
 
     pos_change_indexes.append(pos.last_valid_index())
     step_times = np.diff(pos_change_indexes)
-    ret = pd.DataFrame(data=step_times, index=pos_change_indexes[1:], columns=['Step time'])
-    ret['Step time'] *= tick_time_ms
+    ret = pd.DataFrame(data=step_times, index=pos_change_indexes[1:], columns=['Step time [ms]'])
+    ret['Step time [ms]'] *= tick_time_ms
     ret = ret.reindex(index=data.index, method='backfill')
-    ret['Velocity'] = step_size_mm / ret['Step time']
+    ret['Velocity'] = step_size_mm / ret['Step time [ms]']
     return ret
 
 
 def reorder_columns(data):
     all_cols = data.columns.tolist()
-    first_cols = ['Time', 'Position', 'Step time', 'Velocity', 'Motor state', 'Actual dir', 'Required dir']
+    first_cols = ['Time [ms]', 'Position', 'Step time [ms]', 'Velocity', 'Motor state', 'Actual dir', 'Required dir']
     rest_of_cols = [c for c in all_cols if c not in first_cols]
     data = data[first_cols + rest_of_cols]
     return data
@@ -112,8 +106,9 @@ def interpolate_missing_data(data):
     return data
 
 
-def save_to_excel(data):
+def save_to_excel(data, csv_filename):
     #data = data[1:5000] # TEMP since it's taking so long...
+    output_filename = csv_filename[:-4] + '.xlsx'
     shutil.copy(template_filename, output_filename)
 
     # use xlsxwriter, fast but can't use the template
@@ -129,5 +124,5 @@ def save_to_excel(data):
     writer.save()
 
 if __name__ == '__main__':
-    post_process("motor_run_example original.csv")
+    post_process('D:\\Projects\\Comet ME Pump Drive\\run logs\\emo_002.csv')
 
