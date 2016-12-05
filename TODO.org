@@ -1,4 +1,7 @@
++ [ ] instead of waiting xx wall-clock seconds, count ticks instead (but also with timeout)
+
 + [ ] ACK of last sampler_stop is received by serial2tp and pushed to socket but ignored by emotool.py ; investigate
+
 + [ ] On a nominal run this should not be printed:
  Task was destroyed but it is pending!
  task: <Task pending coro=<Client.add_future.<locals>.set_result_after_timeout() running at D:\Projects\Comet ME Pump Drive\firmware\emolog\emolog\emolog.py:512> wait_for=<Future pending cb=[Task._wakeup()]>>
