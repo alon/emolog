@@ -1,3 +1,5 @@
++ [ ] fix requirements.txt / venv
+
 + [ ] instead of waiting xx wall-clock seconds, count ticks instead (but also with timeout)
 
 + [ ] ACK of last sampler_stop is received by serial2tp and pushed to socket but ignored by emotool.py ; investigate
