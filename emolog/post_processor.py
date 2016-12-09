@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
+from collections import OrderedDict
+from math import pi
+import os
 
 import time     # TEMP for profiling
-import os
 
 tick_time_ms = 0.05     # 50 us = 0.05 ms
 step_size_mm = 4.0
-
+bore_diameter_mm = 26 # TODO
 
 def post_process(csv_filename):
     start_time = time.time()
@@ -20,16 +22,22 @@ def post_process(csv_filename):
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = reorder_columns(data)
     data = interpolate_missing_data(data)
-    data.columns = [std_name_to_output_name(c) for c in data.columns]
     end_time = time.time()
-    print("processing time: {}".format(end_time-start_time))
+    print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
+
+    start_time = time.time()
+    summary_stats = calc_summary_stats(data)
+    half_cycle_stats = calc_half_cycle_stats(data)
+    end_time = time.time()
+    print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, output_filename)
+    save_to_excel(data, summary_stats, half_cycle_stats, output_filename)
     end_time = time.time()
-    print("save to excel time: {}".format(end_time-start_time))
+    print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
+
 
 output_col_names = \
     {
@@ -130,8 +138,87 @@ def interpolate_missing_data(data):
     return data
 
 
-def save_to_excel(data, output_filename):
+def calc_summary_stats(data):
+    res = OrderedDict()
+    res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
+    res['Number of Samples'] = len(data)
+    index_diff = np.diff(data.index)
+    res['Lost Samples'] = sum(index_diff) - len(index_diff)
+    res['Number of Half-Cycles'] = data['Half cycle'].max()
+
+    res['UP Travel Time [ms]'] = data['Actual dir'].value_counts()['UP'] * tick_time_ms
+    res['DOWN Travel Time [ms]'] = data['Actual dir'].value_counts()['DOWN'] * tick_time_ms
+    res['UP Travel [% of total]'] = res['UP Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
+    res['DOWN Travel [% of total]'] = res['DOWN Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
+
+    top_positions = data[data['Actual dir'] == 'UP'].groupby('Half cycle')['Position'].max()
+    bottom_positions = data[data['Actual dir'] == 'DOWN'].groupby('Half cycle')['Position'].min()
+    res['Top Position Average [steps]'] = top_positions.mean()
+    res['Top Position Std. Dev. [steps]'] = top_positions.std()
+    res['Bottom Position Average [steps]'] = bottom_positions.mean()
+    res['Bottom Position Std. Dev. [steps]'] = bottom_positions.std()
+    res['Travel Range Average [steps]'] = res['Top Position Average [steps]'] - res['Bottom Position Average [steps]']
+    res['Travel Range Average [mm]'] = res['Travel Range Average [steps]'] * step_size_mm
+
+    res['Coasting Time [% of total time]'] = data['Motor state'].value_counts(normalize=True)['M_STATE_ALL_OFF']
+
+    res['Average Current [A]'] = data['Total i'].mean()
+    res['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
+    res['Average Current going DOWN [A]'] = data[data['Actual dir'] == 'DOWN']['Total i'].mean()
+    res['Average Current Excluding Coasting [A]'] = data[data['Motor state'] != 'M_STATE_ALL_OFF']['Total i'].mean()
+    res['Average Current During Coasting [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
+
+    return res
+
+
+def calc_half_cycle_stats(data):
+    """
+    Statistics to calculate:
+
+    Half Cycle #
+    Direction
+    Time [ms]
+    Min. Position [steps]
+    Max. Position [steps]
+    Travel Range [steps]
+    Average Velocity [m/s]
+    Middle Section Velocity [m/s]
+    Flow Rate [LPM]
+    Coasting Duration [ms]
+    Coasting Distance [steps]
+    Coasting Percentage [%]
+    Average Current [A]
+    Average Current Excluding Coasting [A]
+    Average Current During Coasting [A]
+    """
+    res = []
+    for (hc_num, hc) in data.groupby('Half cycle'):
+        hc_stats = OrderedDict()
+        hc_stats['Half Cycle #'] = hc_num
+        assert(len(hc['Actual dir'].unique()) == 1)     # a half-cycle should have a constant 'Actual dir'
+        hc_stats['Direction'] = hc['Actual dir'].iloc[0]
+        hc_stats['Time [ms]'] = (hc.last_valid_index() - hc.first_valid_index() + 1) * tick_time_ms
+        hc_stats['Min. Position [steps]'] = hc['Position'].min()
+        hc_stats['Max. Position [steps]'] = hc['Position'].max()
+        hc_stats['Travel Range'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]'] + 1
+        hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range'] * step_size_mm / hc_stats['Time [ms]']
+        hc_stats['Middle Section Velocity [m/s]'] = 'TODO' # TODO
+        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range'] * step_size_mm
+        hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
+        coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
+        hc_stats['Coasting Distance [steps]'] = coasting['Position'].max() - coasting['Position'].min()
+        hc_stats['Coasting Duration [ms]'] = len(coasting) * tick_time_ms
+        hc_stats['Coasting Duration [% of half-cycle]'] = hc_stats['Coasting Duration [ms]'] / hc_stats['Time [ms]']
+        hc_stats['Average Current [A]'] = hc['Total i'].mean()
+        hc_stats['Average Current Excluding Coasting [A]'] = hc[hc['Motor state'] != 'M_STATE_ALL_OFF']['Total i'].mean()
+        hc_stats['Average Current During Coasting [A]'] = coasting['Total i'].mean()
+        res.append(hc_stats)
+    return res
+
+
+def save_to_excel(data, summary_stats, half_cycle_stats, output_filename):
     #data = data[1:5000] # TEMP since it's taking so long...
+    data.columns = [std_name_to_output_name(c) for c in data.columns]
 
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     data.to_excel(excel_writer=writer, sheet_name='Data', header=False, startrow=1)
@@ -142,8 +229,11 @@ def save_to_excel(data, output_filename):
     set_column_formats(workbook, data_sheet, data.columns.tolist())
 
     add_graphs(workbook, data)
+    add_summary_sheet(workbook, summary_stats)
+    add_half_cycles_sheet(workbook, half_cycle_stats)
 
     writer.save()
+
 
 def set_header(wb, ws, cols):
     header_format = wb.add_format({'text_wrap': True, 'bold': True})
@@ -230,6 +320,7 @@ def add_graphs(wb, data):
 
     add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos, Vel, Current - 0.5s')
 
+
 def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     sheet = wb.add_chartsheet()
     chart = wb.add_chart({'type': 'scatter', 'subtype': 'straight'})
@@ -247,6 +338,33 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
+
+
+def add_summary_sheet(wb, summary_stats):
+    sheet = wb.add_worksheet('Analysis Summary')
+    row = 0
+    for field_name, field_value in summary_stats.items():
+        sheet.write(row, 0, field_name)
+        sheet.write(row, 1, field_value)
+        row += 1
+
+
+def add_half_cycles_sheet(wb, half_cycle_stats):
+    sheet = wb.add_worksheet('Half-Cycles Analysis')
+
+    # write header row
+    col = 0
+    for field_name, field_value in half_cycle_stats[0].items():
+        sheet.write(0, col, field_name)
+        col += 1
+
+    row = 1
+    for hc_stat in half_cycle_stats:
+        col = 0
+        for field_name, field_value in hc_stat.items():
+            sheet.write(row, col, field_value)
+            col += 1
+        row += 1
 
 
 if __name__ == '__main__':
