@@ -1,14 +1,15 @@
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
-from math import pi
+from math import pi, isnan
 import os
 
-import time     # TEMP for profiling
+import time     # for profiling
 
 tick_time_ms = 0.05     # 50 us = 0.05 ms
 step_size_mm = 4.0
-bore_diameter_mm = 26 # TODO
+bore_diameter_mm = 26   # TODO is this correct?
+
 
 def post_process(csv_filename):
     start_time = time.time()
@@ -26,8 +27,8 @@ def post_process(csv_filename):
     print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
-    summary_stats = calc_summary_stats(data)
     half_cycle_stats = calc_half_cycle_stats(data)
+    summary_stats = calc_summary_stats(data, half_cycle_stats)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
@@ -51,9 +52,50 @@ output_col_names = \
         'Total i': 'Total I\n[A]',
         'Temp ext': 'Motor\nTemperature',
         'Last flow rate lpm': 'Flow Rate\n[LPM]',
-        'Half cycle': 'Half-Cycle #'
+        'Half cycle': 'Half-Cycle #',
+        'Duty cycle': 'Duty Cycle'
     }
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
+
+
+data_col_formats = \
+    {
+        'Time': {'width': 8, 'format': 'time'},
+        'Position': {'width': 8, 'format': 'general'},
+        'Step time': {'width': 9, 'format': 'time'},
+        'Velocity': {'width': 8, 'format': 'frac'},
+        'Motor state': {'width': 17, 'format': 'general'},
+        'Actual dir': {'width': 9, 'format': 'general'},
+        'Required dir': {'width': 9, 'format': 'general'},
+        'Ref sensor': {'width': 6, 'format': 'general'},
+        'Dc bus v': {'width': 7, 'format': 'frac'},
+        'Total i': {'width': 7, 'format': 'frac'},
+        'Temp ext': {'width': 12, 'format': 'frac'},
+        'Last flow rate lpm': {'width': 9, 'format': 'frac'},
+        'Half cycle': {'width': 11, 'format': 'general'},
+        'Duty cycle': {'width': 8, 'format': 'percent'},
+    }
+
+
+half_cycle_col_formats = \
+    {
+        'Half-Cycle': {'width': 6, 'format': 'general'},
+        'Direction': {'width': 9, 'format': 'general'},
+        'Time [ms]': {'width': 7, 'format': 'time'},
+        'Min. Position [steps]': {'width': 8, 'format': 'general'},
+        'Max. Position [steps]': {'width': 8, 'format': 'general'},
+        'Travel Range [steps]': {'width': 7, 'format': 'general'},
+        'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
+        'Middle Section Velocity [m/s]': {'width': 13, 'format': 'general'},
+        'Flow Rate [LPM]': {'width': 8, 'format': 'frac'},
+        'Coasting Distance [steps]': {'width': 8, 'format': 'general'},
+        'Coasting Duration [ms]': {'width': 8, 'format': 'time'},
+        'Coasting Duration [%]': {'width': 8, 'format': 'percent'},
+        'Average Current [A]': {'width': 8, 'format': 'frac'},
+        'Average Current Excluding Coasting [A]': {'width': 15, 'format': 'frac'},
+        'Average Current During Coasting [A]': {'width': 14, 'format': 'frac'}
+    }
+
 
 def std_name_to_output_name(name):
     if name in output_col_names:
@@ -67,9 +109,9 @@ def output_name_to_std_name(output_name):
     return output_name
 
 
-
 def clean_col_name(name):
     name = remove_prefix(name, 'controller.state.')
+    name = remove_prefix(name, 'duty_cycle.')
     name = name.replace("_", " ")
     name = name[0].upper() + name[1:]
     return name
@@ -89,11 +131,24 @@ def remove_unneeded_columns(data):
 def only_full_cycles(data):
     dir_numeric = data['Actual dir'].replace(['UP', 'DOWN'], [1, -1])
     cycle_start_indexes = data[dir_numeric.diff() != 0].index
-    start_i = cycle_start_indexes[1]
 
+    # no direction changes at all: do not truncate data. all data is the same half-cycle.
+    if len(cycle_start_indexes) <= 1:
+        data['Half cycle'] = pd.Series(data=[1] * len(data))
+        data.index -= data.first_valid_index()  # reindex starting from ticks = 0
+        return data
+
+    # one direction change: probably two incomplete cycles
+    if len(cycle_start_indexes) == 2:
+        data['Half cycle'] = pd.Series(data=np.arange(1, len(cycle_start_indexes) + 1), index=cycle_start_indexes)
+        data['Half cycle'].fillna(method='ffill', inplace=True)
+        data.index -= data.first_valid_index()  # reindex starting from ticks = 0
+        return data
+
+    start_i = cycle_start_indexes[1]
     # the end of the last valid cycle, is one *valid index* before the start of the last (incomplete) cycle
     # note that it's not necessarily means minus 1 (with missing ticks)
-    end_i = data.index[data.index.get_loc(cycle_start_indexes[-1]) - 1] # move one valid index before it
+    end_i = data.index[data.index.get_loc(cycle_start_indexes[-1]) - 1]  # move one valid index before it
 
     data['Half cycle'] = pd.Series(data=np.arange(1, len(cycle_start_indexes)), index=cycle_start_indexes[1:])
     data['Half cycle'].fillna(method='ffill', inplace=True)
@@ -109,10 +164,9 @@ def add_time_column(data):
 
 
 def calc_step_times_and_vel(data):
-    # TODO this assumes no tick jumps, confirm working or fix for data that includes jumps
+    # this assumes no lost samples. Output is incorrect when samples are missing.
     pos = data['Position']
     pos_change_indexes = (pos[pos.diff() != 0].index - 1).tolist()
-    # pos_change_indexes = pos[pos.diff() != 0].index
 
     pos_change_indexes.append(pos.last_valid_index())
     step_times = np.diff(pos_change_indexes)
@@ -138,18 +192,48 @@ def interpolate_missing_data(data):
     return data
 
 
-def calc_summary_stats(data):
+def calc_summary_stats(data, hc_stats):
+    """
+    add:
+    'DC Bus Voltage Average [V]'
+    'DC Bus Voltage Min. [V]'
+    'DC Bus Voltage Max. [V]'
+    'DC Bus Voltage Std. Dev. [V]'
+
+
+    """
     res = OrderedDict()
     res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
     res['Number of Samples'] = len(data)
     index_diff = np.diff(data.index)
     res['Lost Samples'] = sum(index_diff) - len(index_diff)
+    res['Lost samples [%]'] = res['Lost Samples'] / res['Number of Samples']
+    res['separator 1'] = ''
+
     res['Number of Half-Cycles'] = data['Half cycle'].max()
 
-    res['UP Travel Time [ms]'] = data['Actual dir'].value_counts()['UP'] * tick_time_ms
-    res['DOWN Travel Time [ms]'] = data['Actual dir'].value_counts()['DOWN'] * tick_time_ms
-    res['UP Travel [% of total]'] = res['UP Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
-    res['DOWN Travel [% of total]'] = res['DOWN Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
+    # res['Average UP Travel Time [ms]'] = hc_stats[hc_stats['Direction'] == 'UP']['Time [ms]'].mean()
+
+    ##############
+    # try:
+    #     res['Average UP Travel Time [ms]'] = data['Actual dir'].value_counts()['UP'] * tick_time_ms
+    # except:
+    #     res['Average UP Travel Time [ms]'] = 'N/A'
+    #
+    # try:
+    #     res['DOWN Travel Time [ms]'] = data['Actual dir'].value_counts()['DOWN'] * tick_time_ms
+    # except:
+    #     res['DOWN Travel Time [ms]'] = 'N/A'
+    #
+    # # TODO: the following is wrong, in case there are n UP cycles and n+1 DOWN cycles or vice-versa
+    #
+    # res['UP Travel [% of total]'] = res['UP Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
+    # res['DOWN Travel [% of total]'] = res['DOWN Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
+    #
+    # res['UP Travel [% of total]'] = 'N/A'
+    # res['DOWN Travel [% of total]'] = 'N/A'
+
+##############
 
     top_positions = data[data['Actual dir'] == 'UP'].groupby('Half cycle')['Position'].max()
     bottom_positions = data[data['Actual dir'] == 'DOWN'].groupby('Half cycle')['Position'].min()
@@ -159,8 +243,10 @@ def calc_summary_stats(data):
     res['Bottom Position Std. Dev. [steps]'] = bottom_positions.std()
     res['Travel Range Average [steps]'] = res['Top Position Average [steps]'] - res['Bottom Position Average [steps]']
     res['Travel Range Average [mm]'] = res['Travel Range Average [steps]'] * step_size_mm
+    res['separator 2'] = ''
 
     res['Coasting Time [% of total time]'] = data['Motor state'].value_counts(normalize=True)['M_STATE_ALL_OFF']
+    res['separator 3'] = ''
 
     res['Average Current [A]'] = data['Total i'].mean()
     res['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
@@ -172,103 +258,86 @@ def calc_summary_stats(data):
 
 
 def calc_half_cycle_stats(data):
-    """
-    Statistics to calculate:
-
-    Half Cycle #
-    Direction
-    Time [ms]
-    Min. Position [steps]
-    Max. Position [steps]
-    Travel Range [steps]
-    Average Velocity [m/s]
-    Middle Section Velocity [m/s]
-    Flow Rate [LPM]
-    Coasting Duration [ms]
-    Coasting Distance [steps]
-    Coasting Percentage [%]
-    Average Current [A]
-    Average Current Excluding Coasting [A]
-    Average Current During Coasting [A]
-    """
     res = []
     for (hc_num, hc) in data.groupby('Half cycle'):
         hc_stats = OrderedDict()
-        hc_stats['Half Cycle #'] = hc_num
+        hc_stats['Half-Cycle'] = hc_num
         assert(len(hc['Actual dir'].unique()) == 1)     # a half-cycle should have a constant 'Actual dir'
         hc_stats['Direction'] = hc['Actual dir'].iloc[0]
         hc_stats['Time [ms]'] = (hc.last_valid_index() - hc.first_valid_index() + 1) * tick_time_ms
         hc_stats['Min. Position [steps]'] = hc['Position'].min()
         hc_stats['Max. Position [steps]'] = hc['Position'].max()
-        hc_stats['Travel Range'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]'] + 1
-        hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range'] * step_size_mm / hc_stats['Time [ms]']
-        hc_stats['Middle Section Velocity [m/s]'] = 'TODO' # TODO
-        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range'] * step_size_mm
+        hc_stats['Travel Range [steps]'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]'] + 1
+        hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
+        hc_stats['Middle Section Velocity [m/s]'] = 'TODO'  # TODO
+        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range [steps]'] * step_size_mm
         hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
-        hc_stats['Coasting Distance [steps]'] = coasting['Position'].max() - coasting['Position'].min()
-        hc_stats['Coasting Duration [ms]'] = len(coasting) * tick_time_ms
-        hc_stats['Coasting Duration [% of half-cycle]'] = hc_stats['Coasting Duration [ms]'] / hc_stats['Time [ms]']
+        if len(coasting) > 0:
+            hc_stats['Coasting Distance [steps]'] = coasting['Position'].max() - coasting['Position'].min()
+            hc_stats['Coasting Duration [ms]'] = len(coasting) * tick_time_ms
+            hc_stats['Coasting Duration [%]'] = hc_stats['Coasting Duration [ms]'] / hc_stats['Time [ms]']
+        else:
+            hc_stats['Coasting Distance [steps]'] = 'N/A'
+            hc_stats['Coasting Duration [ms]'] = 'N/A'
+            hc_stats['Coasting Duration [%]'] = 'N/A'
         hc_stats['Average Current [A]'] = hc['Total i'].mean()
         hc_stats['Average Current Excluding Coasting [A]'] = hc[hc['Motor state'] != 'M_STATE_ALL_OFF']['Total i'].mean()
-        hc_stats['Average Current During Coasting [A]'] = coasting['Total i'].mean()
+        if len(coasting) > 0:
+            hc_stats['Average Current During Coasting [A]'] = coasting['Total i'].mean()
+        else:
+            hc_stats['Average Current During Coasting [A]'] = 'N/A'
+
         res.append(hc_stats)
-    return res
+    return pd.DataFrame(res)
 
 
 def save_to_excel(data, summary_stats, half_cycle_stats, output_filename):
-    #data = data[1:5000] # TEMP since it's taking so long...
-    data.columns = [std_name_to_output_name(c) for c in data.columns]
-
+    # data = data[1:5000]     # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
-    data.to_excel(excel_writer=writer, sheet_name='Data', header=False, startrow=1)
     workbook = writer.book
-    data_sheet = writer.sheets['Data']
+    wb_formats = add_workbook_formats(workbook)
 
-    set_header(workbook, data_sheet, data.columns.tolist())
-    set_column_formats(workbook, data_sheet, data.columns.tolist())
-
+    add_data_sheet(writer, data, wb_formats)
     add_graphs(workbook, data)
-    add_summary_sheet(workbook, summary_stats)
-    add_half_cycles_sheet(workbook, half_cycle_stats)
+    add_summary_sheet(workbook, summary_stats, wb_formats)
+    add_half_cycles_sheet(writer, half_cycle_stats, wb_formats)
 
     writer.save()
 
 
-def set_header(wb, ws, cols):
-    header_format = wb.add_format({'text_wrap': True, 'bold': True})
-    header_format.set_text_wrap()
-    ws.set_row(row=0, height=30, cell_format=header_format)   # header row has different format
+def add_workbook_formats(wb):
+    formats = \
+        {
+            'frac': wb.add_format({'num_format': '0.000'}),
+            'time': wb.add_format({'num_format': '0.00'}),
+            'percent': wb.add_format({'num_format': '0.00%'}),
+            'general': wb.add_format(),
+            'header': wb.add_format({'text_wrap': True, 'bold': True})
+        }
+    return formats    
+
+
+def add_data_sheet(writer, data, wb_formats):
+    data.to_excel(excel_writer=writer, sheet_name='Data', header=False, startrow=1)
+    data_sheet = writer.sheets['Data']
+    set_data_header(data_sheet, data.columns.tolist(), wb_formats)
+    set_column_formats(data_sheet, [''] + data.columns.tolist(), wb_formats, data_col_formats)
+
+
+def set_data_header(ws, cols, wb_formats):
+    ws.set_row(row=0, height=30, cell_format=wb_formats['header'])
     for (col_num, col_name) in enumerate(cols):
-        ws.write(0, col_num + 1, col_name)
+        ws.write(0, col_num + 1, std_name_to_output_name(col_name))
+    ws.freeze_panes(1, 0)
 
 
-def set_column_formats(wb, ws, cols):
-    frac_format = wb.add_format({'num_format': '0.000'})
-    time_format = wb.add_format({'num_format': '0.00'})
-    general_format = wb.add_format()
-
-    col_formats = {
-        'Time':               (8, time_format),
-        'Position':           (8, general_format),
-        'Step time':          (9, time_format),
-        'Velocity':           (8, frac_format),
-        'Motor state':        (16, general_format),
-        'Actual dir':         (9, general_format),
-        'Required dir':       (9, general_format),
-        'Ref sensor':         (6, general_format),
-        'Dc bus v':           (7, frac_format),
-        'Total i':            (7, frac_format),
-        'Temp ext':           (12, frac_format),
-        'Last flow rate lpm': (9, frac_format),
-        'Half cycle':         (11, general_format)
-    }
-    col_formats = {(std_name_to_output_name(c)): f for (c, f) in col_formats.items()}
-
+def set_column_formats(ws, cols, wb_formats, col_name_to_format):
     for col in cols:
-        if col in col_formats:
-            col_index = cols.index(col) + 1     # +1 since column A is the index (Ticks)
-            ws.set_column(col_index, col_index, col_formats[col][0], col_formats[col][1])
+        if col in col_name_to_format:
+            col_index = cols.index(col)
+            format_dict = col_name_to_format[col]
+            ws.set_column(col_index, col_index, format_dict['width'], wb_formats[format_dict['format']])
 
 
 def add_graphs(wb, data):
@@ -277,9 +346,9 @@ def add_graphs(wb, data):
     max_row = data.last_valid_index() + 1
     short_max_row = 500.0 / tick_time_ms
 
-    pos_col = data.columns.tolist().index(std_name_to_output_name('Position')) + 1
-    vel_col = data.columns.tolist().index(std_name_to_output_name('Velocity')) + 1
-    current_col = data.columns.tolist().index(std_name_to_output_name('Total i')) + 1
+    pos_col = data.columns.tolist().index('Position') + 1
+    vel_col = data.columns.tolist().index('Velocity') + 1
+    current_col = data.columns.tolist().index('Total i') + 1
 
     x_axis = {'min_row': min_row,
               'max_row': max_row,
@@ -302,14 +371,15 @@ def add_graphs(wb, data):
                    'line_width': 1
                    })
 
-
     add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos & Vel - Full')
 
     # short time graph
+
     x_axis['max_row'] = short_max_row
     for y_axis in y_axes:
         y_axis['max_row'] = short_max_row
         y_axis['line_width'] = 1.5
+
     y_axes.append({'name': 'Current',
                    'min_row': min_row,
                    'max_row': short_max_row,
@@ -317,6 +387,16 @@ def add_graphs(wb, data):
                    'secondary': True,
                    'line_width': 1
                    })
+
+    if std_name_to_output_name('Duty cycle') in data.columns.tolist():
+        duty_cycle_col = data.columns.tolist().index(std_name_to_output_name('Duty cycle')) + 1
+        y_axes.append({'name': 'Duty Cycle',
+                       'min_row': min_row,
+                       'max_row': short_max_row,
+                       'col': duty_cycle_col,
+                       'secondary': True,
+                       'line_width': 1.5
+                       })
 
     add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos, Vel, Current - 0.5s')
 
@@ -340,35 +420,38 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     sheet.name = chart_sheet_name
 
 
-def add_summary_sheet(wb, summary_stats):
+def add_summary_sheet(wb, summary_stats, wb_formats):
     sheet = wb.add_worksheet('Analysis Summary')
     row = 0
+    sheet.set_column(0, 0, width=35, cell_format=wb_formats['header'])
     for field_name, field_value in summary_stats.items():
-        sheet.write(row, 0, field_name)
-        sheet.write(row, 1, field_value)
+        if not field_name.startswith('separator'):
+            sheet.write(row, 0, field_name)
+            if isnan(field_value):
+                field_value = 'N/A'
+            sheet.write(row, 1, field_value)
         row += 1
 
 
-def add_half_cycles_sheet(wb, half_cycle_stats):
-    sheet = wb.add_worksheet('Half-Cycles Analysis')
+def add_half_cycles_sheet(writer, half_cycle_stats, wb_formats):
+    half_cycle_stats.to_excel(excel_writer=writer,
+                              sheet_name='Half-Cycles Analysis',
+                              header=False,
+                              index=False,
+                              startrow=1)
+    sheet = writer.sheets['Half-Cycles Analysis']
 
     # write header row
-    col = 0
-    for field_name, field_value in half_cycle_stats[0].items():
-        sheet.write(0, col, field_name)
-        col += 1
+    sheet.set_row(row=0, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(half_cycle_stats.columns):
+        sheet.write(0, col_num, col_name)
 
-    row = 1
-    for hc_stat in half_cycle_stats:
-        col = 0
-        for field_name, field_value in hc_stat.items():
-            sheet.write(row, col, field_value)
-            col += 1
-        row += 1
+    set_column_formats(sheet, half_cycle_stats.columns.tolist(), wb_formats, half_cycle_col_formats)
 
 
 if __name__ == '__main__':
-    input_filename = 'solar_panels_emo_012.csv'
+    # input_filename = 'solar_panels_emo_012.csv'
+    # input_filename = 'my motor with soft start lost data.csv'
+    input_filename = 'my motor with soft start motor off.csv'
     out_filename = post_process(input_filename)
     os.startfile(out_filename)
-
