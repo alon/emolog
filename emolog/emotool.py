@@ -24,11 +24,9 @@ from dwarf import FileParser
 import emolog
 import post_processor
 
+
 logger = logging.getLogger()
 
-# TODO instead of hard coding, get from args
-# results_folder = 'C:\\Comet-ME Pump Drive\\run logs'      # for Noam's laptop
-results_folder = 'D:\\Projects\\Comet ME Pump Drive\\run logs'        # for Guy's laptop
 
 def with_errors(s):
     # TODO - find a library for this? using error distance
@@ -137,10 +135,13 @@ def iterate(filename, initial, firstoption):
 
 
 def next_available(filename, numbered):
-    filenames = iterate(filename, 1, filename if numbered is None else None)
+    base = os.path.dirname(filename)
+    filename = os.path.basename(filename)
+    filenames = iterate(filename, 1, filename if numbered else None)
     for filename in filenames:
-        if not os.path.exists(results_folder + '\\' + filename):
-            return results_folder + '\\' + filename
+        candidate = os.path.join(base, filename)
+        if not os.path.exists(candidate):
+            return candidate
 
 
 def decode_little_endian_float(s):
@@ -289,7 +290,9 @@ def parse_args():
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
-    parser.add_argument('--csv-filename', default=None, help='name of csv output file')
+    parser.add_argument('--csv',
+                        default=r'D:\Projects\Comet ME Pump Drive\run logs\emo', # r'C:\Comet-ME Pump Drive\run logs\emo'      # for Noam's laptop
+                        help='name of csv output file')
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
@@ -334,8 +337,8 @@ async def amain():
 
     names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
 
-    csv_filename = (next_available('emo', numbered=True) if not args.csv_filename else
-                    next_available(args.csv_filename, numbered=False))
+    csv_filename = (next_available('emo', numbered=True) if not args.csv else
+                    next_available(args.csv, numbered=False))
     print("================")
     print("Emotool starting")
     print("================")
