@@ -1,8 +1,10 @@
-import pandas as pd
-import numpy as np
+import sys
 from collections import OrderedDict
 from math import pi, isnan
 import os
+
+import pandas as pd
+import numpy as np
 
 import time     # for profiling
 
@@ -315,7 +317,7 @@ def add_workbook_formats(wb):
             'general': wb.add_format(),
             'header': wb.add_format({'text_wrap': True, 'bold': True})
         }
-    return formats    
+    return formats
 
 
 def add_data_sheet(writer, data, wb_formats):
@@ -452,6 +454,9 @@ def add_half_cycles_sheet(writer, half_cycle_stats, wb_formats):
 if __name__ == '__main__':
     # input_filename = 'solar_panels_emo_012.csv'
     # input_filename = 'my motor with soft start lost data.csv'
-    input_filename = 'my motor with soft start motor off.csv'
+    if len(sys.argv) < 1:
+        input_filename = 'my motor with soft start motor off.csv'
+    else:
+        input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
     os.startfile(out_filename)
