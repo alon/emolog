@@ -30,13 +30,14 @@ def post_process(csv_filename):
 
     start_time = time.time()
     half_cycle_stats = calc_half_cycle_stats(data)
+    half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
     summary_stats = calc_summary_stats(data, half_cycle_stats)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, summary_stats, half_cycle_stats, output_filename)
+    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, output_filename)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -294,7 +295,16 @@ def calc_half_cycle_stats(data):
     return pd.DataFrame(res)
 
 
-def save_to_excel(data, summary_stats, half_cycle_stats, output_filename):
+def calc_half_cycle_summary(hc_stats):
+    summary = hc_stats.groupby('Direction').mean()
+    summary = summary.reindex(columns=hc_stats.columns)
+    summary['Direction'] = summary.index
+    summary['Half-Cycle'] = np.nan
+    summary = summary.fillna('N/A')
+    return summary
+
+
+def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, output_filename):
     # data = data[1:5000]     # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
@@ -303,7 +313,7 @@ def save_to_excel(data, summary_stats, half_cycle_stats, output_filename):
     add_data_sheet(writer, data, wb_formats)
     add_graphs(workbook, data)
     add_summary_sheet(workbook, summary_stats, wb_formats)
-    add_half_cycles_sheet(writer, half_cycle_stats, wb_formats)
+    add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats)
 
     writer.save()
 
@@ -435,7 +445,7 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
         row += 1
 
 
-def add_half_cycles_sheet(writer, half_cycle_stats, wb_formats):
+def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
     half_cycle_stats.to_excel(excel_writer=writer,
                               sheet_name='Half-Cycles Analysis',
                               header=False,
@@ -449,6 +459,16 @@ def add_half_cycles_sheet(writer, half_cycle_stats, wb_formats):
         sheet.write(0, col_num, col_name)
 
     set_column_formats(sheet, half_cycle_stats.columns.tolist(), wb_formats, half_cycle_col_formats)
+
+    # write summary rows
+    summary_start_row = len(half_cycle_stats) + 3
+    half_cycle_summary.to_excel(excel_writer=writer,
+                                sheet_name='Half-Cycles Analysis',
+                                header=False,
+                                index=False,
+                                startrow=summary_start_row)
+
+
 
 
 if __name__ == '__main__':
