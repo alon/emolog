@@ -94,13 +94,19 @@ class EmoToolClient(emolog.Client):
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
         self.csv = None
         self.csv_filename = csv_filename
+        self.first_ticks = None
         self.last_ticks = None
         self.min_ticks = min_ticks
         self.names = names
         self.samples_received = 0
         self.ticks_lost = 0
-        self.total_logged_time = 2
         EmoToolClient.instance = self # ugly reference for KeboardInterrupt handling
+
+    @property
+    def total_ticks(self):
+        if self.first_ticks is None or self.last_ticks is None:
+            return 0
+        return self.last_ticks - self.first_ticks
 
     def initialize_file(self):
         if self.csv:
@@ -119,6 +125,8 @@ class EmoToolClient(emolog.Client):
             print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
             self.ticks_lost += msg.ticks - self.last_ticks - self.min_ticks
         self.last_ticks = msg.ticks
+        if self.first_ticks is None:
+            self.first_ticks = self.last_ticks
 
 
 def iterate(filename, initial, firstoption):
@@ -299,6 +307,7 @@ def parse_args():
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
+    parser.add_argument('--ticks-per-second', default=1000000/50, help='number of ticks per second. used in conjunction with runtime')
     return parser.parse_args()
 
 
@@ -372,17 +381,17 @@ async def amain():
 
     dt = 0.1 if args.runtime is not None else 1.0
     if args.runtime:
-        start = clock()
-        logger.debug("running for {} seconds (start = {}".format(args.runtime, start))
+        max_ticks = args.ticks_per_second * args.runtime
+        print("running for {} seconds = {} ticks".format(args.runtime, max_ticks))
     if try_getch_message:
         print(try_getch_message)
     while True:
         if try_getch():
             break
         await asyncio.sleep(dt)
-        if args.runtime is not None and clock.total_logged_time > args.runtime:
+        if args.runtime is not None and client.total_ticks > max_ticks:
             break
-    logger.debug("stopped at {}".format(clock()))
+    logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
     print("Running post processor (this may take some time)...")
     post_processor.post_process(csv_filename)
