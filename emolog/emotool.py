@@ -88,9 +88,10 @@ async def start_fake_sine():
     await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
     return wsock
 
-g_client = [None]
 
 class EmoToolClient(emolog.Client):
+    instance = None
+
     def __init__(self, csv_filename, verbose, names, dump, min_ticks):
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
         self.csv = None
@@ -100,7 +101,8 @@ class EmoToolClient(emolog.Client):
         self.names = names
         self.samples_received = 0
         self.ticks_lost = 0
-        g_client[0] = self # ugly reference for KeboardInterrupt handling
+        self.total_logged_time = 2
+        EmoToolClient.instance = self # ugly reference for KeboardInterrupt handling
 
     def initialize_file(self):
         if self.csv:
@@ -375,7 +377,7 @@ async def amain():
         if try_getch():
             break
         await asyncio.sleep(dt)
-        if args.runtime is not None and clock() - start > args.runtime:
+        if args.runtime is not None and clock.total_logged_time > args.runtime:
             break
     logger.debug("stopped at {}".format(clock()))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
@@ -397,7 +399,7 @@ def main():
         print("exiting on user ctrl-c")
     except Exception as e:
         logger.debug("got exception {!r}".format(e))
-    loop.run_until_complete(cleanup(g_client[0]))
+    loop.run_until_complete(cleanup(EmoToolClient.instance))
 
 
 if __name__ == '__main__':
