@@ -83,7 +83,7 @@ data_col_formats = \
 half_cycle_col_formats = \
     {
         'Half-Cycle': {'width': 6, 'format': 'general'},
-        'Direction': {'width': 9, 'format': 'general'},
+        'Direction': {'width': 15, 'format': 'general'},
         'Time [ms]': {'width': 7, 'format': 'time'},
         'Min. Position [steps]': {'width': 8, 'format': 'general'},
         'Max. Position [steps]': {'width': 8, 'format': 'general'},
@@ -203,7 +203,9 @@ def calc_summary_stats(data, hc_stats):
     'DC Bus Voltage Max. [V]'
     'DC Bus Voltage Std. Dev. [V]'
 
-
+    'Samples before cropping'
+    'Samples after cropping' (which is what's displayed now)
+    'Samples cropped'
     """
     res = OrderedDict()
     res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
@@ -211,45 +213,8 @@ def calc_summary_stats(data, hc_stats):
     index_diff = np.diff(data.index)
     res['Lost Samples'] = sum(index_diff) - len(index_diff)
     res['Lost samples [%]'] = res['Lost Samples'] / res['Number of Samples']
-    res['separator 1'] = ''
-
     res['Number of Half-Cycles'] = data['Half cycle'].max()
-
-    # res['Average UP Travel Time [ms]'] = hc_stats[hc_stats['Direction'] == 'UP']['Time [ms]'].mean()
-
-    ##############
-    # try:
-    #     res['Average UP Travel Time [ms]'] = data['Actual dir'].value_counts()['UP'] * tick_time_ms
-    # except:
-    #     res['Average UP Travel Time [ms]'] = 'N/A'
-    #
-    # try:
-    #     res['DOWN Travel Time [ms]'] = data['Actual dir'].value_counts()['DOWN'] * tick_time_ms
-    # except:
-    #     res['DOWN Travel Time [ms]'] = 'N/A'
-    #
-    # # TODO: the following is wrong, in case there are n UP cycles and n+1 DOWN cycles or vice-versa
-    #
-    # res['UP Travel [% of total]'] = res['UP Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
-    # res['DOWN Travel [% of total]'] = res['DOWN Travel Time [ms]'] / (res['UP Travel Time [ms]'] + res['DOWN Travel Time [ms]'])
-    #
-    # res['UP Travel [% of total]'] = 'N/A'
-    # res['DOWN Travel [% of total]'] = 'N/A'
-
-##############
-
-    top_positions = data[data['Actual dir'] == 'UP'].groupby('Half cycle')['Position'].max()
-    bottom_positions = data[data['Actual dir'] == 'DOWN'].groupby('Half cycle')['Position'].min()
-    res['Top Position Average [steps]'] = top_positions.mean()
-    res['Top Position Std. Dev. [steps]'] = top_positions.std()
-    res['Bottom Position Average [steps]'] = bottom_positions.mean()
-    res['Bottom Position Std. Dev. [steps]'] = bottom_positions.std()
-    res['Travel Range Average [steps]'] = res['Top Position Average [steps]'] - res['Bottom Position Average [steps]']
-    res['Travel Range Average [mm]'] = res['Travel Range Average [steps]'] * step_size_mm
-    res['separator 2'] = ''
-
-    res['Coasting Time [% of total time]'] = data['Motor state'].value_counts(normalize=True)['M_STATE_ALL_OFF']
-    res['separator 3'] = ''
+    res['separator 1'] = ''
 
     res['Average Current [A]'] = data['Total i'].mean()
     res['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
@@ -298,8 +263,9 @@ def calc_half_cycle_stats(data):
 def calc_half_cycle_summary(hc_stats):
     summary = hc_stats.groupby('Direction').mean()
     summary = summary.reindex(columns=hc_stats.columns)
-    summary['Direction'] = summary.index
-    summary['Half-Cycle'] = np.nan
+    summary.loc['ALL'] = hc_stats.mean()
+    summary['Direction'] = summary.index + ' Averages'
+    summary.drop(['Half-Cycle'], inplace=True, axis=1)
     summary = summary.fillna('N/A')
     return summary
 
@@ -325,7 +291,8 @@ def add_workbook_formats(wb):
             'time': wb.add_format({'num_format': '0.00'}),
             'percent': wb.add_format({'num_format': '0.00%'}),
             'general': wb.add_format(),
-            'header': wb.add_format({'text_wrap': True, 'bold': True})
+            'header': wb.add_format({'text_wrap': True, 'bold': True}),
+            'title': wb.add_format({'font_size': 14, 'bold': True})
         }
     return formats
 
@@ -435,7 +402,7 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
 def add_summary_sheet(wb, summary_stats, wb_formats):
     sheet = wb.add_worksheet('Analysis Summary')
     row = 0
-    sheet.set_column(0, 0, width=35, cell_format=wb_formats['header'])
+    sheet.set_column(0, 0, width=36, cell_format=wb_formats['header'])
     for field_name, field_value in summary_stats.items():
         if not field_name.startswith('separator'):
             sheet.write(row, 0, field_name)
@@ -450,23 +417,38 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
                               sheet_name='Half-Cycles Analysis',
                               header=False,
                               index=False,
-                              startrow=1)
+                              startrow=2)
     sheet = writer.sheets['Half-Cycles Analysis']
-
-    # write header row
-    sheet.set_row(row=0, height=45, cell_format=wb_formats['header'])
-    for (col_num, col_name) in enumerate(half_cycle_stats.columns):
-        sheet.write(0, col_num, col_name)
-
     set_column_formats(sheet, half_cycle_stats.columns.tolist(), wb_formats, half_cycle_col_formats)
 
+    cur_row = 0
+    sheet.write(cur_row, 0, "Half-Cycle List", wb_formats['title'])
+
+    # write header row
+    cur_row += 1
+    sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(half_cycle_stats.columns):
+        sheet.write(cur_row, col_num, col_name)
+
     # write summary rows
-    summary_start_row = len(half_cycle_stats) + 3
+    cur_row = len(half_cycle_stats) + 3
+
+    sheet.write(cur_row, 0, "Half-Cycle Summary", wb_formats['title'])
+    cur_row += 1
+
+    # repeat headers
+    sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(half_cycle_summary.columns):
+        sheet.write(cur_row, col_num + 1, col_name)
+
+    cur_row += 1
     half_cycle_summary.to_excel(excel_writer=writer,
                                 sheet_name='Half-Cycles Analysis',
                                 header=False,
                                 index=False,
-                                startrow=summary_start_row)
+                                startrow=cur_row,
+                                startcol=1)
+
 
 
 
@@ -474,8 +456,8 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
 if __name__ == '__main__':
     # input_filename = 'solar_panels_emo_012.csv'
     # input_filename = 'my motor with soft start lost data.csv'
-    if len(sys.argv) < 1:
-        input_filename = 'my motor with soft start motor off.csv'
+    if len(sys.argv) <= 1:
+        input_filename = 'emo_020.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
