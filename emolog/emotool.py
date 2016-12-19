@@ -401,9 +401,6 @@ async def amain():
 
 
 def main():
-    #if sys.platform == 'win32':
-    #    asyncio.set_event_loop(asyncio.ProactorEventLoop())
-
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(amain())
