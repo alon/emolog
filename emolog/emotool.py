@@ -5,25 +5,22 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
-from time import sleep, clock  # more accurate on windows, vs time.time on linux
-import sys
-import os
-import csv
-import struct
-import asyncio
 import argparse
-import string
-from socket import socketpair
+import asyncio
+import csv
 import logging
-from subprocess import Popen
+import os
 import random
+import string
+import struct
+import sys
+from socket import socketpair
+from subprocess import Popen
+from time import sleep, clock  # more accurate on windows, vs time.time on linux
 
-#import winctrlc
-
-from dwarf import FileParser
 import emolog
 import post_processor
-
+from dwarf import FileParser
 
 logger = logging.getLogger()
 
