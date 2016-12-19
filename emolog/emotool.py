@@ -87,7 +87,8 @@ async def start_fake_sine():
 class EmoToolClient(emolog.Client):
     instance = None
 
-    def __init__(self, csv_filename, verbose, names, dump, min_ticks):
+    def __init__(self, csv_filename, verbose, names, dump, min_ticks,
+                 max_ticks):
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
         self.csv = None
         self.csv_filename = csv_filename
@@ -97,7 +98,13 @@ class EmoToolClient(emolog.Client):
         self.names = names
         self.samples_received = 0
         self.ticks_lost = 0
-        EmoToolClient.instance = self # ugly reference for KeboardInterrupt handling
+        self.max_ticks = max_ticks
+        self._running = True
+        EmoToolClient.instance = self  # ugly reference for KeboardInterrupt handling
+
+    @property
+    def running(self):
+        return self._running
 
     @property
     def total_ticks(self):
@@ -112,7 +119,12 @@ class EmoToolClient(emolog.Client):
         self.csv = csv.writer(self.fd, lineterminator='\n')
         self.csv.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
 
+    def stop(self):
+        self._running = False
+
     def handle_sampler_sample(self, msg):
+        if not self.running:
+            return
         self.initialize_file()
         # todo - decode variables (integer/float) in emolog VariableSampler
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
@@ -125,6 +137,8 @@ class EmoToolClient(emolog.Client):
         self.last_ticks = msg.ticks
         if self.first_ticks is None:
             self.first_ticks = self.last_ticks
+        if self.max_ticks and self.total_ticks + 1 >= self.max_ticks:
+            self.stop()
 
 
 def iterate(filename, initial, firstoption):
@@ -357,10 +371,13 @@ async def amain():
     print("================")
     print("")
     print("output file: {}".format(csv_filename))
+    max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
+    if max_ticks is not None:
+        print("running for {} seconds = {} ticks".format(args.runtime, max_ticks))
+    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
-    min_ticks = min(var['period_ticks'] for var in variables) # this is wrong, use gcd
     client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
-                           min_ticks=min_ticks)
+                           min_ticks=min_ticks, max_ticks=max_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
     logger.debug("about to send version")
     await client.send_version()
@@ -384,17 +401,12 @@ async def amain():
     sys.stdout.flush()
 
     dt = 0.1 if args.runtime is not None else 1.0
-    if args.runtime:
-        max_ticks = args.ticks_per_second * args.runtime
-        print("running for {} seconds = {} ticks".format(args.runtime, max_ticks))
     if try_getch_message:
         print(try_getch_message)
-    while True:
+    while client.running:
         if try_getch():
             break
         await asyncio.sleep(dt)
-        if args.runtime is not None and client.total_ticks > max_ticks:
-            break
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
