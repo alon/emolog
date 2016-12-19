@@ -514,7 +514,8 @@ class Client(asyncio.Protocol):
                     self.set_future_result(f, timeout_result)
                 except:
                     pass
-            asyncio.get_event_loop().create_task(set_result_after_timeout())
+            sleep_task = asyncio.get_event_loop().create_task(set_result_after_timeout())
+            self._futures.add(sleep_task)
         return f
 
     def set_future_result(self, future, result):
