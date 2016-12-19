@@ -119,7 +119,8 @@ class EmoToolClient(emolog.Client):
         self.fd.flush()
         self.samples_received += 1
         if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
-            print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
+            print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
+                clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
             self.ticks_lost += msg.ticks - self.last_ticks - self.min_ticks
         self.last_ticks = msg.ticks
         if self.first_ticks is None:
@@ -173,7 +174,9 @@ def variable_to_decoder(v):
     elif type_name.endswith('float'):
         if size == 4:
             return decode_little_endian_float
-    else:  # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name() doesn't necessarily end with 'int' / 'float'
+    # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name()
+    # doesn't necessarily end with 'int' / 'float'
+    else:
         # Note: will support both int and enum
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
@@ -222,7 +225,7 @@ def start_subprocess(serial, baudrate, port):
     Block until serial2tcp is ready to accept a connection
     """
     p = Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
-                            baudrate, serial, port).split())
+        baudrate, serial, port).split())
     sleep(0.1)
     return p
 
@@ -296,15 +299,18 @@ def parse_args():
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     parser.add_argument('--csv',
-                        default=r'D:\Projects\Comet ME Pump Drive\run logs\emo', # r'C:\Comet-ME Pump Drive\run logs\emo'      # for Noam's laptop
+                        default=r'D:\Projects\Comet ME Pump Drive\run logs\emo',
+                        # r'C:\Comet-ME Pump Drive\run logs\emo'      # for Noam's laptop
                         help='name of csv output file')
-    parser.add_argument('--verbose', default=True, action='store_false', dest='silent', help='turn on verbose logging; affects performance under windows')
+    parser.add_argument('--verbose', default=True, action='store_false', dest='silent',
+                        help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs here')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
-    parser.add_argument('--ticks-per-second', default=1000000/50, help='number of ticks per second. used in conjunction with runtime')
+    parser.add_argument('--ticks-per-second', default=1000000 / 50,
+                        help='number of ticks per second. used in conjunction with runtime')
     return parser.parse_args()
 
 
@@ -320,7 +326,8 @@ def read_elf_variables(vars, varfile):
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()), verbose=not args.silent)
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()),
+                                                  verbose=not args.silent)
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
