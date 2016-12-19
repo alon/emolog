@@ -397,11 +397,6 @@ async def amain():
             break
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
-    print("Running post processor (this may take some time)...")
-    post_processor.post_process(csv_filename)
-    print("Post processing done.")
-
-
 
 
 def main():
@@ -412,7 +407,11 @@ def main():
         print("exiting on user ctrl-c")
     except Exception as e:
         logger.debug("got exception {!r}".format(e))
-    loop.run_until_complete(cleanup(EmoToolClient.instance))
+    client = EmoToolClient.instance
+    loop.run_until_complete(cleanup(client))
+    print("Running post processor (this may take some time)...")
+    post_processor.post_process(client.csv_filename)
+    print("Post processing done.")
 
 
 if __name__ == '__main__':
