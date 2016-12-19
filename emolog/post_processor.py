@@ -206,6 +206,8 @@ def calc_summary_stats(data, hc_stats):
     'Samples before cropping'
     'Samples after cropping' (which is what's displayed now)
     'Samples cropped'
+
+    temperature (avg, std). when we can transmit all temperatures (incl. board), make this another tab.
     """
     res = OrderedDict()
     res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
