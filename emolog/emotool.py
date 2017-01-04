@@ -373,7 +373,7 @@ async def amain():
     print("output file: {}".format(csv_filename))
     max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
     if max_ticks is not None:
-        print("running for {} seconds = {} ticks".format(args.runtime, max_ticks))
+        print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
     client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
