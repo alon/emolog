@@ -20,7 +20,7 @@ def post_process(csv_filename):
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
-    data = only_full_cycles(data)
+    data = partition_to_half_cycles(data)
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = reorder_columns(data)
@@ -89,14 +89,15 @@ half_cycle_col_formats = \
         'Max. Position [steps]': {'width': 8, 'format': 'general'},
         'Travel Range [steps]': {'width': 7, 'format': 'general'},
         'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
-        'Middle Section Velocity [m/s]': {'width': 13, 'format': 'general'},
+        'Cruising Velocity [m/s]': {'width': 13, 'format': 'general'},
         'Flow Rate [LPM]': {'width': 8, 'format': 'frac'},
         'Coasting Distance [steps]': {'width': 8, 'format': 'general'},
         'Coasting Duration [ms]': {'width': 8, 'format': 'time'},
         'Coasting Duration [%]': {'width': 8, 'format': 'percent'},
         'Average Current [A]': {'width': 8, 'format': 'frac'},
         'Average Current Excluding Coasting [A]': {'width': 15, 'format': 'frac'},
-        'Average Current During Coasting [A]': {'width': 14, 'format': 'frac'}
+        'Average Current During Coasting [A]': {'width': 14, 'format': 'frac'},
+        'Peak Current [A]': {'width': 8, 'format': 'frac'}
     }
 
 
@@ -131,8 +132,8 @@ def remove_unneeded_columns(data):
     return data
 
 
-def only_full_cycles(data):
-    dir_numeric = data['Actual dir'].replace(['UP', 'DOWN'], [1, -1])
+def partition_to_half_cycles(data):
+    dir_numeric = data['Required dir'].replace(['UP', 'DOWN'], [1, -1])
     cycle_start_indexes = data[dir_numeric.diff() != 0].index
 
     # no direction changes at all: do not truncate data. all data is the same half-cycle.
@@ -208,6 +209,9 @@ def calc_summary_stats(data, hc_stats):
     'Samples cropped'
 
     temperature (avg, std). when we can transmit all temperatures (incl. board), make this another tab.
+
+    peak current.
+    current during cruising.
     """
     res = OrderedDict()
     res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
@@ -232,14 +236,14 @@ def calc_half_cycle_stats(data):
     for (hc_num, hc) in data.groupby('Half cycle'):
         hc_stats = OrderedDict()
         hc_stats['Half-Cycle'] = hc_num
-        assert(len(hc['Actual dir'].unique()) == 1)     # a half-cycle should have a constant 'Actual dir'
-        hc_stats['Direction'] = hc['Actual dir'].iloc[0]
+        assert(len(hc['Required dir'].unique()) == 1)     # a half-cycle should have a constant 'Required dir'
+        hc_stats['Direction'] = hc['Required dir'].iloc[0]
         hc_stats['Time [ms]'] = (hc.last_valid_index() - hc.first_valid_index() + 1) * tick_time_ms
         hc_stats['Min. Position [steps]'] = hc['Position'].min()
         hc_stats['Max. Position [steps]'] = hc['Position'].max()
-        hc_stats['Travel Range [steps]'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]'] + 1
+        hc_stats['Travel Range [steps]'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]']
         hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
-        hc_stats['Middle Section Velocity [m/s]'] = 'TODO'  # TODO
+        hc_stats['Cruising Velocity [m/s]'] = 'TODO'  # TODO
         water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range [steps]'] * step_size_mm
         hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
@@ -257,6 +261,7 @@ def calc_half_cycle_stats(data):
             hc_stats['Average Current During Coasting [A]'] = coasting['Total i'].mean()
         else:
             hc_stats['Average Current During Coasting [A]'] = 'N/A'
+        hc_stats['Peak Current [A]'] = hc['Total i'].max()
 
         res.append(hc_stats)
     return pd.DataFrame(res)
@@ -459,7 +464,8 @@ if __name__ == '__main__':
     # input_filename = 'solar_panels_emo_012.csv'
     # input_filename = 'my motor with soft start lost data.csv'
     if len(sys.argv) <= 1:
-        input_filename = 'emo_020.csv'
+        # input_filename = 'Noam with PSU emo_007.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_065.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
