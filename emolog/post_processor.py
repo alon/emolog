@@ -12,6 +12,7 @@ tick_time_ms = 0.05     # 50 us = 0.05 ms
 step_size_mm = 4.0
 bore_diameter_mm = 26   # TODO is this correct?
 
+cruising_after_num_steps = 5
 
 def post_process(csv_filename):
     start_time = time.time()
@@ -23,6 +24,7 @@ def post_process(csv_filename):
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
+    data = mark_cruising(data)
     data = reorder_columns(data)
     data = interpolate_missing_data(data)
     end_time = time.time()
@@ -31,13 +33,14 @@ def post_process(csv_filename):
     start_time = time.time()
     half_cycle_stats = calc_half_cycle_stats(data)
     half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
+    motor_state_stats = calc_motor_state_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, output_filename)
+    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, output_filename)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -89,17 +92,39 @@ half_cycle_col_formats = \
         'Max. Position [steps]': {'width': 8, 'format': 'general'},
         'Travel Range [steps]': {'width': 7, 'format': 'general'},
         'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
-        'Cruising Velocity [m/s]': {'width': 13, 'format': 'general'},
+        'Cruising Velocity [m/s]': {'width': 8, 'format': 'frac'},
         'Flow Rate [LPM]': {'width': 8, 'format': 'frac'},
         'Coasting Distance [steps]': {'width': 8, 'format': 'general'},
         'Coasting Duration [ms]': {'width': 8, 'format': 'time'},
         'Coasting Duration [%]': {'width': 8, 'format': 'percent'},
         'Average Current [A]': {'width': 8, 'format': 'frac'},
-        'Average Current Excluding Coasting [A]': {'width': 15, 'format': 'frac'},
-        'Average Current During Coasting [A]': {'width': 14, 'format': 'frac'},
+        'Cruising Current [A]': {'width': 8, 'format': 'frac'},
+        'Coasting Current [A]': {'width': 8, 'format': 'frac'},
         'Peak Current [A]': {'width': 8, 'format': 'frac'}
     }
 
+
+motor_states_col_formats = \
+    {
+        'Direction': {'width': 9, 'format': 'general'},
+        'State': {'width': 17, 'format': 'general'},
+        'Phases State (A,B,C)': {'width': 7, 'format': 'general'},
+        'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
+        'Velocity Std. Dev [m/s]': {'width': 8, 'format': 'frac'},
+        'Average Current [A]': {'width': 8, 'format': 'frac'},
+        'Current Std. Dev [A]': {'width': 8, 'format': 'frac'}
+    }
+
+
+motor_state_to_phases = {
+    'M_STATE_S0': '(+, -, 0)',
+    'M_STATE_S1': '(+, 0, -)',
+    'M_STATE_S2': '(0, +, -)',
+    'M_STATE_S3': '(-, +, 0)',
+    'M_STATE_S4': '(-, 0, +)',
+    'M_STATE_S5': '(0, -, +)',
+    'M_STATE_ALL_OFF': '(0, 0, 0)'
+}
 
 def std_name_to_output_name(name):
     if name in output_col_names:
@@ -181,6 +206,19 @@ def calc_step_times_and_vel(data):
     return ret
 
 
+def mark_cruising(data):
+    data['Cruising'] = True
+    # the coasting phase should not be considered cruising
+    data.loc[data['Motor state'] == 'M_STATE_ALL_OFF', 'Cruising'] = False
+    # The acceleration phase should not be considered cruising
+    for (hc_num, hc) in data.groupby('Half cycle'):
+        first_pos = hc.iloc[0]['Position']
+        startup_indexes = np.abs(hc['Position'] - first_pos) < cruising_after_num_steps
+        startup_indexes = startup_indexes.reindex(data.index, fill_value=False)
+        data.loc[startup_indexes, 'Cruising'] = False
+    return data
+
+
 def reorder_columns(data):
     all_cols = data.columns.tolist()
     first_cols = ['Time', 'Position', 'Step time', 'Velocity', 'Motor state', 'Actual dir', 'Required dir']
@@ -225,8 +263,8 @@ def calc_summary_stats(data, hc_stats):
     res['Average Current [A]'] = data['Total i'].mean()
     res['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
     res['Average Current going DOWN [A]'] = data[data['Actual dir'] == 'DOWN']['Total i'].mean()
-    res['Average Current Excluding Coasting [A]'] = data[data['Motor state'] != 'M_STATE_ALL_OFF']['Total i'].mean()
-    res['Average Current During Coasting [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
+    res['Cruising Current [A]'] = data[data['Cruising'] == True]['Total i'].mean()
+    res['Coasting Current [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
 
     return res
 
@@ -243,7 +281,10 @@ def calc_half_cycle_stats(data):
         hc_stats['Max. Position [steps]'] = hc['Position'].max()
         hc_stats['Travel Range [steps]'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]']
         hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
-        hc_stats['Cruising Velocity [m/s]'] = 'TODO'  # TODO
+        cruising = hc[hc['Cruising'] == True]
+        cruising_range = cruising['Position'].max() - cruising['Position'].min()
+        cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
+        hc_stats['Cruising Velocity [m/s]'] = cruising_range * step_size_mm / cruising_time
         water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range [steps]'] * step_size_mm
         hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
@@ -256,11 +297,11 @@ def calc_half_cycle_stats(data):
             hc_stats['Coasting Duration [ms]'] = 'N/A'
             hc_stats['Coasting Duration [%]'] = 'N/A'
         hc_stats['Average Current [A]'] = hc['Total i'].mean()
-        hc_stats['Average Current Excluding Coasting [A]'] = hc[hc['Motor state'] != 'M_STATE_ALL_OFF']['Total i'].mean()
+        hc_stats['Cruising Current [A]'] = hc[hc['Cruising'] == True]['Total i'].mean()
         if len(coasting) > 0:
-            hc_stats['Average Current During Coasting [A]'] = coasting['Total i'].mean()
+            hc_stats['Coasting Current [A]'] = coasting['Total i'].mean()
         else:
-            hc_stats['Average Current During Coasting [A]'] = 'N/A'
+            hc_stats['Coasting Current [A]'] = 'N/A'
         hc_stats['Peak Current [A]'] = hc['Total i'].max()
 
         res.append(hc_stats)
@@ -277,7 +318,28 @@ def calc_half_cycle_summary(hc_stats):
     return summary
 
 
-def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, output_filename):
+def calc_motor_state_stats(data):
+    res = []
+    for ((direction, state), data_in_state) in data.groupby(['Required dir', 'Motor state']):
+        stats = OrderedDict()
+        if state != 'M_STATE_ALL_OFF':
+            filt_data = data_in_state[data_in_state['Cruising'] == True]
+        else:
+            filt_data = data_in_state
+
+        stats['Direction'] = direction
+        stats['State'] = state
+        stats['Phases State (A,B,C)'] = motor_state_to_phases[state]
+        stats['Average Velocity [m/s]'] = filt_data['Velocity'].mean()
+        stats['Velocity Std. Dev [m/s]'] = filt_data['Velocity'].std()
+
+        stats['Average Current [A]'] = filt_data['Total i'].mean()
+        stats['Current Std. Dev [A]'] = filt_data['Total i'].std()
+        res.append(stats)
+    return pd.DataFrame(res)
+
+
+def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, output_filename):
     # data = data[1:5000]     # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
@@ -287,7 +349,7 @@ def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, out
     add_graphs(workbook, data)
     add_summary_sheet(workbook, summary_stats, wb_formats)
     add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats)
-
+    add_motor_state_sheet(writer, motor_state_stats, wb_formats)
     writer.save()
 
 
@@ -407,7 +469,7 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
 
 
 def add_summary_sheet(wb, summary_stats, wb_formats):
-    sheet = wb.add_worksheet('Analysis Summary')
+    sheet = wb.add_worksheet('Summary')
     row = 0
     sheet.set_column(0, 0, width=36, cell_format=wb_formats['header'])
     for field_name, field_value in summary_stats.items():
@@ -421,11 +483,11 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
 
 def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
     half_cycle_stats.to_excel(excel_writer=writer,
-                              sheet_name='Half-Cycles Analysis',
+                              sheet_name='Half-Cycles',
                               header=False,
                               index=False,
                               startrow=2)
-    sheet = writer.sheets['Half-Cycles Analysis']
+    sheet = writer.sheets['Half-Cycles']
     set_column_formats(sheet, half_cycle_stats.columns.tolist(), wb_formats, half_cycle_col_formats)
 
     cur_row = 0
@@ -450,21 +512,67 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
 
     cur_row += 1
     half_cycle_summary.to_excel(excel_writer=writer,
-                                sheet_name='Half-Cycles Analysis',
+                                sheet_name='Half-Cycles',
                                 header=False,
                                 index=False,
                                 startrow=cur_row,
                                 startcol=1)
 
 
+def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
+    motor_state_stats.to_excel(excel_writer=writer,
+                               sheet_name='Motor States',
+                               header=False,
+                               index=False,
+                               startrow=4)
+    sheet = writer.sheets['Motor States']
+    set_column_formats(sheet, motor_state_stats.columns.tolist(), wb_formats, motor_states_col_formats)
 
+    cur_row = 0
+    sheet.write(cur_row, 0, "Analysis by Motor State", wb_formats['title'])
+    cur_row += 1
+    subtitle = "Ignoring acceleration phase (first {} steps)".format(cruising_after_num_steps)
+    sheet.write(cur_row, 0, subtitle, wb_formats['general'])
+
+    # write header row
+    cur_row += 2
+    sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(motor_state_stats.columns):
+        sheet.write(cur_row, col_num, col_name)
+
+    wb = writer.book
+    chart = wb.add_chart({'type': 'column'})
+    chart.add_series({
+        'name': 'DOWN',
+        'categories': "='Motor States'!$B$5:$B$11",
+        'values': "='Motor States'!$D$5:$D$11",
+        'data_labels': {'value': True},
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values': "='Motor States'!$E$5:$E$11",
+            'minus_values': "='Motor States'!$E$5:$E$11"
+        }
+    })
+    chart.add_series({
+        'name': 'UP',
+        'categories': "='Motor States'!$B$5:$B$11",
+        'values': "='Motor States'!$D$12:$D$18",
+        'data_labels': {'value': True},
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values':  "='Motor States'!$E$12:$E$18",
+            'minus_values': "='Motor States'!$E$12:$E$18"
+        }
+    })
+    chart.set_size({'width': 880, 'height': 450})
+    chart.set_title({'name': 'Velocity vs. Motor State & Direction'})
+
+    sheet.insert_chart('I3', chart)
 
 
 if __name__ == '__main__':
-    # input_filename = 'solar_panels_emo_012.csv'
-    # input_filename = 'my motor with soft start lost data.csv'
     if len(sys.argv) <= 1:
-        # input_filename = 'Noam with PSU emo_007.csv'
+        # input_filename = r'Outputs\Noam with PSU emo_007.csv'
         input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_065.csv'
     else:
         input_filename = sys.argv[1]
