@@ -1,19 +1,22 @@
++ [ ] bug: when sampling several variables with high period and different phases, all of them are written to the first one's column in the csv.
+      there are no commas for data that wasn't sampled. this seems to be because the code that writes each line in the csv is currently not aware of all the variables in the csv, only of the vars in that specific sample.  
+
 + [ ] fix requirements.txt / venv
 
-+ [ ] instead of waiting xx wall-clock seconds, count ticks instead (but also with timeout)
++ [x] instead of waiting xx wall-clock seconds, count ticks instead (but also with timeout)
 
 + [ ] ACK of last sampler_stop is received by serial2tp and pushed to socket but ignored by emotool.py ; investigate
 
-+ [ ] On a nominal run this should not be printed:
++ [x] On a nominal run this should not be printed:
  Task was destroyed but it is pending!
  task: <Task pending coro=<Client.add_future.<locals>.set_result_after_timeout() running at D:\Projects\Comet ME Pump Drive\firmware\emolog\emolog\emolog.py:512> wait_for=<Future pending cb=[Task._wakeup()]>>
 
 + postprocessing:
   [x] clean up data (remove unneeded columns, add time column)
-  [ ] temp ugly enum parsing (to be replaced with proper enum parsing at the emotool level later)
+  [x] temp ugly enum parsing (to be replaced with proper enum parsing at the emotool level later)
   [x] crop data to only full motor cycles
   [x] derive step times and velocity
-  [ ] divide data into cycles
+  [x] divide data into cycles
   [ ] add statistics
     [ ] cycle time average
     [ ] travel range average
@@ -24,13 +27,13 @@
     [ ] flow rate average
     [ ] step time average, std
     [ ] constant-velocity section step time average, std (section is defined as excluding first n steps (~3) and all steps from motor cutoff)
-    [ ] all of the above but for each half-cycle instead of averages? i.e. a separate Excel tab with a table, each row is a half-cycle, columns are as above
+    [x] all of the above but for each half-cycle instead of averages? i.e. a separate Excel tab with a table, each row is a half-cycle, columns are as above
     [ ] another tab: for each position and direction, step time average & std, velocity average & std, current avg & std
   [ ] steps table like the old logger? 
-  [ ] export to Excel
+  [x] export to Excel
   [ ] graphs:
-    [ ] position, velocity, motor state (or better: only mark motor on / off sections), current
-    [ ] what else? or just combine everything to one graph and add checkmarks for series on/off (see below)
+    [x] position, velocity, motor state (or better: only mark motor on / off sections), current
+    [x] what else? or just combine everything to one graph and add checkmarks for series on/off (see below)
   [ ] VBA code to change graph x range conveniently (start time, stop time input fields)
   [ ] VBA code to add or remove series from the graph (checkmarks)? maybe there's a better approach?
 
@@ -44,7 +47,7 @@
   [ ] in the main process, determinisitically (without sleep) wait for subprocess to be ready to accept socket connection
   [ ] check if we can go back to support logging (i.e. does run without --silent still causes buffer overflows?)
   [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
-  [ ] add enum type parsing. enumerators are children of the type-die (currently unused). we'll probably have to change how the type is decided on and parsed in emotool.
+  [x] add enum type parsing. enumerators are children of the type-die (currently unused). we'll probably have to change how the type is decided on and parsed in emotool.
   [ ] signed vs. unsigned int parsing
   [ ] graceful exit: refactor to something cleaner?
   [ ] DMA to serial
