@@ -14,9 +14,9 @@ bore_diameter_mm = 26   # TODO is this correct?
 
 cruising_after_num_steps = 5
 
+
 def post_process(csv_filename):
     start_time = time.time()
-
     data = pd.read_csv(csv_filename)
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
@@ -34,13 +34,14 @@ def post_process(csv_filename):
     half_cycle_stats = calc_half_cycle_stats(data)
     half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
     motor_state_stats = calc_motor_state_stats(data)
+    position_stats = calc_position_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, output_filename)
+    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats, output_filename)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -116,6 +117,17 @@ motor_states_col_formats = \
     }
 
 
+position_stats_col_formats = \
+    {
+        'Direction': {'width': 9, 'format': 'general'},
+        'Position': {'width': 7, 'format': 'general'},
+        'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
+        'Velocity Std. Dev [m/s]': {'width': 8, 'format': 'frac'},
+        'Average Current [A]': {'width': 8, 'format': 'frac'},
+        'Current Std. Dev [A]': {'width': 8, 'format': 'frac'}
+    }
+
+
 motor_state_to_phases = {
     'M_STATE_S0': '(+, -, 0)',
     'M_STATE_S1': '(+, 0, -)',
@@ -125,6 +137,7 @@ motor_state_to_phases = {
     'M_STATE_S5': '(0, -, +)',
     'M_STATE_ALL_OFF': '(0, 0, 0)'
 }
+
 
 def std_name_to_output_name(name):
     if name in output_col_names:
@@ -339,7 +352,22 @@ def calc_motor_state_stats(data):
     return pd.DataFrame(res)
 
 
-def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, output_filename):
+def calc_position_stats(data):
+    res = []
+    for ((direction, pos), data_in_pos) in data.groupby(['Required dir', 'Position']):
+        stats = OrderedDict()
+        stats['Direction'] = direction
+        stats['Position'] = pos
+        stats['Average Velocity [m/s]'] = data_in_pos['Velocity'].mean()
+        stats['Velocity Std. Dev [m/s]'] = data_in_pos['Velocity'].std()
+
+        stats['Average Current [A]'] = data_in_pos['Total i'].mean()
+        stats['Current Std. Dev [A]'] = data_in_pos['Total i'].std()
+        res.append(stats)
+    return pd.DataFrame(res)
+
+
+def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats, output_filename):
     # data = data[1:5000]     # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
@@ -350,6 +378,7 @@ def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, mot
     add_summary_sheet(workbook, summary_stats, wb_formats)
     add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats)
     add_motor_state_sheet(writer, motor_state_stats, wb_formats)
+    add_positions_sheet(writer, position_stats, wb_formats)
     writer.save()
 
 
@@ -565,9 +594,84 @@ def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
         }
     })
     chart.set_size({'width': 880, 'height': 450})
-    chart.set_title({'name': 'Velocity vs. Motor State & Direction'})
+    chart.set_title({'name': 'Average Velocity vs. Motor State & Direction'})
 
     sheet.insert_chart('I3', chart)
+
+
+def add_positions_sheet(writer, position_stats, wb_formats):
+    position_stats.to_excel(excel_writer=writer,
+                            sheet_name='Positions',
+                            header=False,
+                            index=False,
+                            startrow=3)
+    sheet = writer.sheets['Positions']
+    set_column_formats(sheet, position_stats.columns.tolist(), wb_formats, position_stats_col_formats)
+
+    cur_row = 0
+    sheet.write(cur_row, 0, "Analysis by Position", wb_formats['title'])
+
+    # write header row
+    cur_row += 2
+    sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(position_stats.columns):
+        sheet.write(cur_row, col_num, col_name)
+
+    wb = writer.book
+    vel_chart = wb.add_chart({'type': 'line'})
+    down_first_row = 4
+    down_last_row = down_first_row + len(position_stats[position_stats['Direction'] == 'DOWN']) - 1
+    up_first_row = down_last_row + 1
+    up_last_row = up_first_row + len(position_stats[position_stats['Direction'] == 'UP']) - 1
+
+    vel_chart.add_series({
+        'name': 'DOWN',
+        'categories': "='Positions'!$B${}:$B${}".format(down_first_row, down_last_row),
+        'values': "='Positions'!$C${}:$C${}".format(down_first_row, down_last_row),
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values': "='Positions'!$D${}:$D${}".format(down_first_row, down_last_row),
+            'minus_values': "='Positions'!$D${}:$D${}".format(down_first_row, down_last_row)
+        }
+    })
+    vel_chart.add_series({
+        'name': 'UP',
+        'categories': "='Positions'!$B${}:$B${}".format(up_first_row, up_last_row),
+        'values': "='Positions'!$C${}:$C${}".format(up_first_row, up_last_row),
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values': "='Positions'!$D${}:$D${}".format(up_first_row, up_last_row),
+            'minus_values': "='Positions'!$D${}:$D${}".format(up_first_row, up_last_row)
+        }
+    })
+    vel_chart.set_size({'width': 880, 'height': 450})
+    vel_chart.set_title({'name': 'Average Velocity vs. Position & Direction'})
+    sheet.insert_chart('H3', vel_chart)
+
+    cur_chart = wb.add_chart({'type': 'line'})
+    cur_chart.add_series({
+        'name': 'DOWN',
+        'categories': "='Positions'!$B${}:$B${}".format(down_first_row, down_last_row),
+        'values': "='Positions'!$E${}:$E${}".format(down_first_row, down_last_row),
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values': "='Positions'!$F${}:$F${}".format(down_first_row, down_last_row),
+            'minus_values': "='Positions'!$F${}:$F${}".format(down_first_row, down_last_row)
+        }
+    })
+    cur_chart.add_series({
+        'name': 'UP',
+        'categories': "='Positions'!$B${}:$B${}".format(up_first_row, up_last_row),
+        'values': "='Positions'!$E${}:$E${}".format(up_first_row, up_last_row),
+        'y_error_bars': {
+            'type': 'custom',
+            'plus_values': "='Positions'!$F${}:$F${}".format(up_first_row, up_last_row),
+            'minus_values': "='Positions'!$F${}:$F${}".format(up_first_row, up_last_row)
+        }
+    })
+    cur_chart.set_size({'width': 880, 'height': 500})
+    cur_chart.set_title({'name': 'Average Current vs. Position & Direction'})
+    sheet.insert_chart('H26', cur_chart)
 
 
 if __name__ == '__main__':
