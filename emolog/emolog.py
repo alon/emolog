@@ -100,14 +100,16 @@ emo_message_types = EmoMessageTypes()
 emo_message_type_to_str = {}
 
 
-with open('emo_message_t.h') as fd:
-    lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
-    lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
-    for name, value in lines:
-        assert(name.startswith('EMO_MESSAGE_TYPE_'))
-        short_name = name[len('EMO_MESSAGE_TYPE_'):].lower()
-        setattr(emo_message_types, short_name, value)
-        emo_message_type_to_str[value] = short_name
+def initialize_emo_message_type_to_str():
+    with open('emo_message_t.h') as fd:
+        lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
+        lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
+        for name, value in lines:
+            assert(name.startswith('EMO_MESSAGE_TYPE_'))
+            short_name = name[len('EMO_MESSAGE_TYPE_'):].lower()
+            setattr(emo_message_types, short_name, value)
+            emo_message_type_to_str[value] = short_name
+initialize_emo_message_type_to_str()
 
 
 header_size = 8
