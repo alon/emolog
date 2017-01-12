@@ -127,7 +127,9 @@ class EmoToolClient(emolog.Client):
             return
         self.initialize_file()
         # todo - decode variables (integer/float) in emolog VariableSampler
-        self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] + msg.variables)
+        vs = msg.variables
+        self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] +
+                          [vs[name] if name in vs else '' for name in self.names])
         self.fd.flush()
         self.samples_received += 1
         if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
@@ -349,9 +351,11 @@ def read_elf_variables(vars, varfile):
     for name in names:
         v = dwarf_variables[name]
         period_ticks, phase_ticks = name_to_ticks_and_phase[name]
-        variables.append(dict(phase_ticks=phase_ticks, period_ticks=period_ticks,
-                              address=v.address, size=v.size,
-                              _type=variable_to_decoder(v)))
+        variables.append(dict(
+            name=name,
+            phase_ticks=phase_ticks, period_ticks=period_ticks,
+            address=v.address, size=v.size,
+            _type=variable_to_decoder(v)))
     return names, variables
 
 

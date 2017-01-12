@@ -316,7 +316,8 @@ def decode_emo_header(s):
 
 
 class RegisteredVariable(object):
-    def __init__(self, phase_ticks, period_ticks, address, size, _type):
+    def __init__(self, name, phase_ticks, period_ticks, address, size, _type):
+        self.name = name
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
         self.address = address
@@ -338,19 +339,21 @@ class VariableSampler(object):
     def on_stopped(self):
         self.running = False
 
-    def register_variable(self, phase_ticks, period_ticks, address, size, _type):
-        self.table.append(RegisteredVariable(phase_ticks=phase_ticks,
-                                             period_ticks=period_ticks,
-                                             address=address,
-                                             size=size,
-                                             _type=_type))
+    def register_variable(self, name, phase_ticks, period_ticks, address, size, _type):
+        self.table.append(RegisteredVariable(
+            name=name,
+            phase_ticks=phase_ticks,
+            period_ticks=period_ticks,
+            address=address,
+            size=size,
+            _type=_type))
 
     def variables_from_ticks_and_payload(self, ticks, payload):
-        variables = []
+        variables = {}
         offset = 0
         for row in self.table:
             if ticks % row.period_ticks == row.phase_ticks:
-                variables.append(row._type(payload[offset:offset + row.size]))
+                variables[row.name] = row._type(payload[offset:offset + row.size])
                 offset += row.size
         return variables
 
@@ -555,9 +558,12 @@ class Client(asyncio.Protocol):
         self.sampler.clear()
         for d in variables:
             self.sampler.register_variable(**d)
-            d_rest = dict(d)
-            del d_rest['_type']
-            await self.send_sampler_register_variable(**d_rest)
+            await self.send_sampler_register_variable(
+                phase_ticks=d['phase_ticks'],
+                period_ticks=d['period_ticks'],
+                address=d['address'],
+                size=d['size']
+            )
 
     async def send_sampler_clear(self):
         await self.send_and_ack(SamplerClear)
