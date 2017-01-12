@@ -468,6 +468,13 @@ class AckTimeout(Exception):
     pass
 
 
+class Dumper:
+    def write(self, b):
+        sys.stdout.write(repr(b))
+
+dumper = Dumper()
+
+
 class Client(asyncio.Protocol):
     """
     Note: removed handling of Acks
@@ -490,7 +497,7 @@ class Client(asyncio.Protocol):
         if dump:
             self.dump = open(dump, 'wb')
         else:
-            self.dump = None
+            self.dump = None #dumper
 
     def reset_ack(self):
         self.ack = Future()
