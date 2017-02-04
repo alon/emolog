@@ -214,14 +214,15 @@ void handle_uart_rx(void)
 // or from comm_queue_message() to get the initial transmission going
 void handle_uart_tx(void)
 {
-	unsigned char *read = tx_buf + tx_buf_read_pos;
+    unsigned char *read = tx_buf + tx_buf_read_pos;
 	unsigned written = 0;
 
 	tx_buf_level = tx_buf_len();
 
 	if (tx_buf_level == 0)
 	{
-		return;
+		set_aux_pins(7);
+	    return;
 	}
 
 	while (tx_buf_level > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )

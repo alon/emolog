@@ -32,7 +32,6 @@ void emolog_run_step(uint32_t ticks)
 	emo_header *header;
 
 	sampler_sample(ticks);
-
 	if ((header = comm_peek_message()) != NULL) {
 		emolog_handle_message(header, ticks);
 		comm_consume_message();
