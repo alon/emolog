@@ -62,7 +62,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="tm4c1294kcpdt.cmd|error_273|crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="tm4c1294kcpdt.cmd|crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -129,7 +129,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="tm4c1294kcpdt.cmd|error_273|crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="tm4c1294kcpdt.cmd|crc8.c|tm4c1294ncpdt_startup_ccs.c|tm4c1294ncpdt.cmd|tests|dwarf|game-of-life-qml|square_waves_generator.c|gui" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
