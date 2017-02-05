@@ -1,0 +1,9 @@
+controller.state.position,1,0
+controller.state.motor_state,1,0
+controller.state.required_dir,1,0
+controller.state.actual_dir,1,0
+controller.state.dc_bus_v,1,0
+controller.state.total_i,1,0
+controller.state.duty_cycle.duty_cycle,1,0
+controller.state.temp_ext,2000,100
+controller.state.last_flow_rate_lpm,2000,200
