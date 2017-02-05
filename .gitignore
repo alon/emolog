@@ -20,7 +20,7 @@ venv
 .idea
 .cache
 *.so
-*.csv
+emo*.csv
 *.log
 *.dump
 *.pure
