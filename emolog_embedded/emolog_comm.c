@@ -56,7 +56,7 @@ static volatile uint32_t rx_buf_pos = 0;
 
 // This is no longer an encapsulated circular buffer, it is used by emolog_comm as well. Should
 // be moved there and re-static-ed later.
-static unsigned char tx_buf[TX_BUF_SIZE];
+static uint8_t tx_buf[TX_BUF_SIZE];
 
 volatile uint32_t tx_buf_read_pos = 0;	// points at the first (the oldest) byte in the buffer
 volatile uint32_t tx_buf_write_pos = 0;	// points where a new byte should go
