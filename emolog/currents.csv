@@ -1,0 +1,5 @@
+controller.state.position,1,0
+controller.state.phase_a_i,1,0
+controller.state.phase_b_i,1,0
+controller.state.phase_c_i,1,0
+controller.state.total_i,1,0
