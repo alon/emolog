@@ -426,6 +426,7 @@ def add_graphs(wb, data):
     pos_col = data.columns.tolist().index('Position') + 1
     vel_col = data.columns.tolist().index('Velocity') + 1
     current_col = data.columns.tolist().index('Total i') + 1
+    duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
 
     x_axis = {'min_row': min_row,
               'max_row': max_row,
@@ -461,6 +462,14 @@ def add_graphs(wb, data):
                    'min_row': min_row,
                    'max_row': short_max_row,
                    'col': current_col,
+                   'secondary': True,
+                   'line_width': 1
+                   })
+
+    y_axes.append({'name': 'Duty Cycle',
+                   'min_row': min_row,
+                   'max_row': short_max_row,
+                   'col': duty_cycle_col,
                    'secondary': True,
                    'line_width': 1
                    })
@@ -677,7 +686,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_065.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
