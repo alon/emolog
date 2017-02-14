@@ -6,11 +6,11 @@ import os
 import pandas as pd
 import numpy as np
 
-import time     # for profiling
+import time  # for profiling
 
-tick_time_ms = 0.05     # 50 us = 0.05 ms
+tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
-bore_diameter_mm = 26   # TODO is this correct?
+bore_diameter_mm = 26  # TODO is this correct?
 
 cruising_after_num_steps = 5
 
@@ -41,7 +41,8 @@ def post_process(csv_filename):
 
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats, output_filename)
+    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
+                  output_filename)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -64,7 +65,6 @@ output_col_names = \
     }
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
 
-
 data_col_formats = \
     {
         'Time': {'width': 8, 'format': 'time'},
@@ -82,7 +82,6 @@ data_col_formats = \
         'Half cycle': {'width': 11, 'format': 'general'},
         'Duty cycle': {'width': 8, 'format': 'percent'},
     }
-
 
 half_cycle_col_formats = \
     {
@@ -104,7 +103,6 @@ half_cycle_col_formats = \
         'Peak Current [A]': {'width': 8, 'format': 'frac'}
     }
 
-
 motor_states_col_formats = \
     {
         'Direction': {'width': 9, 'format': 'general'},
@@ -116,7 +114,6 @@ motor_states_col_formats = \
         'Current Std. Dev [A]': {'width': 8, 'format': 'frac'}
     }
 
-
 position_stats_col_formats = \
     {
         'Direction': {'width': 9, 'format': 'general'},
@@ -126,7 +123,6 @@ position_stats_col_formats = \
         'Average Current [A]': {'width': 8, 'format': 'frac'},
         'Current Std. Dev [A]': {'width': 8, 'format': 'frac'}
     }
-
 
 motor_state_to_phases = {
     'M_STATE_S0': '(+, -, 0)',
@@ -264,20 +260,30 @@ def calc_summary_stats(data, hc_stats):
     peak current.
     current during cruising.
     """
-    res = OrderedDict()
-    res['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
-    res['Number of Samples'] = len(data)
-    index_diff = np.diff(data.index)
-    res['Lost Samples'] = sum(index_diff) - len(index_diff)
-    res['Lost samples [%]'] = res['Lost Samples'] / res['Number of Samples']
-    res['Number of Half-Cycles'] = data['Half cycle'].max()
-    res['separator 1'] = ''
+    res = []
 
-    res['Average Current [A]'] = data['Total i'].mean()
-    res['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
-    res['Average Current going DOWN [A]'] = data[data['Actual dir'] == 'DOWN']['Total i'].mean()
-    res['Cruising Current [A]'] = data[data['Cruising'] == True]['Total i'].mean()
-    res['Coasting Current [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
+    section = OrderedDict()
+    section['title'] = 'General'
+    fields = OrderedDict()
+    fields['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
+    fields['Number of Samples'] = len(data)
+    index_diff = np.diff(data.index)
+    fields['Lost Samples'] = sum(index_diff) - len(index_diff)
+    fields['Lost samples [%]'] = fields['Lost Samples'] / fields['Number of Samples']
+    fields['Number of Half-Cycles'] = data['Half cycle'].max()
+    section['fields'] = fields
+    res.append(section)
+
+    section = OrderedDict()
+    section['title'] = 'Currents'
+    fields = OrderedDict()
+    fields['Average Current [A]'] = data['Total i'].mean()
+    fields['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
+    fields['Average Current going DOWN [A]'] = data[data['Actual dir'] == 'DOWN']['Total i'].mean()
+    fields['Cruising Current [A]'] = data[data['Cruising'] == True]['Total i'].mean()
+    fields['Coasting Current [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
+    section['fields'] = fields
+    res.append(section)
 
     return res
 
@@ -287,34 +293,52 @@ def calc_half_cycle_stats(data):
     for (hc_num, hc) in data.groupby('Half cycle'):
         hc_stats = OrderedDict()
         hc_stats['Half-Cycle'] = hc_num
-        assert(len(hc['Required dir'].unique()) == 1)     # a half-cycle should have a constant 'Required dir'
+
+        assert (len(hc['Required dir'].unique()) == 1)  # a half-cycle should have a constant 'Required dir'
         hc_stats['Direction'] = hc['Required dir'].iloc[0]
+
         hc_stats['Time [ms]'] = (hc.last_valid_index() - hc.first_valid_index() + 1) * tick_time_ms
+
         hc_stats['Min. Position [steps]'] = hc['Position'].min()
+
         hc_stats['Max. Position [steps]'] = hc['Position'].max()
+
         hc_stats['Travel Range [steps]'] = hc_stats['Max. Position [steps]'] - hc_stats['Min. Position [steps]']
+
         hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
+
         cruising = hc[hc['Cruising'] == True]
         cruising_range = cruising['Position'].max() - cruising['Position'].min()
         cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
         hc_stats['Cruising Velocity [m/s]'] = cruising_range * step_size_mm / cruising_time
-        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0)**2 * hc_stats['Travel Range [steps]'] * step_size_mm
+
+        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0) ** 2 * hc_stats['Travel Range [steps]'] * step_size_mm
         hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
+
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
         if len(coasting) > 0:
             hc_stats['Coasting Distance [steps]'] = coasting['Position'].max() - coasting['Position'].min()
+
             hc_stats['Coasting Duration [ms]'] = len(coasting) * tick_time_ms
+
             hc_stats['Coasting Duration [%]'] = hc_stats['Coasting Duration [ms]'] / hc_stats['Time [ms]']
+
         else:
             hc_stats['Coasting Distance [steps]'] = 'N/A'
+
             hc_stats['Coasting Duration [ms]'] = 'N/A'
+
             hc_stats['Coasting Duration [%]'] = 'N/A'
+
         hc_stats['Average Current [A]'] = hc['Total i'].mean()
+
         hc_stats['Cruising Current [A]'] = hc[hc['Cruising'] == True]['Total i'].mean()
+
         if len(coasting) > 0:
             hc_stats['Coasting Current [A]'] = coasting['Total i'].mean()
         else:
             hc_stats['Coasting Current [A]'] = 'N/A'
+
         hc_stats['Peak Current [A]'] = hc['Total i'].max()
 
         res.append(hc_stats)
@@ -367,8 +391,9 @@ def calc_position_stats(data):
     return pd.DataFrame(res)
 
 
-def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats, output_filename):
-    # data = data[1:5000]     # TEMP since it's taking so long...
+def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
+                  output_filename):
+    data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -390,7 +415,8 @@ def add_workbook_formats(wb):
             'percent': wb.add_format({'num_format': '0.00%'}),
             'general': wb.add_format(),
             'header': wb.add_format({'text_wrap': True, 'bold': True}),
-            'title': wb.add_format({'font_size': 14, 'bold': True})
+            'title': wb.add_format({'font_size': 14, 'bold': True}),
+            'note': wb.add_format({'font_size': 12, 'italic': True, 'text_wrap': True})
         }
     return formats
 
@@ -493,10 +519,10 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     for y_axis in y_axes:
         chart.add_series({
             'name': y_axis['name'],
-            'categories':   [data_sheet_name, x_axis['min_row'], x_axis['col'], x_axis['max_row'], x_axis['col']],
-            'values':       [data_sheet_name, y_axis['min_row'], y_axis['col'], y_axis['max_row'], y_axis['col']],
-            'y2_axis':      y_axis['secondary'],
-            'line':         {'width': y_axis['line_width']}
+            'categories': [data_sheet_name, x_axis['min_row'], x_axis['col'], x_axis['max_row'], x_axis['col']],
+            'values': [data_sheet_name, y_axis['min_row'], y_axis['col'], y_axis['max_row'], y_axis['col']],
+            'y2_axis': y_axis['secondary'],
+            'line': {'width': y_axis['line_width']}
         })
     chart.set_x_axis({'label_position': 'low',
                       'min': 0,
@@ -506,17 +532,33 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     sheet.name = chart_sheet_name
 
 
+cruising_definition_note = \
+    ("\"Cruising\" definition: The portion of the travel range that begins {0} steps "
+     "after the current start point, and ends when coasting starts. "
+     "It is assumed, but currently not checked, that the piston reaches full speed after {0} steps.").format(cruising_after_num_steps)
+
+
 def add_summary_sheet(wb, summary_stats, wb_formats):
     sheet = wb.add_worksheet('Summary')
     row = 0
-    sheet.set_column(0, 0, width=36, cell_format=wb_formats['header'])
-    for field_name, field_value in summary_stats.items():
-        if not field_name.startswith('separator'):
-            sheet.write(row, 0, field_name)
+    sheet.set_column(0, 0, width=36)
+    for section in summary_stats:
+        sheet.write(row, 0, section['title'], wb_formats['title'])
+        row += 1
+        for field_name, field_value in section['fields'].items():
+            sheet.write(row, 0, field_name, wb_formats['header'])
             if isnan(field_value):
                 field_value = 'N/A'
             sheet.write(row, 1, field_value)
-        row += 1
+            row += 1
+        row += 1    # extra line between sections
+
+    # add notes
+    sheet.write(row, 0, 'Notes:', wb_formats['title'])
+    row += 1
+    sheet.merge_range(row, 0, row, 8, cruising_definition_note, wb_formats['note'])
+    sheet.set_row(row, 15 * 2) # standard row height is 15
+    row += 2
 
 
 def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
@@ -598,7 +640,7 @@ def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
         'data_labels': {'value': True},
         'y_error_bars': {
             'type': 'custom',
-            'plus_values':  "='Motor States'!$E$12:$E$18",
+            'plus_values': "='Motor States'!$E$12:$E$18",
             'minus_values': "='Motor States'!$E$12:$E$18"
         }
     })
