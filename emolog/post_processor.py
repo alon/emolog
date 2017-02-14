@@ -21,6 +21,7 @@ def post_process(csv_filename):
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
+    data_before_cropping = data.copy()
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
@@ -35,7 +36,7 @@ def post_process(csv_filename):
     half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
     motor_state_stats = calc_motor_state_stats(data)
     position_stats = calc_position_stats(data)
-    summary_stats = calc_summary_stats(data, half_cycle_stats)
+    summary_stats = calc_summary_stats(data, half_cycle_stats, data_before_cropping)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
@@ -243,48 +244,107 @@ def interpolate_missing_data(data):
     return data
 
 
-def calc_summary_stats(data, hc_stats):
+def calc_summary_stats(data, hc_stats, data_before_cropping):
     """
     add:
-    'DC Bus Voltage Average [V]'
-    'DC Bus Voltage Min. [V]'
-    'DC Bus Voltage Max. [V]'
-    'DC Bus Voltage Std. Dev. [V]'
-
-    'Samples before cropping'
-    'Samples after cropping' (which is what's displayed now)
-    'Samples cropped'
-
-    temperature (avg, std). when we can transmit all temperatures (incl. board), make this another tab.
-
-    peak current.
-    current during cruising.
+    (TBD)
     """
     res = []
 
-    section = OrderedDict()
+    section = {}
     section['title'] = 'General'
-    fields = OrderedDict()
-    fields['Total Time [ms]'] = (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms
-    fields['Number of Samples'] = len(data)
-    index_diff = np.diff(data.index)
-    fields['Lost Samples'] = sum(index_diff) - len(index_diff)
-    fields['Lost samples [%]'] = fields['Lost Samples'] / fields['Number of Samples']
-    fields['Number of Half-Cycles'] = data['Half cycle'].max()
+    fields = []
+    samples_before_cropping = len(data_before_cropping)
+    samples_after_cropping = len(data)
+    samples_cropped = samples_before_cropping - samples_after_cropping
+    index_diff = np.diff(data_before_cropping.index)
+    samples_lost = sum(index_diff) - len(index_diff)
+    fields.append({'name': 'Samples Received',
+                   'value': samples_before_cropping,
+                   'format': 'general'})
+    fields.append({'name': 'Samples Lost',
+                   'value': samples_lost,
+                   'format': 'general'})
+    fields.append({'name': 'Samples Lost [%]',
+                   'value': samples_lost / samples_before_cropping,
+                   'format': 'percent'})
+    fields.append({'name': 'Samples After Cropping',
+                   'value': samples_after_cropping,
+                   'format': 'general'})
+    fields.append({'name': 'Samples Cropped',
+                   'value': samples_cropped,
+                   'format': 'general'})
+    fields.append({'name': 'Total Time After Cropping [ms]',
+                   'value': (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms,
+                   'format': 'time'})
+    fields.append({'name': 'Number of Half-Cycles',
+                   'value': data['Half cycle'].max(),
+                   'format': 'general'})
     section['fields'] = fields
     res.append(section)
 
-    section = OrderedDict()
+    section = {}
     section['title'] = 'Currents'
-    fields = OrderedDict()
-    fields['Average Current [A]'] = data['Total i'].mean()
-    fields['Average Current going UP [A]'] = data[data['Actual dir'] == 'UP']['Total i'].mean()
-    fields['Average Current going DOWN [A]'] = data[data['Actual dir'] == 'DOWN']['Total i'].mean()
-    fields['Cruising Current [A]'] = data[data['Cruising'] == True]['Total i'].mean()
-    fields['Coasting Current [A]'] = data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean()
+    fields = []
+    fields.append({'name': 'Average Current [A]',
+                   'value': data['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Average Current going UP [A]',
+                   'value': data[data['Actual dir'] == 'UP']['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Average Current going DOWN [A]',
+                   'value': data[data['Actual dir'] == 'DOWN']['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Cruising Current [A]',
+                   'value': data[data['Cruising'] == True]['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Cruising Current going UP [A]',
+                   'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'UP')]['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Cruising Current going DOWN [A]',
+                   'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Coasting Current [A]',
+                   'value': data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Peak Current [A]',
+                   'value': data['Total i'].max(),
+                   'format': 'frac'})
     section['fields'] = fields
     res.append(section)
 
+    section = {}
+    section['title'] = 'Bus Voltage'
+    fields = []
+    fields.append({'name': 'Average Voltage [V]',
+                   'value': data['Dc bus v'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Min. Voltage [V]',
+                   'value': data['Dc bus v'].min(),
+                   'format': 'frac'})
+    fields.append({'name': 'Max. Voltage [V]',
+                   'value': data['Dc bus v'].max(),
+                   'format': 'frac'})
+    fields.append({'name': 'Voltage Std. Dev [V]',
+                   'value': data['Dc bus v'].std(),
+                   'format': 'frac'})
+    section['fields'] = fields
+    res.append(section)
+
+    section = {}
+    section['title'] = 'Temperature'
+    fields = []
+    fields.append({'name': 'Average Motor Temperature [deg C]',
+                   'value': data['Temp ext'].mean(),
+                   'format': 'frac'})
+    fields.append({'name': 'Min. Motor Temperature [deg C]',
+                   'value': data['Temp ext'].min(),
+                   'format': 'frac'})
+    fields.append({'name': 'Max. Motor Temperature [deg C]',
+                   'value': data['Temp ext'].max(),
+                   'format': 'frac'})
+    section['fields'] = fields
+    res.append(section)
     return res
 
 
@@ -545,11 +605,11 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
     for section in summary_stats:
         sheet.write(row, 0, section['title'], wb_formats['title'])
         row += 1
-        for field_name, field_value in section['fields'].items():
-            sheet.write(row, 0, field_name, wb_formats['header'])
-            if isnan(field_value):
-                field_value = 'N/A'
-            sheet.write(row, 1, field_value)
+        for field in section['fields']:
+            sheet.write(row, 0, field['name'], wb_formats['header'])
+            if isnan(field['value']):
+                field['value'] = 'N/A'
+            sheet.write(row, 1, field['value'], wb_formats[field['format']])
             row += 1
         row += 1    # extra line between sections
 
