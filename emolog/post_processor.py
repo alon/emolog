@@ -7,12 +7,14 @@ import pandas as pd
 import numpy as np
 
 import time  # for profiling
+from xlsxwriter.utility import xl_rowcol_to_cell
 
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
 bore_diameter_mm = 26  # TODO is this correct?
 
 cruising_after_num_steps = 5
+default_pump_head = 8.0
 
 
 def post_process(csv_filename):
@@ -21,13 +23,14 @@ def post_process(csv_filename):
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
+    data = interpolate_missing_data(data)
+    data['Power In [W]'] = data['Dc bus v'] * data['Total i']
     data_before_cropping = data.copy()
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = mark_cruising(data)
     data = reorder_columns(data)
-    data = interpolate_missing_data(data)
     end_time = time.time()
     print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
@@ -82,6 +85,7 @@ data_col_formats = \
         'Last flow rate lpm': {'width': 9, 'format': 'frac'},
         'Half cycle': {'width': 11, 'format': 'general'},
         'Duty cycle': {'width': 8, 'format': 'percent'},
+        'Power In [W]': {'width': 8, 'format': 'frac'}
     }
 
 half_cycle_col_formats = \
@@ -98,10 +102,14 @@ half_cycle_col_formats = \
         'Coasting Distance [steps]': {'width': 8, 'format': 'general'},
         'Coasting Duration [ms]': {'width': 8, 'format': 'time'},
         'Coasting Duration [%]': {'width': 8, 'format': 'percent'},
+        'Time In Last Step Until Turn On [ms]': {'width': 12, 'format': 'time'},
         'Average Current [A]': {'width': 8, 'format': 'frac'},
         'Cruising Current [A]': {'width': 8, 'format': 'frac'},
         'Coasting Current [A]': {'width': 8, 'format': 'frac'},
-        'Peak Current [A]': {'width': 8, 'format': 'frac'}
+        'Peak Current [A]': {'width': 8, 'format': 'frac'},
+        'Average Power In [W]': {'width': 8, 'format': 'frac'},
+        'Power Out [W]': {'width': 8, 'format': 'frac'},
+        'Efficiency [%]': {'width': 9, 'format': 'percent'},
     }
 
 motor_states_col_formats = \
@@ -238,113 +246,103 @@ def reorder_columns(data):
 
 
 def interpolate_missing_data(data):
-    # TODO: instead of hard-coding columns to interpolate, consider analyzing where it's needed (or just everywhere?)
-    cols_to_interpolate = ['Last flow rate lpm', 'Temp ext']
-    data.loc[:, cols_to_interpolate] = data.loc[:, cols_to_interpolate].fillna(method='ffill')
+    data = data.fillna(method='ffill')
     return data
 
 
 def calc_summary_stats(data, hc_stats, data_before_cropping):
-    """
-    add:
-    (TBD)
-    """
     res = []
 
-    section = {}
-    section['title'] = 'General'
-    fields = []
     samples_before_cropping = len(data_before_cropping)
     samples_after_cropping = len(data)
     samples_cropped = samples_before_cropping - samples_after_cropping
     index_diff = np.diff(data_before_cropping.index)
     samples_lost = sum(index_diff) - len(index_diff)
-    fields.append({'name': 'Samples Received',
-                   'value': samples_before_cropping,
-                   'format': 'general'})
-    fields.append({'name': 'Samples Lost',
-                   'value': samples_lost,
-                   'format': 'general'})
-    fields.append({'name': 'Samples Lost [%]',
-                   'value': samples_lost / samples_before_cropping,
-                   'format': 'percent'})
-    fields.append({'name': 'Samples After Cropping',
-                   'value': samples_after_cropping,
-                   'format': 'general'})
-    fields.append({'name': 'Samples Cropped',
-                   'value': samples_cropped,
-                   'format': 'general'})
-    fields.append({'name': 'Total Time After Cropping [ms]',
-                   'value': (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms,
-                   'format': 'time'})
-    fields.append({'name': 'Number of Half-Cycles',
-                   'value': data['Half cycle'].max(),
-                   'format': 'general'})
-    section['fields'] = fields
-    res.append(section)
+    res.append({'title': 'General',
+                'fields': [
+                    {'name': 'Samples Received',
+                     'value': samples_before_cropping,
+                     'format': 'general'},
+                    {'name': 'Samples Lost',
+                     'value': samples_lost,
+                     'format': 'general'},
+                    {'name': 'Samples Lost [%]',
+                     'value': samples_lost / samples_before_cropping,
+                     'format': 'percent'},
+                    {'name': 'Samples After Cropping',
+                     'value': samples_after_cropping,
+                     'format': 'general'},
+                    {'name': 'Samples Cropped',
+                     'value': samples_cropped,
+                     'format': 'general'},
+                    {'name': 'Total Time After Cropping [ms]',
+                     'value': (data.last_valid_index() - data.first_valid_index() + 1) * tick_time_ms,
+                     'format': 'time'},
+                    {'name': 'Number of Half-Cycles',
+                     'value': data['Half cycle'].max(),
+                     'format': 'general'}
+                ]
+                })
 
-    section = {}
-    section['title'] = 'Currents'
-    fields = []
-    fields.append({'name': 'Average Current [A]',
-                   'value': data['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Average Current going UP [A]',
-                   'value': data[data['Actual dir'] == 'UP']['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Average Current going DOWN [A]',
-                   'value': data[data['Actual dir'] == 'DOWN']['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Cruising Current [A]',
-                   'value': data[data['Cruising'] == True]['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Cruising Current going UP [A]',
-                   'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'UP')]['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Cruising Current going DOWN [A]',
-                   'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Coasting Current [A]',
-                   'value': data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Peak Current [A]',
-                   'value': data['Total i'].max(),
-                   'format': 'frac'})
-    section['fields'] = fields
-    res.append(section)
+    res.append({'title': 'Currents',
+                'fields': [
+                    {'name': 'Average Current [A]',
+                     'value': data['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Average Current going UP [A]',
+                     'value': data[data['Actual dir'] == 'UP']['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Average Current going DOWN [A]',
+                     'value': data[data['Actual dir'] == 'DOWN']['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Cruising Current [A]',
+                     'value': data[data['Cruising'] == True]['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Cruising Current going UP [A]',
+                     'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'UP')]['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Cruising Current going DOWN [A]',
+                     'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Coasting Current [A]',
+                     'value': data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Peak Current [A]',
+                     'value': data['Total i'].max(),
+                     'format': 'frac'}
+                ]
+                })
 
-    section = {}
-    section['title'] = 'Bus Voltage'
-    fields = []
-    fields.append({'name': 'Average Voltage [V]',
-                   'value': data['Dc bus v'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Min. Voltage [V]',
-                   'value': data['Dc bus v'].min(),
-                   'format': 'frac'})
-    fields.append({'name': 'Max. Voltage [V]',
-                   'value': data['Dc bus v'].max(),
-                   'format': 'frac'})
-    fields.append({'name': 'Voltage Std. Dev [V]',
-                   'value': data['Dc bus v'].std(),
-                   'format': 'frac'})
-    section['fields'] = fields
-    res.append(section)
+    res.append({'title': 'Bus Voltage',
+                'fields': [
+                    {'name': 'Average Voltage [V]',
+                     'value': data['Dc bus v'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Min. Voltage [V]',
+                     'value': data['Dc bus v'].min(),
+                     'format': 'frac'},
+                    {'name': 'Max. Voltage [V]',
+                     'value': data['Dc bus v'].max(),
+                     'format': 'frac'},
+                    {'name': 'Voltage Std. Dev [V]',
+                     'value': data['Dc bus v'].std(),
+                     'format': 'frac'}
+                ]
+                })
 
-    section = {}
-    section['title'] = 'Temperature'
-    fields = []
-    fields.append({'name': 'Average Motor Temperature [deg C]',
-                   'value': data['Temp ext'].mean(),
-                   'format': 'frac'})
-    fields.append({'name': 'Min. Motor Temperature [deg C]',
-                   'value': data['Temp ext'].min(),
-                   'format': 'frac'})
-    fields.append({'name': 'Max. Motor Temperature [deg C]',
-                   'value': data['Temp ext'].max(),
-                   'format': 'frac'})
-    section['fields'] = fields
-    res.append(section)
+    res.append({'title': 'Temperature',
+                'fields': [
+                    {'name': 'Average Motor Temperature [deg C]',
+                     'value': data['Temp ext'].mean(),
+                     'format': 'frac'},
+                    {'name': 'Min. Motor Temperature [deg C]',
+                     'value': data['Temp ext'].min(),
+                     'format': 'frac'},
+                    {'name': 'Max. Motor Temperature [deg C]',
+                     'value': data['Temp ext'].max(),
+                     'format': 'frac'}
+                ]
+                })
     return res
 
 
@@ -378,17 +376,15 @@ def calc_half_cycle_stats(data):
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
         if len(coasting) > 0:
             hc_stats['Coasting Distance [steps]'] = coasting['Position'].max() - coasting['Position'].min()
-
             hc_stats['Coasting Duration [ms]'] = len(coasting) * tick_time_ms
-
             hc_stats['Coasting Duration [%]'] = hc_stats['Coasting Duration [ms]'] / hc_stats['Time [ms]']
-
         else:
             hc_stats['Coasting Distance [steps]'] = 'N/A'
-
             hc_stats['Coasting Duration [ms]'] = 'N/A'
-
             hc_stats['Coasting Duration [%]'] = 'N/A'
+
+        last_step = hc[hc['Position'] == hc['Position'].iloc[-1]]
+        hc_stats['Time In Last Step Until Turn On [ms]'] = len(last_step) * tick_time_ms
 
         hc_stats['Average Current [A]'] = hc['Total i'].mean()
 
@@ -400,7 +396,7 @@ def calc_half_cycle_stats(data):
             hc_stats['Coasting Current [A]'] = 'N/A'
 
         hc_stats['Peak Current [A]'] = hc['Total i'].max()
-
+        hc_stats['Average Power In [W]'] = hc['Power In [W]'].mean()
         res.append(hc_stats)
     return pd.DataFrame(res)
 
@@ -476,7 +472,8 @@ def add_workbook_formats(wb):
             'general': wb.add_format(),
             'header': wb.add_format({'text_wrap': True, 'bold': True}),
             'title': wb.add_format({'font_size': 14, 'bold': True}),
-            'note': wb.add_format({'font_size': 12, 'italic': True, 'text_wrap': True})
+            'note': wb.add_format({'font_size': 12, 'italic': True, 'text_wrap': True}),
+            'user_param': wb.add_format({'font_size': 12, 'bg_color': '#B8CCE4'})
         }
     return formats
 
@@ -512,7 +509,8 @@ def add_graphs(wb, data):
     pos_col = data.columns.tolist().index('Position') + 1
     vel_col = data.columns.tolist().index('Velocity') + 1
     current_col = data.columns.tolist().index('Total i') + 1
-    duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
+    if 'Duty Cycle' in data.columns:
+        duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
 
     x_axis = {'min_row': min_row,
               'max_row': max_row,
@@ -552,13 +550,14 @@ def add_graphs(wb, data):
                    'line_width': 1
                    })
 
-    y_axes.append({'name': 'Duty Cycle',
-                   'min_row': min_row,
-                   'max_row': short_max_row,
-                   'col': duty_cycle_col,
-                   'secondary': True,
-                   'line_width': 1
-                   })
+    if 'Duty Cycle' in data.columns:
+        y_axes.append({'name': 'Duty Cycle',
+                       'min_row': min_row,
+                       'max_row': short_max_row,
+                       'col': duty_cycle_col,
+                       'secondary': True,
+                       'line_width': 1
+                       })
 
     if std_name_to_output_name('Duty cycle') in data.columns.tolist():
         duty_cycle_col = data.columns.tolist().index(std_name_to_output_name('Duty cycle')) + 1
@@ -622,34 +621,46 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
 
 
 def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
+    data_start_row = 5
+    power_out_col_name = 'Power Out [W]'
+    efficiency_col_name = 'Efficiency [%]'
     half_cycle_stats.to_excel(excel_writer=writer,
                               sheet_name='Half-Cycles',
                               header=False,
                               index=False,
-                              startrow=2)
+                              startrow=data_start_row)
     sheet = writer.sheets['Half-Cycles']
-    set_column_formats(sheet, half_cycle_stats.columns.tolist(), wb_formats, half_cycle_col_formats)
+    columns = list(half_cycle_stats.columns) + [power_out_col_name, efficiency_col_name]
+    set_column_formats(sheet, columns, wb_formats, half_cycle_col_formats)
 
+    # user parameters section
     cur_row = 0
+    sheet.write(cur_row, 0, "User Parameters", wb_formats['title'])
+    cur_row += 1
+    sheet.write(cur_row, 1, "Pump Head [m]", wb_formats['header'])
+    sheet.write(cur_row, 2, default_pump_head, wb_formats['user_param'])
+
+    # half cycles title
+    cur_row = data_start_row - 2
     sheet.write(cur_row, 0, "Half-Cycle List", wb_formats['title'])
 
-    # write header row
+    # half cycles header row
     cur_row += 1
     sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
-    for (col_num, col_name) in enumerate(half_cycle_stats.columns):
+    for (col_num, col_name) in enumerate(columns):
         sheet.write(cur_row, col_num, col_name)
 
-    # write summary rows
-    cur_row = len(half_cycle_stats) + 3
-
+    # summary title
+    cur_row = len(half_cycle_stats) + data_start_row + 1
     sheet.write(cur_row, 0, "Half-Cycle Summary", wb_formats['title'])
-    cur_row += 1
 
-    # repeat headers
+    # summary header row
+    cur_row += 1
     sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
-    for (col_num, col_name) in enumerate(half_cycle_summary.columns):
+    for (col_num, col_name) in enumerate(columns[1:]):
         sheet.write(cur_row, col_num + 1, col_name)
 
+    # summary data
     cur_row += 1
     half_cycle_summary.to_excel(excel_writer=writer,
                                 sheet_name='Half-Cycles',
@@ -657,6 +668,24 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
                                 index=False,
                                 startrow=cur_row,
                                 startcol=1)
+
+    # Power Out column
+    half_cycle_rows = list(range(data_start_row, data_start_row + len(half_cycle_stats)))
+    summary_rows = list(range(cur_row, cur_row + len(half_cycle_summary)))
+    power_out_col = columns.index(power_out_col_name)
+    pump_head_cell = '$C$2'
+    flow_rate_col = columns.index('Flow Rate [LPM]')
+    for row in half_cycle_rows + summary_rows:
+        formula = '=' + xl_rowcol_to_cell(row, flow_rate_col) + ' / 60 * 9.80665 * ' + pump_head_cell
+        sheet.write_formula(row, power_out_col, formula, wb_formats['frac'])
+
+    # efficiency column
+    power_in_col = columns.index('Average Power In [W]')
+    efficiency_col = columns.index(efficiency_col_name)
+    for row in half_cycle_rows + summary_rows:
+        formula = '=' + xl_rowcol_to_cell(row, power_out_col) + ' / ' + xl_rowcol_to_cell(row, power_in_col)
+        sheet.write_formula(row, efficiency_col, formula, wb_formats['percent'])
+
 
 
 def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
@@ -789,6 +818,8 @@ if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
         input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
+        # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
