@@ -342,8 +342,7 @@ def read_elf_variables(vars, varfile):
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, list(name_to_ticks_and_phase.keys()),
-                                                  verbose=not args.silent)
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, names, verbose=not args.silent)
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
