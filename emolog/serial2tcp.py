@@ -32,9 +32,10 @@ RED_END = "\033[0;0m"
 verbose = False
 
 class Redirector:
-    def __init__(self, serial, socket):
+    def __init__(self, serial, s):
         self.serial = serial
-        self.socket = socket
+        self.socket = s
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 20 * 1024 * 1024)
 
     def shortcut(self):
         """connect the serial port to the tcp port by copying everything
