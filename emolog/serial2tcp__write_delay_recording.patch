@@ -1,0 +1,41 @@
+diff --git a/emolog/serial2tcp.py b/emolog/serial2tcp.py
+index 4de0b4d..4bc5814 100644
+--- a/emolog/serial2tcp.py
++++ b/emolog/serial2tcp.py
+@@ -10,6 +10,7 @@ import socket
+ import logging
+ import signal
+ from argparse import ArgumentParser
++from time import time
+ 
+ import colorama
+ 
+@@ -35,6 +36,8 @@ class Redirector:
+     def __init__(self, serial, socket):
+         self.serial = serial
+         self.socket = socket
++        self.write_times = []
++        self.gen = 0
+ 
+     def shortcut(self):
+         """connect the serial port to the tcp port by copying everything
+@@ -59,7 +62,19 @@ class Redirector:
+                 if data:
+                     #if b'EM\x03' in data: print("probably an ACK")
+                     #send it over TCP
++                    if len(self.write_times) >= 100:
++                        print(len(self.write_times))
++                        try:
++                            with open('write_times_{}.txt'.format(self.gen), 'w+') as fd:
++                                fd.write('\n'.join(map(str, self.write_times)))
++                        except:
++                            print("blabla")
++                        self.write_times.clear()
++                        self.gen += 1
++                    start = time()
+                     self.socket.sendall(data)
++                    dt = time() - start
++                    self.write_times.append(dt)
+             except socket.error as msg:
+                 log.error(msg)
+                 #probably got disconnected
