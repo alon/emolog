@@ -330,6 +330,17 @@ def parse_args():
     return parser.parse_args()
 
 
+def bandwidth_calc(variables):
+    """
+    :param variables: list of dictionaries
+    :return: average baudrate (bits per second, bps)
+    """
+    packets_per_second = args.ticks_per_second # simplification: assume a packet every tick (upper bound)
+    header_average = packets_per_second * emolog.SamplerSample.empty_size()
+    payload_average = sum(args.ticks_per_second / v['period_ticks'] * v['size'] for v in variables)
+    return (header_average + payload_average) * 8
+
+
 def read_elf_variables(vars, varfile):
     if varfile is not None:
         with open(varfile) as fd:
@@ -352,8 +363,10 @@ def read_elf_variables(vars, varfile):
         period_ticks, phase_ticks = name_to_ticks_and_phase[name]
         variables.append(dict(
             name=name,
-            phase_ticks=phase_ticks, period_ticks=period_ticks,
-            address=v.address, size=v.size,
+            phase_ticks=phase_ticks,
+            period_ticks=period_ticks,
+            address=v.address,
+            size=v.size,
             _type=variable_to_decoder(v)))
     return names, variables
 
@@ -374,6 +387,11 @@ async def amain():
     print("================")
     print("")
     print("output file: {}".format(csv_filename))
+    bandwidth_bps = bandwidth_calc(variables)
+    print("upper bound on bandwidth: {} Mbps out of {} ({:.3f}%)".format(
+        bandwidth_bps / 1e6,
+        args.baud / 1e6,
+        100 * bandwidth_bps / args.baud))
     max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
     if max_ticks is not None:
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
@@ -416,6 +434,7 @@ async def amain():
 
 def main():
     loop = asyncio.get_event_loop()
+    loop.set_debug(True)
     try:
         loop.run_until_complete(amain())
     except KeyboardInterrupt:

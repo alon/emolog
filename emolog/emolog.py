@@ -112,7 +112,7 @@ def initialize_emo_message_type_to_str():
 initialize_emo_message_type_to_str()
 
 
-header_size = 8
+header_size = 8 # TODO - check this for consistency with library (add a test)
 
 
 MAGIC_VALUES = list(map(ord, 'EM'))
@@ -225,11 +225,18 @@ class SamplerSample(Message):
         :param vars: dictionary from variable index to value
         :return:
         """
+        if var_size_pairs is None:
+            var_size_pairs = []
         super(SamplerSample, self).__init__(seq=seq)
         self.ticks = ticks
         self.payload = payload
         self.var_size_pairs = var_size_pairs
         self.variables = None
+
+    @classmethod
+    def empty_size(cls):
+        sample = cls(seq=0, ticks=0)
+        return sample.encode_inner()
 
     def encode_inner(self):
         lib.emo_encode_sampler_sample_start(self.buf)

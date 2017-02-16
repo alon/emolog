@@ -55,12 +55,13 @@
   [ ] GUI
 
 
-- [ ] bandwidth print. e.g. "using 3.4 Mbps out of 8Mbps (xx%)"
+- [x] bandwidth print. e.g. "using 3.4 Mbps out of 8Mbps (xx%)"
   - take into account:
     - header
     - ticks counter
     - average, rather than peak, packet size
-  - [ ] every xx seconds (maybe 0.25s or so?) print how many packets were processed and how many were expected (or maybe it's easier to look at their diff, because a steady increase in the diff is what tells us if processing is slower than realtime)
+- [ ] every xx seconds (maybe 0.25s or so?) print how many packets were processed and how many were expected
+      (or maybe it's easier to look at their diff, because a steady increase in the diff is what tells us if processing is slower than realtime)
 
 - [ ] can you make the socket buffer much larger? to test my theory that it overflows and this causes the throttling.
 
