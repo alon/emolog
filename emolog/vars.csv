@@ -7,3 +7,6 @@ controller.state.total_i,1,0
 controller.state.duty_cycle.duty_cycle,1,0
 controller.state.temp_ext,2000,100
 controller.state.last_flow_rate_lpm,2000,200
+controller.state.temp_a,2000,300
+controller.state.temp_b,2000,400
+controller.state.temp_c,2000,500
