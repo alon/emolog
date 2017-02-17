@@ -54,7 +54,7 @@ def post_process(csv_filename):
 
 output_col_names = \
     {
-        'Step time': 'Step Time\n[m/s]',
+        'Step time': 'Step Time\n[ms]',
         'Velocity': 'Velocity\n[m/s]',
         'Motor state': 'Motor State',
         'Actual dir': 'Actual\nDirection',
@@ -817,7 +817,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_074.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
     else:
