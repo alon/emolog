@@ -449,7 +449,7 @@ def calc_position_stats(data):
 
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   output_filename):
-    data = data[1:5000]  # TEMP since it's taking so long...
+    # data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -509,7 +509,7 @@ def add_graphs(wb, data):
     pos_col = data.columns.tolist().index('Position') + 1
     vel_col = data.columns.tolist().index('Velocity') + 1
     current_col = data.columns.tolist().index('Total i') + 1
-    if 'Duty Cycle' in data.columns:
+    if 'Duty cycle' in data.columns:
         duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
 
     x_axis = {'min_row': min_row,
@@ -550,7 +550,7 @@ def add_graphs(wb, data):
                    'line_width': 1
                    })
 
-    if 'Duty Cycle' in data.columns:
+    if 'Duty cycle' in data.columns:
         y_axes.append({'name': 'Duty Cycle',
                        'min_row': min_row,
                        'max_row': short_max_row,
@@ -817,8 +817,8 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_074.csv'
+        # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
     else:
         input_filename = sys.argv[1]
