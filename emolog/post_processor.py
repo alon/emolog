@@ -12,6 +12,8 @@ from xlsxwriter.utility import xl_rowcol_to_cell
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
 bore_diameter_mm = 26  # TODO is this correct?
+velocity_to_lpm_scale_factor = pi * (bore_diameter_mm / 2.0) ** 2  / 1000.0 * 60.0
+
 
 cruising_after_num_steps = 5
 default_pump_head = 8.0
@@ -98,6 +100,7 @@ half_cycle_col_formats = \
         'Travel Range [steps]': {'width': 7, 'format': 'general'},
         'Average Velocity [m/s]': {'width': 8, 'format': 'frac'},
         'Cruising Velocity [m/s]': {'width': 8, 'format': 'frac'},
+        'Cruising Flow Rate [LPM]': {'width': 10, 'format': 'frac'},
         'Flow Rate [LPM]': {'width': 8, 'format': 'frac'},
         'Coasting Distance [steps]': {'width': 8, 'format': 'general'},
         'Coasting Duration [ms]': {'width': 8, 'format': 'time'},
@@ -110,6 +113,8 @@ half_cycle_col_formats = \
         'Average Power In [W]': {'width': 8, 'format': 'frac'},
         'Power Out [W]': {'width': 8, 'format': 'frac'},
         'Efficiency [%]': {'width': 9, 'format': 'percent'},
+        'Cruising Power Out [W]': {'width': 8, 'format': 'frac'},
+        'Cruising Efficiency [%]': {'width': 9, 'format': 'percent'}
     }
 
 motor_states_col_formats = \
@@ -369,9 +374,10 @@ def calc_half_cycle_stats(data):
         cruising_range = cruising['Position'].max() - cruising['Position'].min()
         cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
         hc_stats['Cruising Velocity [m/s]'] = cruising_range * step_size_mm / cruising_time
+        hc_stats['Cruising Power In [W]'] = cruising['Power In [W]'].mean()
+        hc_stats['Cruising Flow Rate [LPM]'] = hc_stats['Cruising Velocity [m/s]'] * velocity_to_lpm_scale_factor
 
-        water_displacement_mm3 = pi * (bore_diameter_mm / 2.0) ** 2 * hc_stats['Travel Range [steps]'] * step_size_mm
-        hc_stats['Flow Rate [LPM]'] = water_displacement_mm3 / 1e6 / (hc_stats['Time [ms]'] / 1000.0 / 60.0)
+        hc_stats['Flow Rate [LPM]'] = hc_stats['Average Velocity [m/s]'] * velocity_to_lpm_scale_factor
 
         coasting = hc[hc['Motor state'] == 'M_STATE_ALL_OFF']
         if len(coasting) > 0:
@@ -624,13 +630,17 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
     data_start_row = 5
     power_out_col_name = 'Power Out [W]'
     efficiency_col_name = 'Efficiency [%]'
+    cruising_power_out_col_name = 'Cruising Power Out [W]'
+    cruising_efficiency_col_name = 'Cruising Efficiency [%]'
     half_cycle_stats.to_excel(excel_writer=writer,
                               sheet_name='Half-Cycles',
                               header=False,
                               index=False,
                               startrow=data_start_row)
     sheet = writer.sheets['Half-Cycles']
-    columns = list(half_cycle_stats.columns) + [power_out_col_name, efficiency_col_name]
+    columns_to_add = [power_out_col_name, efficiency_col_name, cruising_power_out_col_name, cruising_efficiency_col_name]
+    columns = list(half_cycle_stats.columns) + columns_to_add
+
     set_column_formats(sheet, columns, wb_formats, half_cycle_col_formats)
 
     # user parameters section
@@ -685,6 +695,20 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
     for row in half_cycle_rows + summary_rows:
         formula = '=' + xl_rowcol_to_cell(row, power_out_col) + ' / ' + xl_rowcol_to_cell(row, power_in_col)
         sheet.write_formula(row, efficiency_col, formula, wb_formats['percent'])
+
+    # Cruising Power Out column
+    cruising_power_out_col = columns.index(cruising_power_out_col_name)
+    cruising_flow_rate_col = columns.index('Cruising Flow Rate [LPM]')
+    for row in half_cycle_rows + summary_rows:
+        formula = '=' + xl_rowcol_to_cell(row, cruising_flow_rate_col) + ' / 60 * 9.80665 * ' + pump_head_cell
+        sheet.write_formula(row, cruising_power_out_col, formula, wb_formats['frac'])
+
+    # Cruising efficiency column
+    cruising_power_in_col = columns.index('Cruising Power In [W]')
+    cruising_efficiency_col = columns.index(cruising_efficiency_col_name)
+    for row in half_cycle_rows + summary_rows:
+        formula = '=' + xl_rowcol_to_cell(row, cruising_power_out_col) + ' / ' + xl_rowcol_to_cell(row, cruising_power_in_col)
+        sheet.write_formula(row, cruising_efficiency_col, formula, wb_formats['percent'])
 
 
 
@@ -817,7 +841,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\FOR TEST 1.5mm - 55V - down delay 1.0ms.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
     else:
