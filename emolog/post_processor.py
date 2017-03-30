@@ -455,6 +455,7 @@ def calc_position_stats(data):
 
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   output_filename):
+    # TODO make this an option that only runs if __name == '__main__', and also turned on
     # data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
@@ -841,7 +842,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\FOR TEST 1.5mm - 55V - down delay 1.0ms.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_005.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
         # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
     else:
