@@ -27,6 +27,7 @@ def post_process(csv_filename):
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
     data['Power In [W]'] = data['Dc bus v'] * data['Total i']
+    data = step_time_estimate_to_vel(data)
     data_before_cropping = data.copy()
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
@@ -77,6 +78,7 @@ data_col_formats = \
         'Position': {'width': 8, 'format': 'general'},
         'Step time': {'width': 9, 'format': 'time'},
         'Velocity': {'width': 8, 'format': 'frac'},
+        'Estimated Velocity [m/s]': {'width': 12, 'format': 'frac'},
         'Motor state': {'width': 17, 'format': 'general'},
         'Actual dir': {'width': 9, 'format': 'general'},
         'Required dir': {'width': 9, 'format': 'general'},
@@ -244,7 +246,7 @@ def mark_cruising(data):
 
 def reorder_columns(data):
     all_cols = data.columns.tolist()
-    first_cols = ['Time', 'Position', 'Step time', 'Velocity', 'Motor state', 'Actual dir', 'Required dir']
+    first_cols = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]', 'Motor state', 'Actual dir', 'Required dir']
     rest_of_cols = [c for c in all_cols if c not in first_cols]
     data = data[first_cols + rest_of_cols]
     return data
@@ -252,6 +254,12 @@ def reorder_columns(data):
 
 def interpolate_missing_data(data):
     data = data.fillna(method='ffill')
+    return data
+
+
+def step_time_estimate_to_vel(data):
+    data['Estimated Velocity [m/s]'] = step_size_mm / (data['Step time estimate'] * tick_time_ms)
+    #data.drop(['Step time estimate'], inplace=True, axis=1)
     return data
 
 
@@ -456,7 +464,7 @@ def calc_position_stats(data):
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   output_filename):
     # TODO make this an option that only runs if __name == '__main__', and also turned on
-    # data = data[1:5000]  # TEMP since it's taking so long...
+    #data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -529,7 +537,7 @@ def add_graphs(wb, data):
                    'max_row': max_row,
                    'col': pos_col,
                    'secondary': False,
-                   'line_width': 1
+                   'line': {'width': 1}
                    })
 
     y_axes.append({'name': 'Velocity',
@@ -537,8 +545,18 @@ def add_graphs(wb, data):
                    'max_row': max_row,
                    'col': vel_col,
                    'secondary': True,
-                   'line_width': 1
+                   'line': {'width': 1}
                    })
+
+    if 'Estimated Velocity [m/s]' in data.columns.tolist():
+        estimated_velocity_col = data.columns.tolist().index('Estimated Velocity [m/s]') + 1
+        y_axes.append({'name': 'Estimated Velocity',
+                       'min_row': min_row,
+                       'max_row': max_row,
+                       'col': estimated_velocity_col,
+                       'secondary': True,
+                       'line': {'width': 1, 'color': 'orange'}
+                       })
 
     add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos & Vel - Full')
 
@@ -547,33 +565,24 @@ def add_graphs(wb, data):
     x_axis['max_row'] = short_max_row
     for y_axis in y_axes:
         y_axis['max_row'] = short_max_row
-        y_axis['line_width'] = 1.5
+        y_axis['line']['width'] = 1.5
 
     y_axes.append({'name': 'Current',
                    'min_row': min_row,
                    'max_row': short_max_row,
                    'col': current_col,
                    'secondary': True,
-                   'line_width': 1
+                   'line': {'width': 1, 'color': '#98B954'}
                    })
 
-    if 'Duty cycle' in data.columns:
+    if 'Duty cycle' in data.columns.tolist():
+        duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
         y_axes.append({'name': 'Duty Cycle',
                        'min_row': min_row,
                        'max_row': short_max_row,
                        'col': duty_cycle_col,
                        'secondary': True,
-                       'line_width': 1
-                       })
-
-    if std_name_to_output_name('Duty cycle') in data.columns.tolist():
-        duty_cycle_col = data.columns.tolist().index(std_name_to_output_name('Duty cycle')) + 1
-        y_axes.append({'name': 'Duty Cycle',
-                       'min_row': min_row,
-                       'max_row': short_max_row,
-                       'col': duty_cycle_col,
-                       'secondary': True,
-                       'line_width': 1.5
+                       'line': {'width': 1, 'color': 'purple'}
                        })
 
     add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos, Vel, Current - 0.5s')
@@ -588,7 +597,7 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
             'categories': [data_sheet_name, x_axis['min_row'], x_axis['col'], x_axis['max_row'], x_axis['col']],
             'values': [data_sheet_name, y_axis['min_row'], y_axis['col'], y_axis['max_row'], y_axis['col']],
             'y2_axis': y_axis['secondary'],
-            'line': {'width': y_axis['line_width']}
+            'line': y_axis['line']
         })
     chart.set_x_axis({'label_position': 'low',
                       'min': 0,
@@ -841,10 +850,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        # input_filename = r'Outputs\Noam with PSU emo_007.csv'
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_005.csv'
-        # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_198 hand modified.csv'
-        # input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\Noam Feb 2nd emo_020.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_012.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
