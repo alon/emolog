@@ -11,8 +11,8 @@ from xlsxwriter.utility import xl_rowcol_to_cell
 
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
-bore_diameter_mm = 26  # TODO is this correct?
-velocity_to_lpm_scale_factor = pi * (bore_diameter_mm / 2.0) ** 2  / 1000.0 * 60.0
+piston_diameter_mm = 25.4
+velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 60.0
 
 
 cruising_after_num_steps = 5
