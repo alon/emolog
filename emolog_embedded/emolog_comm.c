@@ -37,7 +37,7 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
-#include "../../pump_drive_tiva/Hardware.h"
+#include "../../pump_drive/Hardware.h"
 
 #define RX_BUF_SIZE			1024
 // #define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
