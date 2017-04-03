@@ -27,7 +27,7 @@ def post_process(csv_filename):
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
     data['Power In [W]'] = data['Dc bus v'] * data['Total i']
-    data = step_time_estimate_to_vel(data)
+    data = step_time_prediction_to_vel(data)
     data_before_cropping = data.copy()
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
@@ -63,6 +63,7 @@ output_col_names = \
         'Actual dir': 'Actual\nDirection',
         'Required dir': 'Required\nDirection',
         'Ref sensor': 'Ref\nSensor',
+        'Step time prediction': 'Step Time Prediction [m/s]',
         'Dc bus v': 'DC Bus\n[V]',
         'Total i': 'Total I\n[A]',
         'Temp ext': 'Motor\nTemperature',
@@ -79,6 +80,7 @@ data_col_formats = \
         'Step time': {'width': 9, 'format': 'time'},
         'Velocity': {'width': 8, 'format': 'frac'},
         'Estimated Velocity [m/s]': {'width': 12, 'format': 'frac'},
+        'Step time prediction': {'width': 15, 'format': 'frac'},
         'Motor state': {'width': 17, 'format': 'general'},
         'Actual dir': {'width': 9, 'format': 'general'},
         'Required dir': {'width': 9, 'format': 'general'},
@@ -257,9 +259,9 @@ def interpolate_missing_data(data):
     return data
 
 
-def step_time_estimate_to_vel(data):
-    data['Estimated Velocity [m/s]'] = step_size_mm / (data['Step time estimate'] * tick_time_ms)
-    #data.drop(['Step time estimate'], inplace=True, axis=1)
+def step_time_prediction_to_vel(data):
+    data['Step time prediction'] *= tick_time_ms
+    data['Estimated Velocity [m/s]'] = step_size_mm / data['Step time prediction']
     return data
 
 
@@ -464,7 +466,7 @@ def calc_position_stats(data):
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   output_filename):
     # TODO make this an option that only runs if __name == '__main__', and also turned on
-    #data = data[1:5000]  # TEMP since it's taking so long...
+    # data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -850,7 +852,7 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_012.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_019.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
