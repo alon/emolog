@@ -15,7 +15,6 @@ piston_diameter_mm = 25.4
 velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 60.0
 
 
-cruising_after_num_steps = 5
 default_pump_head = 8.0
 
 
@@ -32,7 +31,6 @@ def post_process(csv_filename):
     data = partition_to_half_cycles(data)
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
-    data = mark_cruising(data)
     data = reorder_columns(data, first_columns)
     end_time = time.time()
     print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
@@ -247,19 +245,6 @@ def calc_step_times_and_vel(data):
     return ret
 
 
-def mark_cruising(data):
-    data['Cruising'] = True
-    # the coasting phase should not be considered cruising
-    data.loc[data['Motor state'] == 'M_STATE_ALL_OFF', 'Cruising'] = False
-    # The acceleration phase should not be considered cruising
-    for (hc_num, hc) in data.groupby('Half cycle'):
-        first_pos = hc.iloc[0]['Position']
-        startup_indexes = np.abs(hc['Position'] - first_pos) < cruising_after_num_steps
-        startup_indexes = startup_indexes.reindex(data.index, fill_value=False)
-        data.loc[startup_indexes, 'Cruising'] = False
-    return data
-
-
 def reorder_columns(data, first_cols):
     all_cols = data.columns.tolist()
     rest_of_cols = [c for c in all_cols if c not in first_cols]
@@ -324,13 +309,13 @@ def calc_summary_stats(data, hc_stats, data_before_cropping):
                      'value': data[data['Actual dir'] == 'DOWN']['Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Cruising Current [A]',
-                     'value': data[data['Cruising'] == True]['Total i'].mean(),
+                     'value': data[data['Mode'] == 'MODE_CRUISING']['Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Cruising Current going UP [A]',
-                     'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'UP')]['Total i'].mean(),
+                     'value': data[(data['Mode'] == 'MODE_CRUISING') & (data['Actual dir'] == 'UP')]['Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Cruising Current going DOWN [A]',
-                     'value': data[(data['Cruising'] == True) & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
+                     'value': data[(data['Mode'] == 'MODE_CRUISING') & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Coasting Current [A]',
                      'value': data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean(),
@@ -393,7 +378,7 @@ def calc_half_cycle_stats(data):
 
         hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
 
-        cruising = hc[hc['Cruising'] == True]
+        cruising = hc[hc['Mode'] == 'MODE_CRUISING']
         cruising_range = cruising['Position'].max() - cruising['Position'].min()
         cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
         hc_stats['Cruising Velocity [m/s]'] = cruising_range * step_size_mm / cruising_time
@@ -417,7 +402,7 @@ def calc_half_cycle_stats(data):
 
         hc_stats['Average Current [A]'] = hc['Total i'].mean()
 
-        hc_stats['Cruising Current [A]'] = hc[hc['Cruising'] == True]['Total i'].mean()
+        hc_stats['Cruising Current [A]'] = cruising['Total i'].mean()
 
         if len(coasting) > 0:
             hc_stats['Coasting Current [A]'] = coasting['Total i'].mean()
@@ -445,7 +430,7 @@ def calc_motor_state_stats(data):
     for ((direction, state), data_in_state) in data.groupby(['Required dir', 'Motor state']):
         stats = OrderedDict()
         if state != 'M_STATE_ALL_OFF':
-            filt_data = data_in_state[data_in_state['Cruising'] == True]
+            filt_data = data_in_state[data_in_state['Mode'] == 'MODE_CRUISING']
         else:
             filt_data = data_in_state
 
@@ -667,12 +652,6 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
     sheet.name = chart_sheet_name
 
 
-cruising_definition_note = \
-    ("\"Cruising\" definition: The portion of the travel range that begins {0} steps "
-     "after the current start point, and ends when coasting starts. "
-     "It is assumed, but currently not checked, that the piston reaches full speed after {0} steps.").format(cruising_after_num_steps)
-
-
 def add_summary_sheet(wb, summary_stats, wb_formats):
     sheet = wb.add_worksheet('Summary')
     row = 0
@@ -687,13 +666,6 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
             sheet.write(row, 1, field['value'], wb_formats[field['format']])
             row += 1
         row += 1    # extra line between sections
-
-    # add notes
-    sheet.write(row, 0, 'Notes:', wb_formats['title'])
-    row += 1
-    sheet.merge_range(row, 0, row, 8, cruising_definition_note, wb_formats['note'])
-    sheet.set_row(row, 15 * 2) # standard row height is 15
-    row += 2
 
 
 def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
@@ -794,8 +766,6 @@ def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
     cur_row = 0
     sheet.write(cur_row, 0, "Analysis by Motor State", wb_formats['title'])
     cur_row += 1
-    subtitle = "Ignoring acceleration phase (first {} steps)".format(cruising_after_num_steps)
-    sheet.write(cur_row, 0, subtitle, wb_formats['general'])
 
     # write header row
     cur_row += 2
@@ -930,7 +900,7 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_024.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_025.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
