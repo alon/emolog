@@ -15,7 +15,7 @@ extern "C" {
 #include "emolog.h"
 
 void emolog_init(void);
-void emolog_run_step(uint32_t ticks);		// TODO surely there's a better name for this...
+void emolog_run_step(uint32_t ticks);
 
 extern emo_error_t handle_app_specific_message(emo_header* message); // to be implemented by application code
 
