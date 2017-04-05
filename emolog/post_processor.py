@@ -523,7 +523,7 @@ def calc_comm_advances(data):
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename):
     # TODO make this an option that only runs if __name == '__main__', and also turned on
-    data = data[1:5000]  # TEMP since it's taking so long...
+    # data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
