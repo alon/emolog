@@ -485,7 +485,6 @@ def ilocs_of_changes(series):
 
 
 def calc_comm_advances(data):
-    start_time = time.time()
     ret_indexes = []
     ret_comm_advances = []
     pos_change_ilocs = ilocs_of_changes(data['Position'])
@@ -499,8 +498,6 @@ def calc_comm_advances(data):
         state_change_index = data.iloc[[i]].index[0]
         ret_indexes.append(pos_change_index)
         ret_comm_advances.append((pos_change_index - state_change_index) * tick_time_ms)
-    end_time = time.time()
-    print("calc_commutation_stats time: {:.2f} seconds".format(end_time - start_time))
     ret = pd.DataFrame(ret_comm_advances, index=ret_indexes, columns=['Actual Commutation Advance [ms]'])
     return ret
 
