@@ -33,7 +33,7 @@ def post_process(csv_filename):
     data = add_time_column(data)
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = mark_cruising(data)
-    data = reorder_columns(data)
+    data = reorder_columns(data, first_columns)
     end_time = time.time()
     print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
@@ -42,6 +42,7 @@ def post_process(csv_filename):
     half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
     motor_state_stats = calc_motor_state_stats(data)
     position_stats = calc_position_stats(data)
+    commutation_stats = calc_commutation_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats, data_before_cropping)
     end_time = time.time()
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
@@ -49,7 +50,7 @@ def post_process(csv_filename):
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
     save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  output_filename)
+                  commutation_stats, output_filename)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -73,6 +74,9 @@ output_col_names = \
     }
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
 
+first_columns = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]',
+              'Motor state', 'Actual dir', 'Required dir']
+
 data_col_formats = \
     {
         'Time': {'width': 8, 'format': 'time'},
@@ -91,6 +95,7 @@ data_col_formats = \
         'Last flow rate lpm': {'width': 9, 'format': 'frac'},
         'Half cycle': {'width': 11, 'format': 'general'},
         'Duty cycle': {'width': 8, 'format': 'percent'},
+        'Mode': {'width': 18, 'format': 'general'},
         'Power In [W]': {'width': 8, 'format': 'frac'}
     }
 
@@ -141,6 +146,15 @@ position_stats_col_formats = \
         'Average Current [A]': {'width': 8, 'format': 'frac'},
         'Current Std. Dev [A]': {'width': 8, 'format': 'frac'}
     }
+
+commutation_stats_col_formats = \
+    {
+        'Mode': {'width': 18, 'format': 'general'},
+        'Timing Error [ms]': {'width': 10, 'format': 'time'},
+        'Intended Commutation Advance [ms]': {'width': 14, 'format': 'time'},
+        'Actual Commutation Advance [ms]': {'width': 14, 'format': 'time'},
+    }
+
 
 motor_state_to_phases = {
     'M_STATE_S0': '(+, -, 0)',
@@ -246,9 +260,8 @@ def mark_cruising(data):
     return data
 
 
-def reorder_columns(data):
+def reorder_columns(data, first_cols):
     all_cols = data.columns.tolist()
-    first_cols = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]', 'Motor state', 'Actual dir', 'Required dir']
     rest_of_cols = [c for c in all_cols if c not in first_cols]
     data = data[first_cols + rest_of_cols]
     return data
@@ -463,10 +476,54 @@ def calc_position_stats(data):
     return pd.DataFrame(res)
 
 
+def calc_commutation_stats(data):
+    stats = calc_comm_advances(data)
+    stats['Intended Commutation Advance [ms]'] = data['Commutation advance ms'][stats.index]
+    stats['Mode'] = data['Mode'][stats.index]   # TEMP?
+    stats.loc[data['Mode'][stats.index] != 'MODE_CRUISING', 'Intended Commutation Advance [ms]'] = 0.0
+    # a bit of a hack: current method of determining commutation advance gets confused by dir change (coasting)
+    stats.loc[data['Mode'][stats.index] == 'MODE_DIR_CHANGE', 'Actual Commutation Advance [ms]'] = 0.0
+    stats['Position'] = data['Position'][stats.index]
+    stats['Timing Error [ms]'] = (stats['Intended Commutation Advance [ms]'] -
+                                  stats['Actual Commutation Advance [ms]'])
+    stats.loc[stats['Mode'] != 'MODE_CRUISING', 'Timing Error [ms]'] = 'N/A'
+    first_cols = ['Position', 'Mode', 'Intended Commutation Advance [ms]', 'Actual Commutation Advance [ms]']
+    stats = reorder_columns(stats, first_cols)
+    return stats
+
+
+def ilocs_of_changes(series):
+    df = pd.DataFrame({'original': series, 'shifted': series.shift(1)})
+    df = df.drop(df.first_valid_index())
+    ret = (df[df['original'] != df['shifted']].index - 1).tolist()
+    return ret
+
+
+def calc_comm_advances(data):
+    start_time = time.time()
+    ret_indexes = []
+    ret_comm_advances = []
+    pos_change_ilocs = ilocs_of_changes(data['Position'])
+    for pos_change_iloc in pos_change_ilocs:
+        i = pos_change_iloc
+        while (i > 0 and
+               (data['Motor state'].iloc[i + 1] == data['Motor state'].iloc[i] or
+                data['Motor state'].iloc[i + 1] == 'M_STATE_ALL_OFF')):
+            i -= 1
+        pos_change_index = data.iloc[[pos_change_iloc]].index[0]
+        state_change_index = data.iloc[[i]].index[0]
+        ret_indexes.append(pos_change_index)
+        ret_comm_advances.append((pos_change_index - state_change_index) * tick_time_ms)
+    end_time = time.time()
+    print("calc_commutation_stats time: {:.2f} seconds".format(end_time - start_time))
+    ret = pd.DataFrame(ret_comm_advances, index=ret_indexes, columns=['Actual Commutation Advance [ms]'])
+    return ret
+
+
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  output_filename):
+                  commutation_stats, output_filename):
     # TODO make this an option that only runs if __name == '__main__', and also turned on
-    # data = data[1:5000]  # TEMP since it's taking so long...
+    data = data[1:5000]  # TEMP since it's taking so long...
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -477,15 +534,16 @@ def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, mot
     add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats)
     add_motor_state_sheet(writer, motor_state_stats, wb_formats)
     add_positions_sheet(writer, position_stats, wb_formats)
+    add_commutation_sheet(writer, commutation_stats, wb_formats)
     writer.save()
 
 
 def add_workbook_formats(wb):
     formats = \
         {
-            'frac': wb.add_format({'num_format': '0.000'}),
-            'time': wb.add_format({'num_format': '0.00'}),
-            'percent': wb.add_format({'num_format': '0.00%'}),
+            'frac': wb.add_format({'num_format': '0.000', 'align': 'right'}),
+            'time': wb.add_format({'num_format': '0.00', 'align': 'right'}),
+            'percent': wb.add_format({'num_format': '0.00%', 'align': 'right'}),
             'general': wb.add_format(),
             'header': wb.add_format({'text_wrap': True, 'bold': True}),
             'title': wb.add_format({'font_size': 14, 'bold': True}),
@@ -850,9 +908,29 @@ def add_positions_sheet(writer, position_stats, wb_formats):
     sheet.insert_chart('H26', cur_chart)
 
 
+def add_commutation_sheet(writer, commutation_stats, wb_formats):
+    commutation_stats.to_excel(excel_writer=writer,
+                                sheet_name='Commutation',
+                                header=False,
+                                index=True,
+                                startrow=3)
+    sheet = writer.sheets['Commutation']
+    headers = ['Tick'] + commutation_stats.columns.tolist()
+    set_column_formats(sheet, headers, wb_formats, commutation_stats_col_formats)
+
+    cur_row = 0
+    sheet.write(cur_row, 0, "Commutation Timing Analysis", wb_formats['title'])
+
+    # write header row
+    cur_row += 2
+    sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(headers):
+        sheet.write(cur_row, col_num, col_name)
+
+
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_019.csv'
+        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_024.csv'
     else:
         input_filename = sys.argv[1]
     out_filename = post_process(input_filename)
