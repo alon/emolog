@@ -2,6 +2,7 @@ import sys
 from collections import OrderedDict
 from math import pi, isnan
 import os
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -18,7 +19,7 @@ velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 6
 default_pump_head = 8.0
 
 
-def post_process(csv_filename):
+def post_process(csv_filename, truncate_data=False):
     start_time = time.time()
     data = pd.read_csv(csv_filename)
     data.columns = [clean_col_name(c) for c in data.columns]
@@ -48,7 +49,7 @@ def post_process(csv_filename):
     start_time = time.time()
     output_filename = csv_filename[:-4] + '.xlsx'
     save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  commutation_stats, output_filename)
+                  commutation_stats, output_filename, truncate_data)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
@@ -503,9 +504,9 @@ def calc_comm_advances(data):
 
 
 def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  commutation_stats, output_filename):
-    # TODO make this an option that only runs if __name == '__main__', and also turned on
-    # data = data[1:5000]  # TEMP since it's taking so long...
+                  commutation_stats, output_filename, truncate_data=False):
+    if truncate_data:  # for quick debug runs
+        data = data[1:5000]
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -896,9 +897,10 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) <= 1:
-        input_filename = r'D:\Projects\Comet ME Pump Drive\run logs\emo_025.csv'
-    else:
-        input_filename = sys.argv[1]
-    out_filename = post_process(input_filename)
+    parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
+    parser.add_argument('input_csv', help='CSV file to parse')
+    parser.add_argument('--truncate', action="store_true", help='Only save first 5000 samples for quick debug runs.')
+    args = parser.parse_args()
+
+    out_filename = post_process(args.input_csv, truncate_data=args.truncate)
     os.startfile(out_filename)
