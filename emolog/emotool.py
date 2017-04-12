@@ -6,6 +6,7 @@
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
 import argparse
+import configparser
 import asyncio
 import csv
 import logging
@@ -143,25 +144,16 @@ class EmoToolClient(emolog.Client):
             self.stop()
 
 
-def iterate(filename, initial, firstoption):
-    if firstoption is not None:
-        if firstoption[-4:] != '.csv':
-            yield '{}.csv'.format(firstoption)
-        else:
-            yield firstoption
-    if filename[-4:] == '.csv':
-        filename = filename[:-4]
+def iterate(prefix, initial):
     while True:
-        yield '{}_{:03}.csv'.format(filename, initial)
+        yield '{}_{:03}.csv'.format(prefix, initial)
         initial += 1
 
 
-def next_available(filename, numbered):
-    base = os.path.dirname(filename)
-    filename = os.path.basename(filename)
-    filenames = iterate(filename, 1, filename if numbered else None)
+def next_available(folder, prefix):
+    filenames = iterate(prefix, 1)
     for filename in filenames:
-        candidate = os.path.join(base, filename)
+        candidate = os.path.join(folder, filename)
         if not os.path.exists(candidate):
             return candidate
 
@@ -314,10 +306,12 @@ def parse_args():
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
-    parser.add_argument('--csv',
-                        default=r'D:\Projects\Comet ME Pump Drive\run logs\emo',
-                        # r'C:\Comet-ME Pump Drive\run logs\emo'      # for Noam's laptop
-                        help='name of csv output file')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--out', help='Output file name. ".csv" extension is added if missing. '
+                                     'File is overwritten if already exists.')
+    group.add_argument('--out_prefix', default='emo', help='Output file prefix. Output is saved to the first free '
+                                                           '(not already existing) file of the format "prefix_xxx.csv", '
+                                                           'where xxx is a sequential number starting from "001"')
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent',
                         help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs here')
@@ -371,17 +365,32 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
+config_file_name = 'local_machine_config.ini'
 async def amain():
     global args
     global serial_process
     args = parse_args()
 
+    if os.path.exists(config_file_name):
+        config = configparser.ConfigParser()
+        config.read(config_file_name)
+    else:
+        print("Configuration file {} not found. "
+              "This file is required for specifying local machine configuration such as the output folder."
+              "\nExiting.".format(config_file_name))
+        raise SystemExit
+
     setup_logging(args.log, args.silent)
 
     names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
 
-    csv_filename = (next_available('emo', numbered=True) if not args.csv else
-                    next_available(args.csv, numbered=False))
+    if args.out:
+        if args.out[-4:] != '.csv':
+            args.out = args.out + '.csv'
+        csv_filename = os.path.join(config['folders']['output_folder'], args.out)
+    else:   # either --out or --out_prefix must be specified
+        csv_filename = next_available(config['folders']['output_folder'], args.out_prefix)
+
     print("================")
     print("Emotool starting")
     print("================")
