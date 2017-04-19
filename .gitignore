@@ -25,3 +25,4 @@ emo*.csv
 *.dump
 *.pure
 emolog/outputs/
+local_machine_config.ini
