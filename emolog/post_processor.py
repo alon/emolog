@@ -15,7 +15,6 @@ step_size_mm = 4.0
 piston_diameter_mm = 25.4
 velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 60.0
 
-
 default_pump_head = 8.0
 
 
@@ -74,7 +73,7 @@ output_col_names = \
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
 
 first_columns = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]',
-              'Motor state', 'Actual dir', 'Required dir']
+                 'Motor state', 'Actual dir', 'Required dir']
 
 data_col_formats = \
     {
@@ -153,7 +152,6 @@ commutation_stats_col_formats = \
         'Intended Commutation Advance [ms]': {'width': 14, 'format': 'time'},
         'Actual Commutation Advance [ms]': {'width': 14, 'format': 'time'},
     }
-
 
 motor_state_to_phases = {
     'M_STATE_S0': '(+, -, 0)',
@@ -316,7 +314,8 @@ def calc_summary_stats(data, hc_stats, data_before_cropping):
                      'value': data[(data['Mode'] == 'MODE_CRUISING') & (data['Actual dir'] == 'UP')]['Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Cruising Current going DOWN [A]',
-                     'value': data[(data['Mode'] == 'MODE_CRUISING') & (data['Actual dir'] == 'DOWN')]['Total i'].mean(),
+                     'value': data[(data['Mode'] == 'MODE_CRUISING') & (data['Actual dir'] == 'DOWN')][
+                         'Total i'].mean(),
                      'format': 'frac'},
                     {'name': 'Coasting Current [A]',
                      'value': data[data['Motor state'] == 'M_STATE_ALL_OFF']['Total i'].mean(),
@@ -465,7 +464,7 @@ def calc_position_stats(data):
 def calc_commutation_stats(data):
     stats = calc_comm_advances(data)
     stats['Intended Commutation Advance [ms]'] = data['Commutation advance ms'][stats.index]
-    stats['Mode'] = data['Mode'][stats.index]   # TEMP?
+    stats['Mode'] = data['Mode'][stats.index]  # TEMP?
     stats.loc[data['Mode'][stats.index] != 'MODE_CRUISING', 'Intended Commutation Advance [ms]'] = 0.0
     # a bit of a hack: current method of determining commutation advance gets confused by dir change (coasting)
     stats.loc[data['Mode'][stats.index] == 'MODE_DIR_CHANGE', 'Actual Commutation Advance [ms]'] = 0.0
@@ -479,9 +478,10 @@ def calc_commutation_stats(data):
 
 
 def ilocs_of_changes(series):
+    """wherever series[i] != series[i+1], add i to the result (indexing by iloc, i.e. zero-based sequential index)"""
     df = pd.DataFrame({'original': series, 'shifted': series.shift(1)})
     df = df.drop(df.first_valid_index())
-    ret = (df[df['original'] != df['shifted']].index - 1).tolist()
+    ret = np.flatnonzero(df['original'] != df['shifted'])
     return ret
 
 
@@ -663,7 +663,7 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
                 field['value'] = 'N/A'
             sheet.write(row, 1, field['value'], wb_formats[field['format']])
             row += 1
-        row += 1    # extra line between sections
+        row += 1  # extra line between sections
 
 
 def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats):
@@ -678,7 +678,8 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
                               index=False,
                               startrow=data_start_row)
     sheet = writer.sheets['Half-Cycles']
-    columns_to_add = [power_out_col_name, efficiency_col_name, cruising_power_out_col_name, cruising_efficiency_col_name]
+    columns_to_add = [power_out_col_name, efficiency_col_name, cruising_power_out_col_name,
+                      cruising_efficiency_col_name]
     columns = list(half_cycle_stats.columns) + columns_to_add
 
     set_column_formats(sheet, columns, wb_formats, half_cycle_col_formats)
@@ -747,9 +748,9 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
     cruising_power_in_col = columns.index('Cruising Power In [W]')
     cruising_efficiency_col = columns.index(cruising_efficiency_col_name)
     for row in half_cycle_rows + summary_rows:
-        formula = '=' + xl_rowcol_to_cell(row, cruising_power_out_col) + ' / ' + xl_rowcol_to_cell(row, cruising_power_in_col)
+        formula = '=' + xl_rowcol_to_cell(row, cruising_power_out_col) + ' / ' + xl_rowcol_to_cell(row,
+                                                                                                   cruising_power_in_col)
         sheet.write_formula(row, cruising_efficiency_col, formula, wb_formats['percent'])
-
 
 
 def add_motor_state_sheet(writer, motor_state_stats, wb_formats):
@@ -878,10 +879,10 @@ def add_positions_sheet(writer, position_stats, wb_formats):
 
 def add_commutation_sheet(writer, commutation_stats, wb_formats):
     commutation_stats.to_excel(excel_writer=writer,
-                                sheet_name='Commutation',
-                                header=False,
-                                index=True,
-                                startrow=3)
+                               sheet_name='Commutation',
+                               header=False,
+                               index=True,
+                               startrow=3)
     sheet = writer.sheets['Commutation']
     headers = ['Tick'] + commutation_stats.columns.tolist()
     set_column_formats(sheet, headers, wb_formats, commutation_stats_col_formats)
