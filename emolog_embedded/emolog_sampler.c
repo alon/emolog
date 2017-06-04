@@ -15,7 +15,7 @@
 
 #include "emolog_comm.h"
 
-#include "../../pump_drive_tiva/Hardware.h" // TEMP for debugging
+#include "../../pump_drive/Hardware.h" // TEMP for debugging
 
 
 bool sampler_running = false;
