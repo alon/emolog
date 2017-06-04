@@ -1,0 +1,9 @@
+controller.state.position,2,0
+controller.state.phase_a_i,2,0
+controller.state.phase_b_i,2,0
+controller.state.phase_c_i,2,0
+controller.state.phase_a_v,2,0
+controller.state.phase_b_v,2,0
+controller.state.phase_c_v,2,0
+controller.state.total_i,2,0
+controller.state.dc_bus_v,2,0
