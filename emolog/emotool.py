@@ -287,7 +287,8 @@ async def cleanup(client):
         except:
             pass
     client.exit_gracefully()
-    client.transport.close()
+    if client.transport is not None:
+        client.transport.close()
     if serial_process[0] is not None:
         p = serial_process[0]
         if hasattr(p, 'send_ctrl_c'):
@@ -365,6 +366,26 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
+async def initialize_client(args, client, serial_process, variables):
+    logger.debug("about to send version")
+    await client.send_version()
+    retries = max_retries = 3
+    while retries > 0:
+        try:
+            logger.debug("about to send sampler stop")
+            await client.send_sampler_stop()
+            logger.debug("about to send sampler set variables")
+            await client.send_set_variables(variables)
+            logger.debug("about to send sampler start")
+            await client.send_sampler_start()
+            logger.debug("client initiated, starting to log data at rate TBD")
+            break
+        except emolog.AckTimeout:
+            retries -= 1
+            logger.debug("retry {}".format(max_retries - retries))
+    return retries != 0
+
+
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain():
     global args
@@ -409,23 +430,7 @@ async def amain():
     client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
                            min_ticks=min_ticks, max_ticks=max_ticks)
     await start_transport(args=args, client=client, serial_process=serial_process)
-    logger.debug("about to send version")
-    await client.send_version()
-    retries = max_retries = 3
-    while retries > 0:
-        try:
-            logger.debug("about to send sampler stop")
-            await client.send_sampler_stop()
-            logger.debug("about to send sampler set variables")
-            await client.send_set_variables(variables)
-            logger.debug("about to send sampler start")
-            await client.send_sampler_start()
-            logger.debug("client initiated, starting to log data at rate TBD")
-            break
-        except emolog.AckTimeout:
-            retries -= 1
-            logger.debug("retry {}".format(max_retries - retries))
-    if retries == 0:
+    if not await initialize_client(args=args, client=client, serial_process=serial_process, variables=variables):
         print("failed to initialize board, exiting.")
         raise SystemExit
     sys.stdout.flush()
@@ -452,6 +457,9 @@ def main():
         logger.debug("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
+    if not os.path.exists(client.csv_filename):
+        print("no csv file created, exiting before post processing")
+        return
     print("Running post processor (this may take some time)...")
     post_processor.post_process(client.csv_filename)
     print("Post processing done.")
