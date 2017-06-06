@@ -365,19 +365,19 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
-config_file_name = 'local_machine_config.ini'
+CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain():
     global args
     global serial_process
     args = parse_args()
 
-    if os.path.exists(config_file_name):
+    if os.path.exists(CONFIG_FILE_NAME):
         config = configparser.ConfigParser()
-        config.read(config_file_name)
+        config.read(CONFIG_FILE_NAME)
     else:
         print("Configuration file {} not found. "
               "This file is required for specifying local machine configuration such as the output folder."
-              "\nExiting.".format(config_file_name))
+              "\nExiting.".format(CONFIG_FILE_NAME))
         raise SystemExit
 
     setup_logging(args.log, args.silent)
