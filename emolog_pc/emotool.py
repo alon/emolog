@@ -326,7 +326,7 @@ else:
 
 
 async def cleanup(client):
-    if not hasattr(client, 'transport'):
+    if not hasattr(client, 'transport') or client.transport is None:
         cancel_outstanding_tasks()
         return
     if not args.no_cleanup:
