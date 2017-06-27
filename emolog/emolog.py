@@ -34,6 +34,7 @@ from math import sin
 from abc import ABCMeta, abstractmethod
 import logging
 
+from util import which
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header',
@@ -64,14 +65,6 @@ if 'win' in sys.platform:
     LIBRARY_PATH = 'emolog.dll'
 else:
     LIBRARY_PATH = 'libemolog.so'
-
-
-def which(filename):
-    path = os.environ.get('PATH', '.').split(':')
-    for d in path:
-        if os.path.exists(os.path.join(d, filename)):
-            return os.path.join(d, filename)
-    return None
 
 
 def build_library():
