@@ -388,6 +388,11 @@ def emo_decode(buf):
         payload = buf[header_size:header_size + emo_len]
         buf = buf[header_size + emo_len:]
         if emo_type == emo_message_types.version:
+        if emo_type == emo_message_types.sampler_sample:
+            # TODO: this requires having a variable map so we can compute the variables from ticks
+            ticks = struct.unpack(endianess + 'L', payload[:4])[0]
+            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
+        elif emo_type == emo_message_types.version:
             (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
         elif emo_type == emo_message_types.ack:
@@ -404,10 +409,6 @@ def emo_decode(buf):
             phase_ticks, period_ticks, address, size, _reserved = struct.unpack(endianess + 'LLLHH', payload)
             msg = SamplerRegisterVariable(seq=seq, phase_ticks=phase_ticks, period_ticks=period_ticks,
                                           address=address, size=size)
-        elif emo_type == emo_message_types.sampler_sample:
-            # TODO: this requires having a variable map so we can compute the variables from ticks
-            ticks = struct.unpack(endianess + 'L', payload[:4])[0]
-            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
         else:
             msg = UnknownMessage(seq=seq, type=emo_type, buf=Message.buf)
     elif needed > 0:
