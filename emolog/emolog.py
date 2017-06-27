@@ -66,10 +66,22 @@ else:
     LIBRARY_PATH = 'libemolog.so'
 
 
+def which(filename):
+    path = os.environ.get('PATH', '.').split(':')
+    for d in path:
+        if os.path.exists(os.path.join(d, filename)):
+            return os.path.join(d, filename)
+    return None
+
+
 def build_library():
     # chdir to path of module
-    os.chdir(os.path.split(__file__)[0])
+    basedir = os.path.realpath(os.path.split(__file__)[0])
+    os.chdir(basedir)
     if not os.path.exists(LIBRARY_PATH) or os.stat(LIBRARY_PATH).st_mtime < os.stat('emolog.c').st_mtime:
+        if which('make') is None:
+            print("missing make; please place a copy of {} at {}".format(LIBRARY_PATH, basedir))
+            raise SystemExit
         ret = os.system("make {} 2>&1 > /dev/null".format(LIBRARY_PATH))
         assert ret == 0, "make failed with error code {}, see above.".format(ret)
     assert os.path.exists(LIBRARY_PATH)
