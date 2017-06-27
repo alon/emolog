@@ -226,6 +226,11 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks)
 /* sampler_sample encoding end */
 
 
+int16_t emo_decode_with_offset(const uint8_t *src, unsigned offset, uint16_t size)
+{
+    return emo_decode(src + offset, size);
+}
+
 int16_t emo_decode(const uint8_t *src, uint16_t size)
 {
     const emo_header *hdr;

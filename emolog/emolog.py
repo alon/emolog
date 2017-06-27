@@ -97,8 +97,7 @@ def emolog():
 # importing builds!
 lib = emolog()
 
-
-lib.emo_decode.restype = ctypes.c_int16
+lib.emo_decode_with_offset.restype = ctypes.c_int16
 
 
 ### Globals
@@ -377,17 +376,16 @@ class VariableSampler(object):
         return variables
 
 
-def emo_decode(buf):
-    needed = lib.emo_decode(buf, len(buf))
-    msg = None
+def emo_decode(buf, i_start):
+    assert i_start < len(buf)
+    needed = lib.emo_decode_with_offset(buf, i_start, min(len(buf) - i_start, 0xffff))
     error = None
     if needed == 0:
-        error, emo_type, emo_len, seq = decode_emo_header(buf)
+        error, emo_type, emo_len, seq = decode_emo_header(buf[i_start : i_start + header_size])
         if error:
-            return None, buf[1:], error
-        payload = buf[header_size:header_size + emo_len]
-        buf = buf[header_size + emo_len:]
-        if emo_type == emo_message_types.version:
+            return None, i_start + 1, error
+        payload = buf[i_start + header_size : i_start + header_size + emo_len]
+        i_next = i_start + header_size + emo_len
         if emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
             ticks = struct.unpack(endianess + 'L', payload[:4])[0]
@@ -412,11 +410,12 @@ def emo_decode(buf):
         else:
             msg = UnknownMessage(seq=seq, type=emo_type, buf=Message.buf)
     elif needed > 0:
-        msg = MissingBytes(message=buf, header=buf[:header_size], needed=needed)
+        msg = MissingBytes(message=buf, header=buf[i_start : i_start + header_size], needed=needed)
+        i_next = i_start + needed
     else:
         msg = SkipBytes(-needed)
-        buf = buf[-needed:]
-    return msg, buf, error
+        i_next = i_start - needed
+    return msg, i_next, error
 
 
 def none_to_empty_buffer(item):
@@ -444,8 +443,9 @@ class Parser(object):
             if self.empty_count > 2:
                 raise SystemExit()
         self.buf = self.buf + s
-        while len(self.buf) > 0:
-            msg, left_over_buf, error = emo_decode(self.buf)
+        i = 0
+        while i < len(self.buf):
+            msg, i_next, error = emo_decode(self.buf, i_start=i)
             if error:
                 logger.error(error)
             if self.debug_message_decoding:
@@ -456,15 +456,19 @@ class Parser(object):
                     logger.debug("decoded {}".format(msg))
                 else:
                     logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
-                        emo_message_type_to_str[msg.type], len(self.buf) - len(left_over_buf), msg.seq,
+                        emo_message_type_to_str[msg.type], i_next - i, msg.seq,
                         len(self.buf)))
-            parsed_buf = self.buf[:len(self.buf) - len(left_over_buf)]
-            self.buf = left_over_buf
+            parsed_buf = self.buf[i:i_next]
             if isinstance(msg, SkipBytes):
                 logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
             yield msg
+            i = i_next
+        self.buf = self.buf[i:]
+        if len(self.buf) > 1024:
+            print("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
+                len(self.buf), len(self.buf) + i))
 
     def send_message(self, command_class, **kw):
         """
