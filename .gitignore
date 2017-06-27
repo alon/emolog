@@ -26,3 +26,4 @@ emo*.csv
 *.pure
 emolog/outputs/
 local_machine_config.ini
+profile*.txt
