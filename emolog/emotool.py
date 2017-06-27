@@ -322,6 +322,8 @@ def parse_args():
     parser.add_argument('--dump')
     parser.add_argument('--ticks-per-second', default=1000000 / 50,
                         help='number of ticks per second. used in conjunction with runtime')
+    parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
+    parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
     return parser.parse_args()
 
 
@@ -388,9 +390,7 @@ async def initialize_client(args, client, serial_process, variables):
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain():
-    global args
     global serial_process
-    args = parse_args()
 
     if os.path.exists(CONFIG_FILE_NAME):
         config = configparser.ConfigParser()
@@ -447,14 +447,27 @@ async def amain():
 
 
 def main():
+    global args
+    args = parse_args()
+
     loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-    try:
+    loop.set_debug(args.debug)
+
+    def call_main():
         loop.run_until_complete(amain())
-    except KeyboardInterrupt:
-        print("exiting on user ctrl-c")
-    except Exception as e:
-        logger.debug("got exception {!r}".format(e))
+
+    if args.profile:
+        import cProfile as profile
+        profile.runctx("call_main()", globals(), locals(), "profile.txt")
+        #import vprof.runner as runner
+        #runner.run(call_main, 'cmhp')
+    else:
+        try:
+            call_main()
+        except KeyboardInterrupt:
+            print("exiting on user ctrl-c")
+        except Exception as e:
+            logger.debug("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
     if not os.path.exists(client.csv_filename):
