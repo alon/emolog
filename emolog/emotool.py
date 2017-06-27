@@ -5,6 +5,7 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
+import subprocess
 import argparse
 import configparser
 import asyncio
@@ -388,6 +389,12 @@ async def initialize_client(args, client, serial_process, variables):
     return retries != 0
 
 
+def banner(s):
+    print("=" * len(s))
+    print(s)
+    print("=" * len(s))
+
+
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain():
     global serial_process
@@ -412,9 +419,7 @@ async def amain():
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(config['folders']['output_folder'], args.out_prefix)
 
-    print("================")
-    print("Emotool starting")
-    print("================")
+    banner("Emotool {}".format(version()))
     print("")
     print("output file: {}".format(csv_filename))
     bandwidth_bps = bandwidth_calc(variables)
@@ -445,6 +450,16 @@ async def amain():
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
+
+def version():
+    gitroot = os.path.realpath(os.path.join('..', os.path.split(__file__)[0], '.git'))
+    if not os.path.exists(gitroot):
+        return "unknown version"
+    try:
+        output = subprocess.check_output("git describe --tags")
+    except:
+        return "unknown version"
+    return output.strip().decode('utf-8')
 
 def main():
     global args
