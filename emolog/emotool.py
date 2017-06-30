@@ -260,7 +260,7 @@ serial_process = [None]
 
 def cancel_outstanding_tasks():
     for task in asyncio.Task.all_tasks():
-        logger.warn('canceling task {}'.format(task))
+        logger.warning('canceling task {}'.format(task))
         task.cancel()
 
 
