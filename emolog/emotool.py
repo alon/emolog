@@ -192,7 +192,7 @@ def variable_to_decoder(v):
             return lambda q: struct.unpack('<h', q)[0]
         elif size == 1:
             return ord
-    logger.error("type names supported: int, float. looked for: {}, {}".format(s, size))
+    logger.error("type names supported: int, float. looked for: {}, {}".format(type_name, size))
     raise SystemExit
 
 
