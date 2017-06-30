@@ -5,7 +5,6 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
-import subprocess
 import argparse
 import configparser
 import asyncio
@@ -17,7 +16,7 @@ import string
 import struct
 import sys
 from socket import socketpair
-from subprocess import Popen
+import subprocess
 from time import sleep, clock  # more accurate on windows, vs time.time on linux
 
 import emolog
@@ -141,7 +140,7 @@ class EmoToolClient(emolog.Client):
         self.last_ticks = msg.ticks
         if self.first_ticks is None:
             self.first_ticks = self.last_ticks
-        if self.max_ticks and self.total_ticks + 1 >= self.max_ticks:
+        if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
             self.stop()
 
 
@@ -229,14 +228,18 @@ def setup_logging(filename, silent):
     logger.info('info first')
 
 
+serial_subprocess = None
+
 def start_subprocess(serial, baudrate, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
-    p = Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
-        baudrate, serial, port).split())
-    sleep(0.1)
-    return p
+    global serial_subprocess
+    if serial_subprocess is None:
+        serial_subprocess = subprocess.Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
+                           baudrate, serial, port).split())
+        sleep(0.1)
+    return serial_subprocess
 
 
 async def start_transport(args, client, serial_process):
@@ -307,6 +310,7 @@ def parse_args():
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
+    parser.add_argument('--snapshotfile', help='file containing variable definitions to be taken once at startup')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--out', help='Output file name. ".csv" extension is added if missing. '
@@ -395,6 +399,37 @@ def banner(s):
     print("=" * len(s))
 
 
+async def run_client(csv_filename, verbose, names, variables, dump, max_ticks):
+    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
+    client = EmoToolClient(csv_filename=csv_filename, verbose=verbose, names=names, dump=dump,
+                           min_ticks=min_ticks, max_ticks=max_ticks)
+    print ('created client')
+    await start_transport(args=args, client=client, serial_process=serial_process)
+    print ('started transport')
+    if not await initialize_client(args=args, client=client, serial_process=serial_process, variables=variables):
+        print("failed to initialize board, exiting.")
+        raise SystemExit
+    sys.stdout.flush()
+
+    print('initialized board')
+    dt = 0.1 if args.runtime is not None else 1.0
+    if try_getch_message:
+        print(try_getch_message)
+    while client.running:
+        print ('beep')
+        if try_getch():
+            break
+        await asyncio.sleep(dt)
+    return client
+
+
+async def record_snapshot(csvfile, varsfile, verbose):
+    # TODO
+    # names, variables = read_elf_variables(vars=[], varfile=varsfile)
+    # await run_client(csv_filename=csvfile, verbose=verbose, names=names,
+    #                  variables=variables, dump=args.dump, max_ticks=0)
+
+
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain():
     global serial_process
@@ -410,6 +445,8 @@ async def amain():
 
     setup_logging(args.log, args.silent)
 
+    banner("Emotool {}".format(version()))
+
     names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
 
     if args.out:
@@ -419,7 +456,6 @@ async def amain():
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(config['folders']['output_folder'], args.out_prefix)
 
-    banner("Emotool {}".format(version()))
     print("")
     print("output file: {}".format(csv_filename))
     bandwidth_bps = bandwidth_calc(variables)
@@ -430,29 +466,23 @@ async def amain():
     max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
     if max_ticks is not None:
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
-    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
-    client = EmoToolClient(csv_filename=csv_filename, verbose=not args.silent, names=names, dump=args.dump,
-                           min_ticks=min_ticks, max_ticks=max_ticks)
-    await start_transport(args=args, client=client, serial_process=serial_process)
-    if not await initialize_client(args=args, client=client, serial_process=serial_process, variables=variables):
-        print("failed to initialize board, exiting.")
-        raise SystemExit
-    sys.stdout.flush()
+    if args.snapshotfile:
+        print("taking snapshot of parameters")
+        await record_snapshot(csvfile='snapshot_results.csv', verbose=not args.silent,
+                              varsfile=args.snapshotfile)
+        print("Snapshot of parameters taken")
 
-    dt = 0.1 if args.runtime is not None else 1.0
-    if try_getch_message:
-        print(try_getch_message)
-    while client.running:
-        if try_getch():
-            break
-        await asyncio.sleep(dt)
+
+    client = await run_client(csv_filename=csv_filename, verbose=not args.silent, names=names,
+                              variables=variables, dump=args.dump, max_ticks=max_ticks)
+
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
 
 def version():
-    gitroot = os.path.realpath(os.path.join('..', os.path.split(__file__)[0], '.git'))
+    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '.git'))
     if not os.path.exists(gitroot):
         return "unknown version"
     try:
@@ -488,6 +518,7 @@ def main():
     if not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
+    print("processing {}".format(client.csv_filename))
     print("Running post processor (this may take some time)...")
     post_processor.post_process(client.csv_filename)
     print("Post processing done.")
