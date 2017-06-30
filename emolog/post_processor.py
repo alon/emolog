@@ -380,7 +380,10 @@ def calc_half_cycle_stats(data):
 
         cruising = hc[hc['Mode'] == 'MODE_CRUISING']
         cruising_range = cruising['Position'].max() - cruising['Position'].min()
-        cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
+        if len(cruising) > 0:
+            cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
+        else:
+            cruising_time = np.nan
         hc_stats['Cruising Velocity [m/s]'] = cruising_range * step_size_mm / cruising_time
         hc_stats['Cruising Power In [W]'] = cruising['Power In [W]'].mean()
         hc_stats['Cruising Flow Rate [LPM]'] = hc_stats['Cruising Velocity [m/s]'] * velocity_to_lpm_scale_factor
