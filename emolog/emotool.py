@@ -54,7 +54,7 @@ def dwarf_get_variables_by_name(filename, names):
     logger.debug('candidate variables found in ELF file:')
     for v in elf_vars:
         v_name = v.get_full_name()
-        logger.debug("candidate {}".format(v_name))
+        logger.debug("candidate var: {}".format(v_name))
         if v_name in names:
             sampled_vars[v_name] = v
             found.add(v_name)
@@ -203,14 +203,16 @@ def variable_to_decoder(v):
             return decode_little_endian_float
     # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name()
     # doesn't necessarily end with 'int' / 'float'
+    elif type_name.endswith('bool'):
+        return lambda q: 'True' if ord(q) else 'False'
     else:
-        # Note: will support both int and enum
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
         elif size == 2:
             return lambda q: struct.unpack('<h', q)[0]
         elif size == 1:
             return ord
+
     logger.error("type names supported: int, float. looked for: {}, {}".format(type_name, size))
     raise SystemExit
 
