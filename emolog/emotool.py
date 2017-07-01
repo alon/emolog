@@ -468,10 +468,10 @@ async def amain():
     logger.info('Client initialized')
 
     if args.snapshotfile:
-        logger.info("Taking snapshot of parameters")
-        snapshot_outout_filename = csv_filename[:-4] + '_params.csv'
-        await record_snapshot(client=client, csvfile=snapshot_outout_filename, varsfile=args.snapshotfile)
-        print("Snapshot of parameters taken")
+        print("Taking snapshot of parameters")
+        snapshot_output_filename = csv_filename[:-4] + '_params.csv'
+        await record_snapshot(client=client, csvfile=snapshot_output_filename, varsfile=args.snapshotfile)
+        print("parameters saved to: {}".format(snapshot_output_filename))
 
     print("")
     print("output file: {}".format(csv_filename))
@@ -528,6 +528,7 @@ def main():
     if not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
+    print()
     print("processing {}".format(client.csv_filename))
     print("Running post processor (this may take some time)...")
     post_processor.post_process(client.csv_filename, truncate_data=args.truncate)
