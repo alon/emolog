@@ -43,7 +43,7 @@ def with_errors(s):
             yield s[:i] + other + s[i + 1:]
 
 
-def dwarf_get_variables_by_name(filename, names, verbose):
+def dwarf_get_variables_by_name(filename, names):
     file_parser = FileParser(filename=filename)
     sampled_vars = {}
     found = set()
@@ -100,6 +100,7 @@ class EmoToolClient(emolog.Client):
         self.ticks_lost = 0
         self.max_ticks = None
         self._running = False
+        self.fd = None
         EmoToolClient.instance = self  # ugly reference for KeboardInterrupt handling
 
     def reset(self, csv_filename, names, min_ticks, max_ticks):
@@ -138,7 +139,7 @@ class EmoToolClient(emolog.Client):
         if not self.running:
             return
         self.initialize_file()
-        # todo - decode variables (integer/float) in emolog VariableSampler
+        # TODO - decode variables (integer/float) in emolog VariableSampler
         vs = msg.variables
         self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] +
                           [vs[name] if name in vs else '' for name in self.names])
@@ -207,14 +208,6 @@ def variable_to_decoder(v):
     raise SystemExit
 
 
-def an_int(x):
-    try:
-        b = int(x)
-    except:
-        return False
-    return True
-
-
 def setup_logging(filename, silent):
     if silent:
         logger.setLevel(logging.ERROR)
@@ -222,24 +215,26 @@ def setup_logging(filename, silent):
         logger.setLevel(logging.DEBUG)
 
     if filename:
-        fileHandler = logging.FileHandler(filename=filename)
-        fileHandler.setLevel(level=logging.DEBUG)
-        fileFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        fileHandler.setFormatter(fileFormatter)
-        logger.addHandler(fileHandler)
+        file_handler = logging.FileHandler(filename=filename)
+        file_handler.setLevel(level=logging.DEBUG)
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
 
-    streamFormatter = logging.Formatter('%(message)s')
-    streamHandler = logging.StreamHandler()
-    streamHandler.setLevel(level=logging.INFO)
-    streamHandler.setFormatter(streamFormatter)
+    stream_formatter = logging.Formatter('%(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(level=logging.INFO)
+    stream_handler.setFormatter(stream_formatter)
 
-    logger.addHandler(streamHandler)
+    logger.addHandler(stream_handler)
 
     logger.debug('debug first')
     logger.info('info first')
 
 
 serial_subprocess = None
+
+
 def start_subprocess(serial, baudrate, port):
     """
     Block until serial2tcp is ready to accept a connection
@@ -360,14 +355,14 @@ def read_elf_variables(vars, varfile):
         with open(varfile) as fd:
             vars = vars + fd.readlines()
     split_vars = [[x.strip() for x in v.split(',')] for v in vars]
-    for v, orig in zip(split_vars, args.var):
-        if len(v) != 3 or not an_int(v[1]) or not an_int(v[2]):
+    for v, orig in zip(split_vars, args.var):  # TODO: bug - args.var isn't usually relevant
+        if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
             logger.error("problem with '--var' argument {!r}".format(orig))
             logger.error("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, names, verbose=not args.silent)
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, names)
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
