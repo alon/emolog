@@ -86,9 +86,16 @@ async def start_fake_sine():
 
 
 class EmoToolClient(emolog.Client):
+    # must be singleton!
+    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
+    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
+    # until the final cleanup. This means multiple instances will fail to communicate.
+
     instance = None
 
     def __init__(self, verbose, dump):
+        if EmoToolClient.instance is not None:
+            raise Exception("EmoToolClient is a singleton, can't create another instance")
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
         self.csv = None
         self.csv_filename = None
@@ -101,7 +108,7 @@ class EmoToolClient(emolog.Client):
         self.max_ticks = None
         self._running = False
         self.fd = None
-        EmoToolClient.instance = self  # ugly reference for KeboardInterrupt handling
+        EmoToolClient.instance = self  # for singleton
 
     def reset(self, csv_filename, names, min_ticks, max_ticks):
         self.csv = None
@@ -232,35 +239,31 @@ def setup_logging(filename, silent):
     logger.info('info first')
 
 
-serial_subprocess = None
-
-
-def start_subprocess(serial, baudrate, port):
+def start_serial_process(serial, baudrate, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
-    global serial_subprocess
-    if serial_subprocess is None:
-        serial_subprocess = subprocess.Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
-                           baudrate, serial, port).split())
-        sleep(0.1)
+    serial_subprocess = subprocess.Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
+                                         baudrate, serial, port).split())
+    sleep(0.1)
     return serial_subprocess
 
 
-async def start_transport(args, client, serial_process):
+async def start_transport(args, client):
+    global serial_process
     loop = asyncio.get_event_loop()
     if args.fake_sine:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
         return
     port = random.randint(10000, 50000)
-    serial_process[0] = start_subprocess(serial=args.serial, baudrate=args.baud, port=port)
+    serial_process = start_serial_process(serial=args.serial, baudrate=args.baud, port=port)
     client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', port)
     assert client2 is client
 
 
 args = None
-serial_process = [None]
+serial_process = None
 
 
 def cancel_outstanding_tasks():
@@ -298,12 +301,11 @@ async def cleanup(client):
     client.exit_gracefully()
     if client.transport is not None:
         client.transport.close()
-    if serial_process[0] is not None:
-        p = serial_process[0]
-        if hasattr(p, 'send_ctrl_c'):
-            p.send_ctrl_c()
+    if serial_process is not None:
+        if hasattr(serial_process, 'send_ctrl_c'):
+            serial_process.send_ctrl_c()
         else:
-            p.terminate()
+            serial_process.terminate()
 
 
 def parse_args():
@@ -380,7 +382,7 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
-async def initialize_board(args, client, serial_process, variables):
+async def initialize_board(args, client, variables):
     logger.debug("about to send version")
     await client.send_version()
     retries = max_retries = 3
@@ -396,7 +398,7 @@ async def initialize_board(args, client, serial_process, variables):
             break
         except emolog.AckTimeout:
             retries -= 1
-            logger.debug("retry {}".format(max_retries - retries))
+            logger.info("Ack Timeout. Retry {}".format(max_retries - retries))
     return retries != 0
 
 
@@ -408,12 +410,12 @@ def banner(s):
 
 async def init_client(verbose, dump):
     client = EmoToolClient(verbose=verbose, dump=dump)
-    await start_transport(args=args, client=client, serial_process=serial_process)
+    await start_transport(args=args, client=client)
     return client
 
 
 async def run_client(client, variables):
-    if not await initialize_board(args=args, client=client, serial_process=serial_process, variables=variables):
+    if not await initialize_board(args=args, client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
         raise SystemExit
     sys.stdout.flush()
@@ -520,7 +522,7 @@ def main():
         except KeyboardInterrupt:
             print("exiting on user ctrl-c")
         except Exception as e:
-            logger.info("got exception {!r}".format(e))
+            logger.error("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
     if not os.path.exists(client.csv_filename):
