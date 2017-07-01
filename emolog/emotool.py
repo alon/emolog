@@ -88,9 +88,21 @@ async def start_fake_sine():
 class EmoToolClient(emolog.Client):
     instance = None
 
-    def __init__(self, csv_filename, verbose, names, dump, min_ticks,
-                 max_ticks):
+    def __init__(self, verbose, dump):
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
+        self.csv = None
+        self.csv_filename = None
+        self.first_ticks = None
+        self.last_ticks = None
+        self.min_ticks = None
+        self.names = None
+        self.samples_received = 0
+        self.ticks_lost = 0
+        self.max_ticks = None
+        self._running = False
+        EmoToolClient.instance = self  # ugly reference for KeboardInterrupt handling
+
+    def reset(self, csv_filename, names, min_ticks, max_ticks):
         self.csv = None
         self.csv_filename = csv_filename
         self.first_ticks = None
@@ -101,7 +113,6 @@ class EmoToolClient(emolog.Client):
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
-        EmoToolClient.instance = self  # ugly reference for KeboardInterrupt handling
 
     @property
     def running(self):
@@ -229,7 +240,6 @@ def setup_logging(filename, silent):
 
 
 serial_subprocess = None
-
 def start_subprocess(serial, baudrate, port):
     """
     Block until serial2tcp is ready to accept a connection
@@ -285,11 +295,11 @@ async def cleanup(client):
         cancel_outstanding_tasks()
         return
     if not args.no_cleanup:
-        logger.debug("sending sampler stop")
+        logger.info("sending sampler stop")
         try:
             await client.send_sampler_stop()
         except:
-            pass
+            logger.info("exception when sending sampler stop in cleanup()")
     client.exit_gracefully()
     if client.transport is not None:
         client.transport.close()
@@ -320,7 +330,7 @@ def parse_args():
                                                            'where xxx is a sequential number starting from "001"')
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent',
                         help='turn on verbose logging; affects performance under windows')
-    parser.add_argument('--log', default=None, help='log messages and other debug/info logs here')
+    parser.add_argument('--log', default=None, help='log messages and other debug/info logs to this file')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
@@ -329,6 +339,8 @@ def parse_args():
                         help='number of ticks per second. used in conjunction with runtime')
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
     parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
+    parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
+
     return parser.parse_args()
 
 
@@ -373,7 +385,7 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
-async def initialize_client(args, client, serial_process, variables):
+async def initialize_board(args, client, serial_process, variables):
     logger.debug("about to send version")
     await client.send_version()
     retries = max_retries = 3
@@ -399,41 +411,39 @@ def banner(s):
     print("=" * len(s))
 
 
-async def run_client(csv_filename, verbose, names, variables, dump, max_ticks):
-    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
-    client = EmoToolClient(csv_filename=csv_filename, verbose=verbose, names=names, dump=dump,
-                           min_ticks=min_ticks, max_ticks=max_ticks)
-    print ('created client')
+async def init_client(verbose, dump):
+    client = EmoToolClient(verbose=verbose, dump=dump)
     await start_transport(args=args, client=client, serial_process=serial_process)
-    print ('started transport')
-    if not await initialize_client(args=args, client=client, serial_process=serial_process, variables=variables):
-        print("failed to initialize board, exiting.")
+    return client
+
+
+async def run_client(client, variables):
+    if not await initialize_board(args=args, client=client, serial_process=serial_process, variables=variables):
+        logger.error("Failed to initialize board, exiting.")
         raise SystemExit
     sys.stdout.flush()
+    logger.info('initialized board')
 
-    print('initialized board')
     dt = 0.1 if args.runtime is not None else 1.0
     if try_getch_message:
         print(try_getch_message)
     while client.running:
-        print ('beep')
+        logger.info('beep')
         if try_getch():
             break
         await asyncio.sleep(dt)
-    return client
+    await client.send_sampler_stop()
 
 
-async def record_snapshot(csvfile, varsfile, verbose):
-    # TODO
-    # names, variables = read_elf_variables(vars=[], varfile=varsfile)
-    # await run_client(csv_filename=csvfile, verbose=verbose, names=names,
-    #                  variables=variables, dump=args.dump, max_ticks=0)
+async def record_snapshot(client, csvfile, varsfile):
+    names, variables = read_elf_variables(vars=[], varfile=varsfile)
+    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0)
+    await run_client(client, variables)
 
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
-async def amain():
-    global serial_process
 
+async def amain():
     if os.path.exists(CONFIG_FILE_NAME):
         config = configparser.ConfigParser()
         config.read(CONFIG_FILE_NAME)
@@ -449,12 +459,22 @@ async def amain():
 
     names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
 
+    output_folder = config['folders']['output_folder']
     if args.out:
         if args.out[-4:] != '.csv':
             args.out = args.out + '.csv'
-        csv_filename = os.path.join(config['folders']['output_folder'], args.out)
+        csv_filename = os.path.join(output_folder, args.out)
     else:   # either --out or --out_prefix must be specified
-        csv_filename = next_available(config['folders']['output_folder'], args.out_prefix)
+        csv_filename = next_available(output_folder, args.out_prefix)
+
+    client = await init_client(verbose=not args.silent, dump=args.dump)
+    logger.info('Client initialized')
+
+    if args.snapshotfile:
+        logger.info("Taking snapshot of parameters")
+        snapshot_outout_filename = csv_filename[:-4] + '_params.csv'
+        await record_snapshot(client=client, csvfile=snapshot_outout_filename, varsfile=args.snapshotfile)
+        print("Snapshot of parameters taken")
 
     print("")
     print("output file: {}".format(csv_filename))
@@ -466,16 +486,10 @@ async def amain():
     max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
     if max_ticks is not None:
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
+    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
-    if args.snapshotfile:
-        print("taking snapshot of parameters")
-        await record_snapshot(csvfile='snapshot_results.csv', verbose=not args.silent,
-                              varsfile=args.snapshotfile)
-        print("Snapshot of parameters taken")
-
-
-    client = await run_client(csv_filename=csv_filename, verbose=not args.silent, names=names,
-                              variables=variables, dump=args.dump, max_ticks=max_ticks)
+    client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
+    await run_client(client=client, variables=variables)
 
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
@@ -491,6 +505,7 @@ def version():
         return "unknown version"
     return output.strip().decode('utf-8')
 
+
 def main():
     global args
     args = parse_args()
@@ -504,15 +519,13 @@ def main():
     if args.profile:
         import cProfile as profile
         profile.runctx("call_main()", globals(), locals(), "profile.txt")
-        #import vprof.runner as runner
-        #runner.run(call_main, 'cmhp')
     else:
         try:
             call_main()
         except KeyboardInterrupt:
             print("exiting on user ctrl-c")
         except Exception as e:
-            logger.debug("got exception {!r}".format(e))
+            logger.info("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
     if not os.path.exists(client.csv_filename):
@@ -520,7 +533,7 @@ def main():
         return
     print("processing {}".format(client.csv_filename))
     print("Running post processor (this may take some time)...")
-    post_processor.post_process(client.csv_filename)
+    post_processor.post_process(client.csv_filename, truncate_data=args.truncate)
     print("Post processing done.")
 
 
