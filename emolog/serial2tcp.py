@@ -17,10 +17,10 @@ import serial_util
 
 
 log = logging.getLogger('serial2tcp')
-log.setLevel(logging.CRITICAL)
+log.setLevel(logging.ERROR)
 formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 ch = logging.StreamHandler()
-ch.setLevel(logging.CRITICAL)
+ch.setLevel(logging.ERROR)
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
