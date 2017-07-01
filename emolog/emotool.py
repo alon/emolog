@@ -280,10 +280,10 @@ def windows_try_getch():
 
 
 if sys.platform == 'win32':
-    try_getch_message = 'Press any key to exit'
+    try_getch_message = "Press any key to stop capture early..."
     try_getch = windows_try_getch
 else:
-    try_getch_message = "Press Ctrl-C to exit"
+    try_getch_message = "Press Ctrl-C to stop capture early..."
     def try_getch():
         return None
 
@@ -414,7 +414,7 @@ async def init_client(verbose, dump):
     return client
 
 
-async def run_client(client, variables):
+async def run_client(client, variables, allow_kb_stop):
     if not await initialize_board(args=args, client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
         raise SystemExit
@@ -422,11 +422,11 @@ async def run_client(client, variables):
     logger.info('initialized board')
 
     dt = 0.1 if args.runtime is not None else 1.0
-    if try_getch_message:
+    if allow_kb_stop and try_getch_message:
         print(try_getch_message)
     while client.running:
         logger.info('beep')
-        if try_getch():
+        if allow_kb_stop and try_getch():
             break
         await asyncio.sleep(dt)
     await client.send_sampler_stop()
@@ -435,7 +435,7 @@ async def run_client(client, variables):
 async def record_snapshot(client, csvfile, varsfile):
     names, variables = read_elf_variables(vars=[], varfile=varsfile)
     client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0)
-    await run_client(client, variables)
+    await run_client(client, variables, allow_kb_stop=False)
 
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
@@ -486,7 +486,7 @@ async def amain():
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
-    await run_client(client=client, variables=variables)
+    await run_client(client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
