@@ -1,3 +1,33 @@
++ [ ] update this file!
+
++ [ ] emotool: remove passing of "args" since it's global (unless passed also to Emolog.py?). may need to move the global arg earlier in the file.
+
++ [ ] emotool & emolog: there's both received_samples and samples_received (one in emotool and one in emolog). is this intentional? if yes, rename to reflect different usages. if not, merge them.
+
++ [ ] emotool & emolog: emolog has 'stopped' variable, emotool has '_running'. why two of them?
+
++ [ ] emotool: renames in setup_logging()
+
++ [x] emotool: print --> logger.xxx where appropriate
+
++ [ ] the name csvfile and the like is too ambigious, there are lots of csv files (vars, output, snapshot vars, snapshot output)... rename variables to be more explicit
+
++ [ ] not sure if cleanup() is really sending sampler_stop. note that transmission stopping can also be because CTS goes inactive when closing the port. need to check for actual receive of stop (log from embedded?). Also, it seems it doesn't receive an ack (or pops an exception for some other reason), run with --verbose to see log message about it.
+
++ [ ] also added a sampler_stop at the end of each run_client(), and it seems to be doing something (check with very short times for snapshot var freq) however there's a "got exception AckTimeout()" at the end of the *2nd* run. try to figure why.
+
++ [ ] are we waiting for the 2nd sample in the snapshot run? play with snapshot var file to check. fix if true (should finish after first sample is received)
+
++ [ ] no need for 'press any key' when taking snapshot (both the message and the actual listening for a key)
+
++ [ ] consider refactoring out init_client(). the call to start_transport can either be part of the constructor or explicit in amain(). in both cases, this function can be gone.
+
++ [ ] run_client() makes sense to be a member function of client
+
+
+-------------------------------------
+Older, sort through this...
+
 + [ ] bug: when sampling several variables with high period and different phases, all of them are written to the first one's column in the csv.
       there are no commas for data that wasn't sampled. this seems to be because the code that writes each line in the csv is currently not aware of all the variables in the csv, only of the vars in that specific sample.  
 
