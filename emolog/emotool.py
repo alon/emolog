@@ -249,7 +249,7 @@ def start_serial_process(serial, baudrate, port):
     return serial_subprocess
 
 
-async def start_transport(args, client):
+async def start_transport(client):
     global serial_process
     loop = asyncio.get_event_loop()
     if args.fake_sine:
@@ -364,7 +364,7 @@ def read_elf_variables(vars, varfile):
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, names)
+    dwarf_variables = dwarf_get_variables_by_name(args.elf, names)  # TODO does this really have to access args?
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
@@ -382,7 +382,7 @@ def read_elf_variables(vars, varfile):
     return names, variables
 
 
-async def initialize_board(args, client, variables):
+async def initialize_board(client, variables):
     logger.debug("about to send version")
     await client.send_version()
     retries = max_retries = 3
@@ -410,12 +410,12 @@ def banner(s):
 
 async def init_client(verbose, dump):
     client = EmoToolClient(verbose=verbose, dump=dump)
-    await start_transport(args=args, client=client)
+    await start_transport(client=client)
     return client
 
 
 async def run_client(client, variables, allow_kb_stop):
-    if not await initialize_board(args=args, client=client, variables=variables):
+    if not await initialize_board(client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
         raise SystemExit
     sys.stdout.flush()
