@@ -157,6 +157,7 @@ class VarDescriptor:
     DW_TAG_pointer_type = 'DW_TAG_pointer_type'
     DW_TAG_array_type = 'DW_TAG_array_type'
     DW_TAG_typedef = 'DW_TAG_typedef'
+    DW_TAG_subrange_type = 'DW_TAG_subrange_type'
 
     type_tags_to_names = {DW_TAG_class_type: 'class',
                           DW_TAG_const_type: 'const',
@@ -217,6 +218,12 @@ class VarDescriptor:
             type_str.append('(unnamed variable)')
 
         return ' '.join(type_str)
+
+    def get_array_sizes(self):
+        res = []
+        for child in self.type.iter_children():
+            res.append(child.attributes['DW_AT_upper_bound'].value + 1)
+        return res
 
     def _get_size(self):
         type_chain, last_type = self.visit_type_chain()

@@ -18,6 +18,7 @@ import sys
 from socket import socketpair
 import subprocess
 from time import sleep, clock  # more accurate on windows, vs time.time on linux
+from functools import reduce
 
 import emolog
 import post_processor
@@ -189,23 +190,49 @@ def return_enum_decoder(size):
     return ord
 
 
-def variable_to_decoder(v):
-    type_name = v.get_type_str()
-    size = v.size
+def array_decoder(array, elem_decoder, length, elem_size):
+    res = '{ '
+    for i in range(length):
+        elem = elem_decoder(array[i * elem_size: (i + 1) * elem_size])
+        if isinstance(elem, float):
+            elem_str = "{:.3f}".format(elem)
+        else:
+            elem_str = "{}".format(elem)
+        res += elem_str
+        res += ', '
+    res = res[:-2]  # throw away last comma
+    res += ' }'
+    return res
+
+
+def variable_to_decoder(v, type_name, size):
+    # NOTE: function accepts type_name and size as parameters instead of directly getting those from v so that
+    # it would be able to call itself recursively with the element of an array
     if type_name.startswith('enum '):
         name_to_val = v.get_enum_dict()
         max_unsigned_val = 1 << (size * 8)
         val_to_name = {v % max_unsigned_val: k for k, v in name_to_val.items()}
         enum_decoder = return_enum_decoder(size)
         return lambda q: val_to_name[enum_decoder(q)]
+
+    elif type_name.startswith('array of '):
+        # this currently flattens multi-dimensional arrays to a long one dimensional array
+        elem_type = type_name[9:]
+        bounds = v.get_array_sizes()
+        array_len = reduce(lambda x, y: x * y, bounds)
+        elem_size = int(size / array_len)
+        assert(elem_size * array_len == size)
+        elem_decoder = variable_to_decoder(v=v, type_name=elem_type, size=elem_size)
+        return lambda q: array_decoder(array=q, elem_decoder=elem_decoder, length=array_len, elem_size=elem_size)
+
     elif type_name.endswith('float'):
         if size == 4:
             return decode_little_endian_float
-    # might be broken since s which is dwarf.dwarf.VarDescriptor.get_type_name()
-    # doesn't necessarily end with 'int' / 'float'
+
     elif type_name.endswith('bool'):
         return lambda q: 'True' if ord(q) else 'False'
-    else:
+
+    else:  # TODO this should be "if it's an int". also should handle signed/unsigned correctly
         if size == 4:
             return lambda q: struct.unpack('<l', q)[0]
         elif size == 2:
@@ -213,7 +240,7 @@ def variable_to_decoder(v):
         elif size == 1:
             return ord
 
-    logger.error("type names supported: int, float. looked for: {}, {}".format(type_name, size))
+    logger.error("type names supported: int, float. looked for: '{}', size = {}".format(type_name, size))
     raise SystemExit
 
 
@@ -380,7 +407,7 @@ def read_elf_variables(vars, varfile):
             period_ticks=period_ticks,
             address=v.address,
             size=v.size,
-            _type=variable_to_decoder(v)))
+            _type=variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)))
     return names, variables
 
 
