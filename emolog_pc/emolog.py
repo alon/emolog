@@ -16,7 +16,7 @@ Usage for testing purposes:
     1. TODO
 
 
-Wrap emolog c library. Build it if it doesn't exist. Provides the same
+Wrap emolog_protocol c library. Build it if it doesn't exist. Provides the same
 API otherwise, plus helpers.
 """
 
@@ -62,33 +62,39 @@ logger = logging.getLogger('emolog')
 
 
 if 'win' in sys.platform:
-    LIBRARY_PATH = 'emolog.dll'
+    LIB_RELATIVE_DIR = '../emolog_protocol'
+    LIB_FILENAME = 'emolog_protocol.dll'
+    MAKE_EXEC = 'make.exe'
 else:
-    LIBRARY_PATH = 'libemolog.so'
+    LIB_RELATIVE_DIR = '../emolog_protocol'
+    LIB_FILENAME = 'libemolog_protocol.so'
+    MAKE_EXEC = 'make'
+LIB_ABS_DIR = os.path.realpath(os.path.join(os.path.split(__file__)[0], LIB_RELATIVE_DIR))
 
 
 def build_library():
-    # chdir to path of module
-    basedir = os.path.realpath(os.path.split(__file__)[0])
-    os.chdir(basedir)
-    if not os.path.exists(LIBRARY_PATH) or os.stat(LIBRARY_PATH).st_mtime < os.stat('emolog.c').st_mtime:
-        if which('make') is None:
-            print("missing make; please place a copy of {} at {}".format(LIBRARY_PATH, basedir))
+    # chdir to path of library
+    orig_path = os.getcwd()
+    os.chdir(LIB_ABS_DIR)
+    if not os.path.exists(LIB_FILENAME) or os.stat(LIB_FILENAME).st_mtime < os.stat('emolog_protocol.c').st_mtime:
+        if which(MAKE_EXEC) is None:
+            print("missing make; please place a copy of {} at {}".format(LIB_FILENAME, LIB_ABS_DIR))
             raise SystemExit
-        ret = os.system("make {} 2>&1 > /dev/null".format(LIBRARY_PATH))
+        ret = os.system("make {}".format(LIB_FILENAME))
         assert ret == 0, "make failed with error code {}, see above.".format(ret)
-    assert os.path.exists(LIBRARY_PATH)
+    assert os.path.exists(LIB_FILENAME)
+    os.chdir(orig_path)
 
 
-def emolog():
+def emolog_lib():
     build_library()
-    assert os.path.exists(LIBRARY_PATH)
-    lib = ctypes.CDLL(os.path.join('.', LIBRARY_PATH))
+    assert os.path.exists(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
+    lib = ctypes.CDLL(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
     return lib
 
 
 # importing builds!
-lib = emolog()
+lib = emolog_lib()
 
 lib.emo_decode_with_offset.restype = ctypes.c_int16
 
@@ -105,7 +111,7 @@ emo_message_type_to_str = {}
 
 
 def initialize_emo_message_type_to_str():
-    with open('emo_message_t.h') as fd:
+    with open(os.path.join(LIB_ABS_DIR, 'emo_message_t.h')) as fd:
         lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
         lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
         for name, value in lines:

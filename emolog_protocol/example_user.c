@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 int serialize_version_test(void)
 {

@@ -1,9 +1,9 @@
 /* vim: set tabstop=4 softtabstop=4 shiftwidth=4 expandtab : */
 
 /*
- * emolog.h
+ * emolog_protocol.h
  *
- * Main include for Comet-ME Water Pump Protocol.
+ * Main include for Emolog Protocol.
  *
  *  Created on: Mar 17, 2016
  *      Author: alon

@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 #include "emolog_comm.h"
 

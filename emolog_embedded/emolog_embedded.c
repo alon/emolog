@@ -11,7 +11,7 @@
 #include "emolog_embedded.h"
 #include "emolog_comm.h"
 #include "emolog_sampler.h"
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 #include "../../pump_drive/Hardware.h" // TEMP for debugging
 

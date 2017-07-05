@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 
 static uint8_t s_seq = 0;

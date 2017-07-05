@@ -8,7 +8,7 @@
 #ifndef EMOLOG_SAMPLER_H_
 #define EMOLOG_SAMPLER_H_
 
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 // Embedded to Host
 void sampler_sample(uint32_t ticks);

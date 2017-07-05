@@ -3,8 +3,8 @@
 .metadata
 *.pyc
 *.sw?
-emolog/example_user
-emolog/emolog.dll
+emolog_protocol/example_user
+emolog_protocol.dll
 emolog/example_user.exe
 RemoteSystemsTempFiles
 tags
@@ -22,6 +22,5 @@ emo*.csv
 *.log
 *.dump
 *.pure
-emolog/outputs/
 local_machine_config.ini
 profile*.txt

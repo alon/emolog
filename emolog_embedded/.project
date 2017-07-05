@@ -3,8 +3,8 @@
 	<name>emolog_embedded</name>
 	<comment></comment>
 	<projects>
-		<project>emolog</project>
 		<project>driverlib</project>
+		<project>emolog_protocol</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

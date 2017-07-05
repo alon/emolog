@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#include "emolog.h"
+#include "emolog_protocol.h"
 
 void emolog_init(void);
 void emolog_run_step(uint32_t ticks);
