@@ -13,7 +13,7 @@
 #include "emolog_sampler.h"
 #include "emolog_protocol.h"
 
-#include "../../pump_drive/Hardware.h" // TEMP for debugging
+#include "Hardware.h"  // for debugging
 
 
 void emolog_handle_message(emo_header* header, uint32_t ticks);

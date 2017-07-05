@@ -24,7 +24,7 @@
 #define M_PI 3.14159265358979323846 // pedantic
 #endif
 
-/* Water Pump Protocol */
+/* Emolog embedded client example for TI Tiva C MCU's */
 
 
 uint32_t sys_clk_hz;
