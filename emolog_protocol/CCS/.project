@@ -24,10 +24,17 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>Source</name>
+			<type>2</type>
+			<locationURI>$%7BPARENT-1-PROJECT_LOC%7D/Source</locationURI>
+		</link>
+	</linkedResources>
 	<variableList>
 		<variable>
 			<name>SW_ROOT</name>
-			<value>$%7BPARENT-2-PROJECT_LOC%7D/TivaWare</value>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D/TivaWare</value>
 		</variable>
 	</variableList>
 </projectDescription>

@@ -76,7 +76,7 @@ def build_library():
     # chdir to path of library
     orig_path = os.getcwd()
     os.chdir(LIB_ABS_DIR)
-    if not os.path.exists(LIB_FILENAME) or os.stat(LIB_FILENAME).st_mtime < os.stat('emolog_protocol.c').st_mtime:
+    if not os.path.exists(LIB_FILENAME) or os.stat(LIB_FILENAME).st_mtime < os.stat('source/emolog_protocol.c').st_mtime:
         if which(MAKE_EXEC) is None:
             print("missing make; please place a copy of {} at {}".format(LIB_FILENAME, LIB_ABS_DIR))
             raise SystemExit
@@ -111,7 +111,7 @@ emo_message_type_to_str = {}
 
 
 def initialize_emo_message_type_to_str():
-    with open(os.path.join(LIB_ABS_DIR, 'emo_message_t.h')) as fd:
+    with open(os.path.join(LIB_ABS_DIR, 'source/emo_message_t.h')) as fd:
         lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
         lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
         for name, value in lines:

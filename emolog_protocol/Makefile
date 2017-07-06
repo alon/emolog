@@ -15,11 +15,11 @@ LIBRARY=$(LIBPREFIX)emolog_protocol$(LIBSUFFIX)
 
 all: $(LIBRARY) example_user$(EXESUFFIX)
 
-$(LIBRARY): emolog_protocol.h emolog_protocol.c
-	$(CC) $(CFLAGS) -shared -fPIC -o $(LIBRARY) emolog_protocol.c
+$(LIBRARY): source/emolog_protocol.h source/emolog_protocol.c
+	$(CC) $(CFLAGS) -shared -fPIC -o $(LIBRARY) source/emolog_protocol.c
 
-example_user$(EXESUFFIX): example_user.c $(LIBRARY)
-	$(CC) $(CFLAGS) -o example_user -L. -lemolog_protocol example_user.c
+example_user$(EXESUFFIX): source/example_user.c $(LIBRARY)
+	$(CC) $(CFLAGS) -o example_user -L. -lemolog_protocol source/example_user.c
 
 .PHONY: clean run
 
