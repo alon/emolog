@@ -148,7 +148,7 @@ emo_header *comm_peek_message(void)
 }
 
 
-void uart0_interrupt(void)
+void emolog_uart_interrupt(void)
 {
     uint32_t status;
 
