@@ -1,3 +1,9 @@
++ [ ] example client - Tiva:
+  + clean up
+  + add some comments, including expected HW platform (launchpad xxx etc)
+  + add hardware.h (for debugging)
+  + test!
+
 + [x] emotool: remove passing of "args" since it's global (unless passed also to Emolog.py?). 
 
 + [x] emotool: renames in setup_logging()
