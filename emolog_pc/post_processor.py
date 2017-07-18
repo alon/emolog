@@ -18,9 +18,9 @@ velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 6
 default_pump_head = 8.0
 
 
-def post_process(csv_filename, truncate_data=False):
+def post_process(input_csv_filename, truncate_data=False):
     start_time = time.time()
-    data = pd.read_csv(csv_filename)
+    data = pd.read_csv(input_csv_filename)
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
@@ -35,6 +35,8 @@ def post_process(csv_filename, truncate_data=False):
     end_time = time.time()
     print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
+    params = process_params_snapshot(input_csv_filename)
+
     start_time = time.time()
     half_cycle_stats = calc_half_cycle_stats(data)
     half_cycle_summary = calc_half_cycle_summary(half_cycle_stats)
@@ -46,8 +48,8 @@ def post_process(csv_filename, truncate_data=False):
     print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
-    output_filename = csv_filename[:-4] + '.xlsx'
-    save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
+    output_filename = input_csv_filename[:-4] + '.xlsx'
+    save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data)
     end_time = time.time()
     print("save to excel time: {:.2f} seconds".format(end_time - start_time))
@@ -63,6 +65,7 @@ output_col_names = \
         'Required dir': 'Required\nDirection',
         'Ref sensor': 'Ref\nSensor',
         'Step time prediction': 'Step Time Prediction [m/s]',
+        'Commutation advance ms': 'Commutation\nAdvance [ms]',
         'Dc bus v': 'DC Bus\n[V]',
         'Total i': 'Total I\n[A]',
         'Temp ext': 'Motor\nTemperature',
@@ -83,6 +86,7 @@ data_col_formats = \
         'Velocity': {'width': 8, 'format': 'frac'},
         'Estimated Velocity [m/s]': {'width': 12, 'format': 'frac'},
         'Step time prediction': {'width': 15, 'format': 'frac'},
+        'Commutation advance ms': {'width': 13, 'format': 'time'},
         'Motor state': {'width': 17, 'format': 'general'},
         'Actual dir': {'width': 9, 'format': 'general'},
         'Required dir': {'width': 9, 'format': 'general'},
@@ -178,6 +182,7 @@ def output_name_to_std_name(output_name):
 
 def clean_col_name(name):
     name = remove_prefix(name, 'controller.state.')
+    name = remove_prefix(name, 'controller.params.')
     name = remove_prefix(name, 'duty_cycle.')
     name = name.replace("_", " ")
     name = name[0].upper() + name[1:]
@@ -260,6 +265,18 @@ def step_time_prediction_to_vel(data):
     data['Step time prediction'] *= tick_time_ms
     data['Estimated Velocity [m/s]'] = step_size_mm / data['Step time prediction']
     return data
+
+
+def process_params_snapshot(input_csv_filename):
+    snapshot_csv_filename = input_csv_filename[:-4] + '_params.csv'
+    if not os.path.isfile(snapshot_csv_filename):
+        return None
+    params = pd.read_csv(snapshot_csv_filename)
+    assert(len(params) == 1)
+    params.columns = [clean_col_name(c) for c in params.columns]
+    params.drop(['Sequence', 'Timestamp', 'Ticks'], inplace=True, axis=1)
+    return params
+
 
 
 def calc_summary_stats(data, hc_stats, data_before_cropping):
@@ -506,7 +523,7 @@ def calc_comm_advances(data):
     return ret
 
 
-def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
+def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data=False):
     if truncate_data:  # for quick debug runs
         data = data[1:5000]
@@ -515,6 +532,8 @@ def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, mot
     wb_formats = add_workbook_formats(workbook)
 
     add_data_sheet(writer, data, wb_formats)
+    if params is not None:
+        add_params_sheet(workbook, params, wb_formats)
     add_graphs(workbook, data)
     add_summary_sheet(workbook, summary_stats, wb_formats)
     add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_formats)
@@ -527,10 +546,10 @@ def save_to_excel(data, summary_stats, half_cycle_stats, half_cycle_summary, mot
 def add_workbook_formats(wb):
     formats = \
         {
-            'frac': wb.add_format({'num_format': '0.000', 'align': 'right'}),
-            'time': wb.add_format({'num_format': '0.00', 'align': 'right'}),
-            'percent': wb.add_format({'num_format': '0.00%', 'align': 'right'}),
-            'general': wb.add_format(),
+            'frac': wb.add_format({'num_format': '0.000', 'align': 'left'}),
+            'time': wb.add_format({'num_format': '0.00', 'align': 'left'}),
+            'percent': wb.add_format({'num_format': '0.00%', 'align': 'left'}),
+            'general': wb.add_format({'align': 'left'}),
             'header': wb.add_format({'text_wrap': True, 'bold': True}),
             'title': wb.add_format({'font_size': 14, 'bold': True}),
             'note': wb.add_format({'font_size': 12, 'italic': True, 'text_wrap': True}),
@@ -544,6 +563,17 @@ def add_data_sheet(writer, data, wb_formats):
     data_sheet = writer.sheets['Data']
     set_data_header(data_sheet, data.columns.tolist(), wb_formats)
     set_column_formats(data_sheet, [''] + data.columns.tolist(), wb_formats, data_col_formats)
+
+
+def add_params_sheet(wb, params, wb_formats):
+    sheet = wb.add_worksheet('Parameters')
+    row = 0
+    sheet.set_column(0, 0, width=32)
+    sheet.set_column(1, 1, width=32)
+    for col in params.columns:
+        sheet.write(row, 0, col, wb_formats['header'])
+        sheet.write(row, 1, params[col][params.first_valid_index()], wb_formats['general'])
+        row += 1
 
 
 def set_data_header(ws, cols, wb_formats):
