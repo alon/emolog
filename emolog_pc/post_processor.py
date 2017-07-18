@@ -25,6 +25,7 @@ def post_process(input_csv_filename, truncate_data=False):
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
+    data = remove_invalid_temperatures(data)
     data['Power In [W]'] = data['Dc bus v'] * data['Total i']
     data = step_time_prediction_to_vel(data)
     data_before_cropping = data.copy()
@@ -261,6 +262,14 @@ def interpolate_missing_data(data):
     return data
 
 
+def remove_invalid_temperatures(data):
+    min_temp = -50
+    if 'Temp ext' not in data.columns:
+        return data
+    data.loc[data['Temp ext'] < min_temp, 'Temp ext'] = np.nan
+    return data
+
+
 def step_time_prediction_to_vel(data):
     data['Step time prediction'] *= tick_time_ms
     data['Estimated Velocity [m/s]'] = step_size_mm / data['Step time prediction']
@@ -276,7 +285,6 @@ def process_params_snapshot(input_csv_filename):
     params.columns = [clean_col_name(c) for c in params.columns]
     params.drop(['Sequence', 'Timestamp', 'Ticks'], inplace=True, axis=1)
     return params
-
 
 
 def calc_summary_stats(data, hc_stats, data_before_cropping):
