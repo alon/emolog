@@ -65,7 +65,7 @@ output_col_names = \
         'Actual dir': 'Actual\nDirection',
         'Required dir': 'Required\nDirection',
         'Ref sensor': 'Ref\nSensor',
-        'Step time prediction': 'Step Time Prediction [m/s]',
+        'Step time prediction': 'Step Time Prediction [ms]',
         'Commutation advance ms': 'Commutation\nAdvance [ms]',
         'Dc bus v': 'DC Bus\n[V]',
         'Total i': 'Total I\n[A]',
