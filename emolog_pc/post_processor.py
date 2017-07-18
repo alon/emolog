@@ -534,7 +534,7 @@ def calc_comm_advances(data):
 def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data=False):
     if truncate_data:  # for quick debug runs
-        data = data[1:5000]
+        data = data[0:5000]
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
