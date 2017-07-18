@@ -218,16 +218,22 @@ def partition_to_half_cycles(data):
         data.index -= data.first_valid_index()  # reindex starting from ticks = 0
         return data
 
-    start_i = cycle_start_indexes[1]
-    # the end of the last valid cycle, is one *valid index* before the start of the last (incomplete) cycle
-    # note that it's not necessarily means minus 1 (with missing ticks)
+    # throw away initial incomplete cycle. final incomplete cycle's index is required (see end_i = ...)
+    #  so don't throw it yet
+    cycle_start_indexes = cycle_start_indexes[1:]
+    # crop to FULL cycles (not half cycles), that start with UP.
+    if data['Required dir'][cycle_start_indexes[0]] != 'UP':
+        cycle_start_indexes = cycle_start_indexes[1:]
+    if data['Required dir'][cycle_start_indexes[-2]] != 'DOWN':  # -2 since last one points to incomplete cycle
+        cycle_start_indexes = cycle_start_indexes[:-1]
+
+    start_i = cycle_start_indexes[0]
     end_i = data.index[data.index.get_loc(cycle_start_indexes[-1]) - 1]  # move one valid index before it
 
-    data['Half cycle'] = pd.Series(data=np.arange(1, len(cycle_start_indexes)), index=cycle_start_indexes[1:])
+    data['Half cycle'] = pd.Series(data=np.arange(1, len(cycle_start_indexes) + 1), index=cycle_start_indexes)
     data['Half cycle'].fillna(method='ffill', inplace=True)
     data = data.loc[start_i: end_i]
     data.index -= data.first_valid_index()  # reindex starting from ticks = 0
-
     return data
 
 
