@@ -77,7 +77,7 @@ output_col_names = \
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
 
 first_columns = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]',
-                 'Motor state', 'Actual dir', 'Required dir']
+                 'Motor state', 'Required dir', 'Actual dir']
 
 data_col_formats = \
     {
