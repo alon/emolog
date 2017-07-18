@@ -554,7 +554,7 @@ def main():
             logger.error("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
-    if not os.path.exists(client.csv_filename):
+    if client.csv_filename is None or not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
     print()
