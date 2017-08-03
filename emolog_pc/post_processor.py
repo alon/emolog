@@ -691,7 +691,11 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
         })
     chart.set_x_axis({'label_position': 'low',
                       'min': 0,
-                      'max': x_axis['max_row'] * tick_time_ms})
+                      'max': x_axis['max_row'] * tick_time_ms,
+                      'line': {'none': True},
+                      })
+    chart.set_y_axis({'major_gridlines': {'visible': False}})
+    chart.set_y2_axis({'major_gridlines': {'visible': True}})
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
