@@ -121,6 +121,7 @@ half_cycle_col_formats = \
         'Average Current [A]': {'width': 8, 'format': 'frac'},
         'Cruising Current [A]': {'width': 8, 'format': 'frac'},
         'Coasting Current [A]': {'width': 8, 'format': 'frac'},
+        'Accel. Current [A]':  {'width': 8, 'format': 'frac'},
         'Peak Current [A]': {'width': 8, 'format': 'frac'},
         'Average Power In [W]': {'width': 8, 'format': 'frac'},
         'Power Out [W]': {'width': 8, 'format': 'frac'},
@@ -442,6 +443,12 @@ def calc_half_cycle_stats(data):
             hc_stats['Coasting Current [A]'] = coasting['Total i'].mean()
         else:
             hc_stats['Coasting Current [A]'] = 'N/A'
+
+        accel = hc[hc['Mode'] == 'MODE_ACCEL']
+        if len(accel) > 0:
+            hc_stats['Accel. Current [A]'] = accel['Total i'].mean()
+        else:
+            hc_stats['Accel. Current [A]'] = 'N/A'
 
         hc_stats['Peak Current [A]'] = hc['Total i'].max()
         hc_stats['Average Power In [W]'] = hc['Power In [W]'].mean()
