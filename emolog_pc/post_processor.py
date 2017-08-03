@@ -66,7 +66,7 @@ output_col_names = \
         'Required dir': 'Required\nDirection',
         'Ref sensor': 'Ref\nSensor',
         'Step time prediction': 'Step Time Prediction [ms]',
-        'Commutation advance ms': 'Commutation\nAdvance [ms]',
+        'Comm advance ms': 'Commutation\nAdvance [ms]',
         'Dc bus v': 'DC Bus\n[V]',
         'Total i': 'Total I\n[A]',
         'Temp ext': 'Motor\nTemperature',
@@ -87,7 +87,7 @@ data_col_formats = \
         'Velocity': {'width': 8, 'format': 'frac'},
         'Estimated Velocity [m/s]': {'width': 12, 'format': 'frac'},
         'Step time prediction': {'width': 15, 'format': 'frac'},
-        'Commutation advance ms': {'width': 13, 'format': 'time'},
+        'Comm advance ms': {'width': 13, 'format': 'time'},
         'Motor state': {'width': 17, 'format': 'general'},
         'Actual dir': {'width': 9, 'format': 'general'},
         'Required dir': {'width': 9, 'format': 'general'},
@@ -497,7 +497,7 @@ def calc_position_stats(data):
 
 def calc_commutation_stats(data):
     stats = calc_comm_advances(data)
-    stats['Intended Commutation Advance [ms]'] = data['Commutation advance ms'][stats.index]
+    stats['Intended Commutation Advance [ms]'] = data['Comm advance ms'][stats.index]
     stats['Mode'] = data['Mode'][stats.index]  # TEMP?
     stats.loc[data['Mode'][stats.index] != 'MODE_CRUISING', 'Intended Commutation Advance [ms]'] = 0.0
     # a bit of a hack: current method of determining commutation advance gets confused by dir change (coasting)
