@@ -11,8 +11,11 @@ controller.params.turn_on_v_threshold,20000,1
 controller.params.turn_off_v_threshold,20000,1
 controller.params.use_soft_start,20000,1
 soft_start_table,20000,1
-controller.params.use_commutation_advance,20000,1
-commutation_advance_table_up,20000,1
-commutation_advance_table_down,20000,1
+controller.params.comm_advance_mode,20000,1
+controller.params.comm_advance_const_delay_up,20000,1
+controller.params.comm_advance_const_delay_down,20000,1
+controller.params.comm_advance_during_accel,20000,1
+comm_advance_table_up,20000,1
+comm_advance_table_down,20000,1
 controller.params.acceleration_steps_up,20000,1
 controller.params.acceleration_steps_down,20000,1
