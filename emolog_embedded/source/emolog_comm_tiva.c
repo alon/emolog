@@ -37,7 +37,8 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
-#include "Hardware.h"  // for debugging
+#include "emolog_debug.h"
+
 
 #define RX_BUF_SIZE			1024
 // #define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
@@ -77,7 +78,7 @@ bool tx_buf_put_bytes(const uint8_t *src, size_t len)
 {
 	if (tx_buf_bytes_free() < len)
 	{
-		debug("tx_buf_put_bytes: tx buffer full: %d < %d\n", tx_buf_bytes_free(), len);
+		debug_printf("tx_buf_put_bytes: tx buffer full: %d < %d\n", tx_buf_bytes_free(), len);
 		return false;
 	}
 
@@ -152,7 +153,6 @@ void emolog_uart_interrupt(void)
 {
     uint32_t status;
 
-    set_yellow_led(ON);
     status = UARTIntStatus(UART0_BASE, true);
     UARTIntClear(UART0_BASE, status);     		// Clear all asserted interrupts for the UART
 
@@ -165,7 +165,6 @@ void emolog_uart_interrupt(void)
     	handle_uart_rx();
     }
     IntEnable(INT_UART0);
-    set_yellow_led(OFF);
 }
 
 
@@ -177,7 +176,7 @@ void handle_uart_rx(void)
     uint16_t n;
 
     if (message_available) {
-    	debug("EMOLOG_EMBEDDED: Unexpected bytes from PC before having processed last message\n");
+    	debug_printf("EMOLOG_EMBEDDED: Unexpected bytes from PC before having processed last message\n");
    	    return; // not our turn
     }
 
@@ -186,7 +185,7 @@ void handle_uart_rx(void)
     {
         new_char = UARTCharGetNonBlocking(UART0_BASE);
         if (rx_buf_pos >= sizeof(rx_buf)) {
-            debug("EMOLOG_EMBEDDED: RX Buffer Overflow! rx_buf_pos = %u, rx_buf = %u\n", rx_buf_pos, rx_buf);
+            debug_printf("EMOLOG_EMBEDDED: RX Buffer Overflow! rx_buf_pos = %u, rx_buf = %u\n", rx_buf_pos, rx_buf);
             continue; // buffer overflow
         }
         rx_buf[rx_buf_pos++] = new_char;
@@ -221,7 +220,6 @@ void handle_uart_tx(void)
 
 	if (tx_buf_level == 0)
 	{
-		set_aux_pins(7);
 	    return;
 	}
 

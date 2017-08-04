@@ -237,22 +237,6 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  */
 int16_t emo_decode(const uint8_t *src, uint16_t size);
 
-// comment out to disable debugging prints
-#ifndef EMOLOG_HOST
-// #define CLIENT_DEBUG
-#endif
-
-// TODO: write vararg function to prepend "EMOLOG: " instead of manually inserting it every debug call
-#ifdef HOST_DEBUG
-    #include <stdio.h>
-    #define debug printf
-#elif defined(CLIENT_DEBUG)
-    #include "utils/uartstdio.h"
-    #define debug UARTprintf
-#else
-#define debug(...)
-#endif
-
 
 #ifdef __cplusplus
 }

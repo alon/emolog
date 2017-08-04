@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Default Linker Command file for the Texas Instruments TM4C1294NCPDT
+ * Default Linker Command file for the Texas Instruments TM4C1294KCPDT
  *
  * This is derived from revision 15071 of the TivaWare Library.
  *
@@ -10,7 +10,7 @@
 
 MEMORY
 {
-    FLASH (RX) : origin = 0x00000000, length = 0x00100000
+    FLASH (RX) : origin = 0x00000000, length = 0x00080000
     SRAM (RWX) : origin = 0x20000000, length = 0x00040000
 }
 

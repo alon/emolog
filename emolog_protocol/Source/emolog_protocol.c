@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "emolog_protocol.h"
-
+#include "emolog_debug.h"
 
 static uint8_t s_seq = 0;
 
@@ -249,7 +249,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
 
     /* if we missed the header skip a byte, check again */
     if (!header_check_start(hdr)) {
-        debug("EMOLOG: header magic wrong, skipping a byte.\n");
+        debug_printf("EMOLOG: header magic wrong, skipping a byte.\n");
         return -1;
     }
 
@@ -257,7 +257,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
     header_crc = crc8(src, EMO_HEADER_NO_CRC_SIZE);
     //debug("EMO_HEADER_NO_CRC_SIZE = %d\n", EMO_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
-        debug("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
+        debug_printf("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;
     }
 
@@ -279,7 +279,7 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
          * 2. What we consider the payload bytes are actually the start of the next message, and the
          *    real payload of this packet was lost (UART HW didn't parse it).
          * Therefore, the only safe thing to do is try to parse after the header. */
-        debug("EMOLOG: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
+        debug_printf("EMOLOG: payload crc failed %d expected, %d got\n", payload_crc, hdr->payload_crc);
         ret = -(int16_t)sizeof(emo_header);
         return ret;
     }

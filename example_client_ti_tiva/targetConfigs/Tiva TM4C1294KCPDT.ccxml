@@ -6,7 +6,7 @@
             <instance XML_version="1.2" href="drivers/stellaris_cs_dap.xml" id="drivers" xml="stellaris_cs_dap.xml" xmlpath="drivers"/>
             <instance XML_version="1.2" href="drivers/stellaris_cortex_m4.xml" id="drivers" xml="stellaris_cortex_m4.xml" xmlpath="drivers"/>
             <platform XML_version="1.2" id="platform_0">
-                <instance XML_version="1.2" desc="Tiva TM4C1294NCPDT" href="devices/tm4c1294ncpdt.xml" id="Tiva TM4C1294NCPDT" xml="tm4c1294ncpdt.xml" xmlpath="devices"/>
+                <instance XML_version="1.2" desc="Tiva TM4C1294KCPDT" href="devices/tm4c1294kcpdt.xml" id="Tiva TM4C1294KCPDT" xml="tm4c1294kcpdt.xml" xmlpath="devices"/>
             </platform>
         </connection>
     </configuration>

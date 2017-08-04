@@ -16,9 +16,8 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 
-#include <emolog.h>
-
-#include <emolog_embedded.h>
+#include "emolog_protocol.h"
+#include "emolog_embedded.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846 // pedantic
@@ -50,7 +49,7 @@ void delay_ms(uint32_t ms)
 }
 
 
-void setup_clock(void)
+void init_clock(void)
 {
     sys_clk_hz = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
                                              SYSCTL_OSC_MAIN |
@@ -58,20 +57,12 @@ void setup_clock(void)
                                              SYSCTL_CFG_VCO_480), 120000000);
 }
 
-void setup_led(void)
-{
-    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
-    SysCtlDelay(3);
-    ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0); // led
-}
 
-
-void setup(void)
+void init(void)
 {
-    setup_clock();
+    init_clock();
     emolog_init();
-    setup_led();
-    ROM_IntMasterEnable();
+    IntMasterEnable();
 }
 
 
@@ -83,14 +74,14 @@ emo_error_t handle_app_specific_message(emo_header* message)
 
 void main(void)
 {
-    setup();
+    init();
     uint32_t ticks = 0;
 
     while (1) {
         sawtooth = (sawtooth + 1) % 100;
         sine = 50.0 * sin(2 * M_PI * ((float)ticks / 100.0));
 
-        emolog_run_step();
+        emolog_run_step(ticks);
         ticks++;
         delay_ms(50);
     }

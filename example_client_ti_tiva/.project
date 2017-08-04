@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>protocol_embedded</name>
+	<name>emolog_example_client</name>
 	<comment></comment>
 	<projects>
-		<project>emolog</project>
+		<project>driverlib</project>
+		<project>emolog_embedded</project>
+		<project>emolog_protocol</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
@@ -25,4 +27,10 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<variableList>
+		<variable>
+			<name>SW_ROOT</name>
+			<value>$%7BPARENT-2-PROJECT_LOC%7D/TivaWare</value>
+		</variable>
+	</variableList>
 </projectDescription>
