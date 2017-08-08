@@ -1,5 +1,3 @@
-#include "hw_tiva.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 

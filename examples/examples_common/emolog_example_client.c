@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "hw_tiva.h"
+#include "emolog_example_hw.h"
 #include "emolog_protocol.h"
 #include "emolog_embedded.h"
 
