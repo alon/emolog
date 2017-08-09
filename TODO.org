@@ -1,16 +1,3 @@
-+ [ ] example client - Tiva:
-  + clean up
-  + add some comments, including expected HW platform (launchpad xxx etc)
-  + add hardware.h (for debugging)
-  + test!
-
-+ [x] emotool: remove passing of "args" since it's global (unless passed also to Emolog.py?). 
-
-+ [x] emotool: renames in setup_logging()
-
-+ [x] emotool: print --> logger.xxx where appropriate
-
-+ [x] no need for 'press any key' when taking snapshot (both the message and the actual listening for a key)
 
 + [ ] the name csvfile and the like is too ambigious, there are lots of csv files (vars, output, snapshot vars, snapshot output)... rename variables to be more explicit
 
@@ -35,53 +22,14 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 
 
 -------------- 
-this is older stuff. Updated it on 1/7/2017.
-
-+ [x] bug: when sampling several variables with high period and different phases, all of them are written to the first one's column in the csv.
-      there are no commas for data that wasn't sampled. this seems to be because the code that writes each line in the csv is currently not aware of all the variables in the csv, only of the vars in that specific sample.  
-
-+ [x] fix requirements.txt / venv
-
-+ [x] instead of waiting xx wall-clock seconds, count ticks instead (but also with timeout)
-
-+ [x] On a nominal run this should not be printed:
- Task was destroyed but it is pending!
- task: <Task pending coro=<Client.add_future.<locals>.set_result_after_timeout() running at D:\Projects\Comet ME Pump Drive\firmware\emolog\emolog\emolog.py:512> wait_for=<Future pending cb=[Task._wakeup()]>>
+this is older stuff --> Updated it on 1/7/2017.
 
 + postprocessing:
-  [x] clean up data (remove unneeded columns, add time column)
-  [x] temp ugly enum parsing (to be replaced with proper enum parsing at the emotool level later)
-  [x] crop data to only full motor cycles
-  [x] derive step times and velocity
-  [x] divide data into cycles
-  [x] add statistics
-    [x] cycle time average
-    [x] travel range average
-    [x] velocity average
-    [x] time per direction average
-    [x] velocity average per direction
-    [x] current average
-    [x] flow rate average
-    [x] step time average, std
-    [x] constant-velocity section step time average, std (section is defined as excluding first n steps (~3) and all steps from motor cutoff)
-    [x] all of the above but for each half-cycle instead of averages? i.e. a separate Excel tab with a table, each row is a half-cycle, columns are as above
-    [x] another tab: for each position and direction, step time average & std, velocity average & std, current avg & std
   [ ] steps table like the old logger? 
-  [x] export to Excel
-  [x] graphs:
-    [x] position, velocity, motor state (or better: only mark motor on / off sections), current
-    [x] what else? or just combine everything to one graph and add checkmarks for series on/off (see below)
-
-+ [x] verify that the recording matches reality. possibly Logic Analyzer recording vs. our recording.
-
-+ [x] calculate bandwidth based on vars and print it
-
 
 * LATER
   [ ] in the main process, determinisitically (without sleep) wait for subprocess to be ready to accept socket connection
-  [x] check if we can go back to support logging (i.e. does run without --silent still causes buffer overflows?)
   [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
-  [x] add enum type parsing. enumerators are children of the type-die (currently unused). we'll probably have to change how the type is decided on and parsed in emotool.
   [ ] signed vs. unsigned int parsing
   [ ] graceful exit: refactor to something cleaner?
   [ ] DMA to serial
