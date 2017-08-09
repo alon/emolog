@@ -268,12 +268,18 @@ def setup_logging(filename, silent):
     logger.info('info first')
 
 
-def start_serial_process(serial, baudrate, port):
+def start_serial_process(serial, baudrate, hw_flow_control, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
-    serial_subprocess = subprocess.Popen('python serial2tcp.py -r -b {} -p {} -P {}'.format(
-                                         baudrate, serial, port).split())
+    emolog_pc_path = os.path.dirname(os.path.realpath(__file__))
+    serial2tcp_path = os.path.join(emolog_pc_path, 'serial2tcp.py')
+    serial2tcp_cmd = ['python', serial2tcp_path]
+    if hw_flow_control is True:
+        serial2tcp_cmd += ['-r']
+    serial2tcp_cmd += ' -b {} -p {} -P {}'.format(baudrate, serial, port).split()
+
+    serial_subprocess = subprocess.Popen(serial2tcp_cmd)
     sleep(0.1)
     return serial_subprocess
 
@@ -286,7 +292,7 @@ async def start_transport(client):
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
         return
     port = random.randint(10000, 50000)
-    serial_process = start_serial_process(serial=args.serial, baudrate=args.baud, port=port)
+    serial_process = start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', port)
     assert client2 is client
 
@@ -343,6 +349,8 @@ def parse_args():
     parser.add_argument('--fake-sine', default=False, action='store_true',
                         help='debug only - use a fake sine producing client')
     parser.add_argument('--serial', default='auto', help='serial port to use')
+    parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
+    parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
     parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
@@ -358,10 +366,9 @@ def parse_args():
                         help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs to this file')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
-    parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
-    parser.add_argument('--ticks-per-second', default=1000000 / 50,
+    parser.add_argument('--ticks-per-second', default=1000000 / 50, type=float,
                         help='number of ticks per second. used in conjunction with runtime')
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
     parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
