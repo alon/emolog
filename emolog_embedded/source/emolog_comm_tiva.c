@@ -39,6 +39,13 @@
 
 #include "emolog_debug.h"
 
+#define EMOLOG_UART         UART0
+
+#define TOKENPASTE(x, y)    x ## y
+#define TOKENPASTE2(x, y)   TOKENPASTE(x, y)
+#define EMOLOG_UART_BASE    TOKENPASTE2(EMOLOG_UART, _BASE)
+#define EMOLOG_UART_INT     TOKENPASTE2(INT_, EMOLOG_UART)
+
 
 #define RX_BUF_SIZE			1024
 // #define TX_BUF_SIZE			5586 // 19 * 294 - did problems at some point (long repeating sequences of -293,A>0,B>0,C>0 tick jumps)
@@ -48,7 +55,6 @@ static volatile bool message_available = false;
 
 static unsigned char rx_buf[RX_BUF_SIZE];
 static volatile uint32_t rx_buf_pos = 0;
-
 
 /**
  *  Circular Transmit buffer
@@ -114,13 +120,13 @@ bool comm_queue_message(const uint8_t *src, size_t len)
 {
 	bool ret;
 
-	IntDisable(INT_UART0);
+	IntDisable(EMOLOG_UART_INT);
 	ret = tx_buf_put_bytes(src, len);
 	if (ret)
 	{
 		handle_uart_tx();
 	}
-	IntEnable(INT_UART0);
+	IntEnable(EMOLOG_UART_INT);
 	return ret;
 }
 
@@ -153,10 +159,10 @@ void emolog_uart_interrupt(void)
 {
     uint32_t status;
 
-    status = UARTIntStatus(UART0_BASE, true);
-    UARTIntClear(UART0_BASE, status);     		// Clear all asserted interrupts for the UART
+    status = UARTIntStatus(EMOLOG_UART_BASE, true);
+    UARTIntClear(EMOLOG_UART_BASE, status);     		// Clear all asserted interrupts for the UART
 
-    IntDisable(INT_UART0);
+    IntDisable(EMOLOG_UART_INT);
     if (status & UART_INT_TX){
     	handle_uart_tx();
     }
@@ -164,7 +170,7 @@ void emolog_uart_interrupt(void)
     if (status & (UART_INT_RX | UART_INT_RT )){
     	handle_uart_rx();
     }
-    IntEnable(INT_UART0);
+    IntEnable(EMOLOG_UART_INT);
 }
 
 
@@ -181,9 +187,9 @@ void handle_uart_rx(void)
     }
 
     // Loop while there are characters in the receive FIFO.
-    while(UARTCharsAvail(UART0_BASE))
+    while(UARTCharsAvail(EMOLOG_UART_BASE))
     {
-        new_char = UARTCharGetNonBlocking(UART0_BASE);
+        new_char = UARTCharGetNonBlocking(EMOLOG_UART_BASE);
         if (rx_buf_pos >= sizeof(rx_buf)) {
             debug_printf("EMOLOG_EMBEDDED: RX Buffer Overflow! rx_buf_pos = %u, rx_buf = %u\n", rx_buf_pos, rx_buf);
             continue; // buffer overflow
@@ -223,9 +229,9 @@ void handle_uart_tx(void)
 	    return;
 	}
 
-	while (tx_buf_level > 0 && !(HWREG(UART0_BASE + UART_O_FR) & UART_FR_TXFF) )
+	while (tx_buf_level > 0 && !(HWREG(EMOLOG_UART_BASE + UART_O_FR) & UART_FR_TXFF) )
 	{
-		HWREG(UART0_BASE + UART_O_DR) = *read;
+		HWREG(EMOLOG_UART_BASE + UART_O_DR) = *read;
 		read++;
 		if (read >= tx_buf + TX_BUF_SIZE) read = tx_buf;
 		written++;
