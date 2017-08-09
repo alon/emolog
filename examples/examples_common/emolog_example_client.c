@@ -5,10 +5,11 @@
  *      Author: Guy Ovadia
  */
 
+#include "emolog_example_client.h"
+
 #include <stdint.h>
 #include <math.h>
 
-#include "emolog_example_hw.h"
 #include "emolog_protocol.h"
 #include "emolog_embedded.h"
 
@@ -24,12 +25,10 @@ float sine = 0;
 
 #define TICK_PERIOD_MS     5
 
-int main(void)
+
+void emolog_example_main_loop(void)
 {
     uint32_t ticks = 0;
-
-    hw_init();  // platform specific HW initialization.
-    emolog_init(); // this must be called before using Emolog;
 
     while (1)
     {

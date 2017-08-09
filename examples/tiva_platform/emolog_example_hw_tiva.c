@@ -24,6 +24,10 @@
 #include "utils/uartstdio.h"
 
 
+#include "../examples_common/emolog_example_client.h" // include for example code that is common to all platforms
+#include "emolog_embedded.h"       // for calling emolog_init()
+
+
 #define EMOLOG_BAUD_RATE_HZ         1000000
 #define AUX_UART_BAUD_RATE_HZ       1000000
 
@@ -106,5 +110,13 @@ void hw_init(void)
     init_emolog_uart();
     init_aux_uart();
     IntMasterEnable();
+}
+
+
+int main(void)
+{
+    hw_init();     // platform specific HW initialization.
+    emolog_init(); // this must be called before using Emolog;
+    emolog_example_main_loop(); // this never returns
 }
 
