@@ -52,9 +52,9 @@ void sampler_sample(uint32_t ticks)
 		return;
 	}
 
-    set_aux_pins(3);
+//    set_aux_pins(3);
     emo_encode_sampler_sample_start(buf);
-    set_aux_pins(4);
+//    set_aux_pins(4);
 	for (index = 0 ; index < sampler_table_size ; ++index) {
 		row_t *row = &sampler_table[index];
 		if (relative_ticks % row->period_ticks == row->phase_ticks) {
@@ -62,7 +62,7 @@ void sampler_sample(uint32_t ticks)
 			emo_encode_sampler_sample_add_var(buf, (const uint8_t*)row->address, row->size);
 		}
 	}
-    set_aux_pins(5);
+//    set_aux_pins(5);
 	if (num_encoded_vars > 0) {
 		encoded_len = emo_encode_sampler_sample_end(buf, relative_ticks);
 		comm_queue_message(buf, encoded_len);
