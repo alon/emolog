@@ -22,6 +22,7 @@
 uint32_t sawtooth = 0;
 float sine = 0;
 
+#define TICK_PERIOD_MS     5
 
 int main(void)
 {
@@ -38,8 +39,8 @@ int main(void)
         emolog_run_step(ticks); // this is where the magic happens.
         ticks++;
 
-        // not best practice, as tick time will equal 50ms + run time of loop, but it will do for this simple example
-        delay_ms(50);
+        // not best practice, as tick time will equal TICK_PERIOD_MS + run time of loop, but it will do for this simple example
+        delay_ms(TICK_PERIOD_MS);
     }
 }
 
