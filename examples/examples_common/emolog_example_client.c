@@ -12,6 +12,8 @@
 
 #include "emolog_protocol.h"
 #include "emolog_embedded.h"
+#include "emolog_debug.h"
+
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846 // pedantic
@@ -29,6 +31,8 @@ float sine = 0;
 void emolog_example_main_loop(void)
 {
     uint32_t ticks = 0;
+    debug_printf("\n--- Emolog Example Start ---\n\n");
+    emolog_init();
 
     while (1)
     {

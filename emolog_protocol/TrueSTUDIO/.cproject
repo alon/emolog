@@ -40,6 +40,10 @@
 								<option id="com.atollic.truestudio.common_options.target.fpucore.1061239707" name="FPU" superClass="com.atollic.truestudio.common_options.target.fpucore" value="com.atollic.truestudio.common_options.target.fpucore.fpv4-sp-d16" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.fpu.2035199081" name="Floating point" superClass="com.atollic.truestudio.common_options.target.fpu" value="com.atollic.truestudio.common_options.target.fpu.hard" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.interwork.1919586727" name="Mix ARM/Thumb" superClass="com.atollic.truestudio.common_options.target.interwork"/>
+								<option id="com.atollic.truestudio.gcc.symbols.defined.324972260" superClass="com.atollic.truestudio.gcc.symbols.defined" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="EMOLOG_PLATFORM_STM32"/>
+									<listOptionValue builtIn="false" value="CLIENT_DEBUG"/>
+								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.1764099674" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
 							<tool id="com.atollic.truestudio.ld.base.601514267" name="C Linker" superClass="com.atollic.truestudio.ld.base">

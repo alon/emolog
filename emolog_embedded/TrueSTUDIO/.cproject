@@ -23,7 +23,7 @@
 							<option id="com.atollic.truestudio.toolchain_options.mcu.1596939047" name="Microcontroller" superClass="com.atollic.truestudio.toolchain_options.mcu" value="STM32F302R8" valueType="string"/>
 							<option id="com.atollic.truestudio.toolchain_options.vendor.1961534750" name="Vendor name" superClass="com.atollic.truestudio.toolchain_options.vendor" value="STMicroelectronics" valueType="string"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.lib.debug.toolchain.platform.2053299817" isAbstract="false" name="Debug platform" superClass="com.atollic.truestudio.lib.debug.toolchain.platform"/>
-							<builder buildPath="${workspace_loc:/emolog_embedded}/Debug" customBuilderProperties="toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for ARM 7.1.2\\ARMTools\\bin|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|toolChainpathType=1|com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|" id="com.atollic.truestudio.mbs.builder1.214632396" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
+							<builder buildPath="${workspace_loc:/emolog_embedded}/Debug" customBuilderProperties="toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for ARM 7.1.2\\ARMTools\\bin|toolChainpathType=1|com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|" id="com.atollic.truestudio.mbs.builder1.214632396" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
 							<tool id="com.atollic.truestudio.lib.debug.toolchain.as.204282500" name="Assembler" superClass="com.atollic.truestudio.lib.debug.toolchain.as">
 								<option id="com.atollic.truestudio.common_options.target.mcpu.987404988" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32F302R8" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.endianess.900251074" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess"/>
@@ -44,7 +44,15 @@
 								<option id="com.atollic.truestudio.common_options.target.fpu.1984297837" name="Floating point" superClass="com.atollic.truestudio.common_options.target.fpu" value="com.atollic.truestudio.common_options.target.fpu.hard" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.interwork.1338900588" name="Mix ARM/Thumb" superClass="com.atollic.truestudio.common_options.target.interwork"/>
 								<option id="com.atollic.truestudio.gcc.directories.select.1934778969" name="Include path" superClass="com.atollic.truestudio.gcc.directories.select" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../../emolog_protocol/source"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/emolog_protocol/Source}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/STM32F3xx_HAL_Driver/Inc}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/CMSIS/Device/ST/STM32F3xx/Include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/CMSIS/Include}&quot;"/>
+								</option>
+								<option id="com.atollic.truestudio.gcc.symbols.defined.797819745" name="Defined symbols" superClass="com.atollic.truestudio.gcc.symbols.defined" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="EMOLOG_PLATFORM_STM32"/>
+									<listOptionValue builtIn="false" value="CLIENT_DEBUG"/>
 								</option>
 								<inputType id="com.atollic.truestudio.gcc.input.1514997660" superClass="com.atollic.truestudio.gcc.input"/>
 							</tool>
@@ -79,7 +87,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -115,7 +123,7 @@
 							<option id="com.atollic.truestudio.toolchain_options.mcu.903084125" name="Microcontroller" superClass="com.atollic.truestudio.toolchain_options.mcu" value="STM32F302R8" valueType="string"/>
 							<option id="com.atollic.truestudio.toolchain_options.vendor.474217583" name="Vendor name" superClass="com.atollic.truestudio.toolchain_options.vendor" value="STMicroelectronics" valueType="string"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.lib.release.toolchain.platform.1176567296" isAbstract="false" name="Release platform" superClass="com.atollic.truestudio.lib.release.toolchain.platform"/>
-							<builder buildPath="${workspace_loc:/emolog_embedded}/Release" customBuilderProperties="com.atollic.truestudio.common_options.target.mcu=STM32F302R8|com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|" id="com.atollic.truestudio.mbs.builder1.1333327272" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
+							<builder buildPath="${workspace_loc:/emolog_embedded}/Release" customBuilderProperties="com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|" id="com.atollic.truestudio.mbs.builder1.1333327272" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
 							<tool id="com.atollic.truestudio.lib.release.toolchain.as.18221390" name="Assembler" superClass="com.atollic.truestudio.lib.release.toolchain.as">
 								<option id="com.atollic.truestudio.common_options.target.mcpu.1164413764" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32F302R8" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.endianess.620551111" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess"/>
@@ -163,7 +171,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

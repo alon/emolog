@@ -24,3 +24,4 @@ emo*.csv
 *.pure
 local_machine_config.ini
 profile*.txt
+*.launch
