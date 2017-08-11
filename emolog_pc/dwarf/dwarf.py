@@ -17,6 +17,7 @@ from elftools.elf.elffile import ELFFile
 
 logger = logging.getLogger('dwarf')
 
+
 class FileParser:
     def __init__(self, filename):
         self.all_dies = {}
@@ -97,7 +98,8 @@ class VarDescriptor:
             return None
         assert self.parent is not None
         attr = self.var_die.attributes['DW_AT_data_member_location']
-        assert attr.form == 'DW_FORM_block1'
+        if attr.form != 'DW_FORM_block1':
+            return '(data member location uses form {} which is unsupported'.format(attr.form)
         opcode = attr.value[0]
         if opcode != DW_OP_plus_uconst:
             return '(Address Type of data member is Unsupported)'
