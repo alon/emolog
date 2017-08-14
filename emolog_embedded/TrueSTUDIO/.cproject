@@ -52,6 +52,7 @@
 								</option>
 								<option id="com.atollic.truestudio.gcc.symbols.defined.797819745" name="Defined symbols" superClass="com.atollic.truestudio.gcc.symbols.defined" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="EMOLOG_PLATFORM_STM32"/>
+									<listOptionValue builtIn="false" value="CLIENT_DEBUG"/>
 								</option>
 								<option id="com.atollic.truestudio.lib.debug.toolchain.gcc.optimization.level.1456496933" name="Optimization Level" superClass="com.atollic.truestudio.lib.debug.toolchain.gcc.optimization.level" useByScannerDiscovery="false" value="com.atollic.truestudio.gcc.optimization.level.0fast" valueType="enumerated"/>
 								<inputType id="com.atollic.truestudio.gcc.input.1514997660" superClass="com.atollic.truestudio.gcc.input"/>
