@@ -100,14 +100,19 @@ class VarDescriptor:
             return None
         assert self.parent is not None
         attr = self.var_die.attributes['DW_AT_data_member_location']
-        if attr.form != 'DW_FORM_block1':
+
+        if attr.form == 'DW_FORM_block1':
+            opcode = attr.value[0]
+            if opcode != DW_OP_plus_uconst:
+                return self.ADDRESS_TYPE_UNSUPPORTED
+            offset = attr.value[1]
+        elif attr.form in ['DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4']:
+            offset = attr.value
+        else:
             return self.ADDRESS_TYPE_UNSUPPORTED
-        opcode = attr.value[0]
-        if opcode != DW_OP_plus_uconst:
-            return self.ADDRESS_TYPE_UNSUPPORTED
-        offset = attr.value[1]
+
         if not isinstance(self.parent.address, int):
-            return 0
+            return self.ADDRESS_TYPE_UNSUPPORTED
         return self.parent.address + offset
 
     def _parse_location_attribute(self):

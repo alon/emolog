@@ -19,11 +19,18 @@
 #define M_PI 3.14159265358979323846 // pedantic
 #endif
 
+typedef struct
+{
+    int a;
+    float b;
+}MyStruct;
 
 // these are the variables we're going to sample with Emolog.
 // they are changed periodically by the code below.
 uint32_t sawtooth = 0;
 float sine = 0;
+MyStruct my_struct;
+
 
 #define TICK_PERIOD_MS     5
 
@@ -31,6 +38,9 @@ float sine = 0;
 void emolog_example_main_loop(void)
 {
     uint32_t ticks = 0;
+    my_struct.a = 42;
+    my_struct.b = M_PI;
+
     debug_printf("\n--- Emolog Example Start ---\n\n");
     emolog_init();
 
@@ -38,6 +48,8 @@ void emolog_example_main_loop(void)
     {
         sawtooth = (sawtooth + 1) % 100;
         sine = 50.0 * sin(2 * M_PI * ((float)ticks / 100.0));
+        my_struct.a++;
+        my_struct.b += 1.0F;
 
         emolog_run_step(ticks); // this is where the magic happens.
         ticks++;
