@@ -56,6 +56,16 @@ static volatile bool message_available = false;
 static unsigned char rx_buf[RX_BUF_SIZE];
 static volatile uint32_t rx_buf_pos = 0;
 
+void emolog_uart_interrupt(void);
+
+// called from the UART interrupt handler when there are incoming bytes in the RX FIFO
+void handle_uart_rx(void);
+
+// called from the UART interrupt handler when all the bytes in the tx FIFO have been transmitted
+void handle_uart_tx(void);
+
+
+
 /**
  *  Circular Transmit buffer
  */
