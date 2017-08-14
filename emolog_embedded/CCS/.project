@@ -35,6 +35,10 @@
 	</linkedResources>
 	<variableList>
 		<variable>
+			<name>EMOLOG_ROOT</name>
+			<value>$%7BPARENT-2-PROJECT_LOC%7D</value>
+		</variable>
+		<variable>
 			<name>SW_ROOT</name>
 			<value>$%7BPARENT-3-PROJECT_LOC%7D/TivaWare</value>
 		</variable>
