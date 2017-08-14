@@ -57,6 +57,9 @@ def dwarf_get_variables_by_name(filename, names):
         v_name = v.get_full_name()
         logger.debug("candidate var: {}".format(v_name))
         if v_name in names:
+            if v.address == v.ADDRESS_TYPE_UNSUPPORTED:
+                logger.error("Address type not supported for requested variable '{}'".format(v_name))
+                raise SystemExit
             sampled_vars[v_name] = v
             found.add(v_name)
     given = set(names)
