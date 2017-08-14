@@ -237,6 +237,8 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  */
 int16_t emo_decode(const uint8_t *src, uint16_t size);
 
+void crc_init(void);
+
 
 #ifdef __cplusplus
 }

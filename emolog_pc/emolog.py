@@ -3,7 +3,7 @@ Emolog is a logging protocol for debugging embedded c programs.
 
 It consists of:
     1. python high-level library (this)
-    2. c library compilable on for linux/windows hosts and TI embedded target
+    2. c library compilable both on linux/windows hosts and embedded targets
 
 Usage for real life:
     1. link c library into your program
@@ -90,6 +90,7 @@ def emolog_lib():
     build_library()
     assert os.path.exists(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
     lib = ctypes.CDLL(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
+    lib.crc_init()
     return lib
 
 
@@ -122,7 +123,7 @@ def initialize_emo_message_type_to_str():
 initialize_emo_message_type_to_str()
 
 
-header_size = 8 # TODO - check this for consistency with library (add a test)
+header_size = 8  # TODO - check this for consistency with library (add a test)
 
 
 MAGIC_VALUES = list(map(ord, 'EM'))

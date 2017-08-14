@@ -3,6 +3,7 @@
 	<name>emolog_example_client_Nucleo_F302R8</name>
 	<comment />
 	<projects>
+		<project>emolog_embedded</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

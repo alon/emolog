@@ -22,6 +22,7 @@ void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 void emolog_init(void)
 {
 	debug_printf("emolog_init\n");
+    crc_init();
 	comm_setup();
 }
 

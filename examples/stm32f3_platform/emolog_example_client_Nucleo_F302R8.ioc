@@ -40,6 +40,7 @@ NVIC.PendSV_IRQn=true\:0\:0\:false\:false\:false
 NVIC.PriorityGroup=NVIC_PRIORITYGROUP_0
 NVIC.SVCall_IRQn=true\:0\:0\:false\:false\:false
 NVIC.SysTick_IRQn=true\:0\:0\:false\:false\:true
+NVIC.USART1_IRQn=true\:0\:0\:false\:false\:false
 NVIC.UsageFault_IRQn=true\:0\:0\:false\:false\:false
 PA13.Locked=true
 PA13.Mode=Serial_Wire

@@ -93,22 +93,22 @@ class VarDescriptor:
             ret = "(No Address)"
         return ret
 
+    ADDRESS_TYPE_UNSUPPORTED = '(Address Type Unsupported)'
+
     def _parse_member_location(self):
         if not 'DW_AT_data_member_location' in self.var_die.attributes:
             return None
         assert self.parent is not None
         attr = self.var_die.attributes['DW_AT_data_member_location']
         if attr.form != 'DW_FORM_block1':
-            return '(data member location uses form {} which is unsupported'.format(attr.form)
+            return self.ADDRESS_TYPE_UNSUPPORTED
         opcode = attr.value[0]
         if opcode != DW_OP_plus_uconst:
-            return '(Address Type of data member is Unsupported)'
+            return self.ADDRESS_TYPE_UNSUPPORTED
         offset = attr.value[1]
         if not isinstance(self.parent.address, int):
             return 0
         return self.parent.address + offset
-
-    ADDRESS_TYPE_UNSUPPORTED = '(Address Type Unsupported)'
 
     def _parse_location_attribute(self):
         if 'DW_AT_location' not in self.var_die.attributes:
@@ -121,8 +121,8 @@ class VarDescriptor:
         return self.ADDRESS_TYPE_UNSUPPORTED
 
     def _parse_address_exprloc(self, loc):
-        logger.warning("this is just for testing, not used for real ELFs - faking parsing address of type exprloc")
-        return 42
+        # TODO right now only supporting exprloc of the same format as block1:
+        return self._parse_address_block1(loc)
 
     def _parse_address_block1(self, loc):
         opcode = loc.value[0]

@@ -18,31 +18,23 @@ static crc  crcTable[256];
 #define TOPBIT (1 << (WIDTH - 1))
 
 
-uint8_t*
-getCrcTable(void)
+uint8_t* getCrcTable(void)
 {
     return crcTable;
 }
 
 
-uint8_t
-get_seq(void)
+uint8_t get_seq(void)
 {
     return s_seq;
 }
 
 
-void
-crc_init(void)
+void crc_init(void)
 {
     crc  remainder;
     uint8_t bit;
-    static uint8_t crc_inited = 0;
     int dividend;
-
-    if (crc_inited != 0) {
-        return;
-    }
 
     /*
      * Compute the remainder of each possible dividend.
@@ -77,20 +69,14 @@ crc_init(void)
          */
         crcTable[dividend] = remainder;
     }
-
-    crc_inited = 1;
-
-}   /* crc_init() */
+}
 
 
-crc
-crc8(uint8_t const message[], int nBytes)
+crc crc8(uint8_t const message[], int nBytes)
 {
     uint8_t data;
     crc remainder = 0;
     int byte;
-
-    crc_init();
 
     /*
      * Divide the message by the polynomial, a byte at a time.

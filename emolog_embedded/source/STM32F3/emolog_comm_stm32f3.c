@@ -7,6 +7,7 @@
 
 #include "emolog_comm.h"
 
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -68,12 +69,16 @@ void USART1_IRQHandler(void)
     int16_t needed;
     uint16_t n;
 
+    new_char = USART1->RDR;  // must read the byte in all cases, to clear the UART.
+    if (USART1->ISR & USART_ISR_ORE){
+        USART1->ICR |= USART_ICR_ORECF;
+    }
+
     if (message_available) {
         debug_printf("EMOLOG_EMBEDDED: Unexpected bytes from PC before having processed last message\n");
         return; // not our turn
     }
 
-    new_char = USART1->RDR;
     if (rx_buf_pos >= sizeof(rx_buf)) {
         debug_printf("EMOLOG_EMBEDDED: RX Buffer Overflow! rx_buf_pos = %lu\n", rx_buf_pos);
     } else {

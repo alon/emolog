@@ -45,7 +45,6 @@
 /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/
-#define TIM1_PWM_COUNTER_PERIOD 1800
 
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
