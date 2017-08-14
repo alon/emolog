@@ -42,15 +42,6 @@ void comm_consume_message(void);
 bool comm_queue_message(const uint8_t *src, size_t len);
 
 
-void emolog_uart_interrupt(void);
-
-
-// called from the UART interrupt handler when there are incoming bytes in the RX FIFO
-void handle_uart_rx(void);
-
-// called from the UART interrupt handler when all the bytes in the tx FIFO have been transmitted
-void handle_uart_tx(void);
-
 #ifdef __cplusplus
 }
 #endif
