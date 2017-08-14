@@ -27,6 +27,14 @@ static unsigned char rx_buf[RX_BUF_SIZE];
 static volatile uint32_t rx_buf_pos = 0;
 
 
+void comm_setup(void)
+{
+    // initialize globals
+    message_available = false;
+    USART1->CR1 |= USART_CR1_RXNEIE;
+}
+
+
 bool comm_queue_message(const uint8_t *src, size_t len)
 {
     // simple blocking implementation
@@ -42,14 +50,6 @@ void comm_consume_message(void)
 {
     rx_buf_pos = 0;
     message_available = false;
-}
-
-
-void comm_setup(void)
-{
-    // initialize globals
-    message_available = false;
-    USART1->CR1 |= USART_CR1_RXNEIE;
 }
 
 
