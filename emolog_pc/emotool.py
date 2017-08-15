@@ -536,9 +536,13 @@ def version():
     if not os.path.exists(gitroot):
         return "unknown version"
     try:
+        orig_path = os.getcwd()
+        os.chdir(gitroot)
         output = subprocess.check_output("git describe --tags")
     except:
         return "unknown version"
+    finally:
+        os.chdir(orig_path)
     return output.strip().decode('utf-8')
 
 
