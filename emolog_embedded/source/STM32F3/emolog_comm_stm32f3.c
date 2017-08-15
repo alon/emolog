@@ -68,6 +68,7 @@ void USART1_IRQHandler(void)
     int32_t new_char;
     int16_t needed;
     uint16_t n;
+    // GPIOB->BSRR = 1 << 13; // DEBUG_1 UP
 
     new_char = USART1->RDR;  // must read the byte in all cases, to clear the UART.
     if (USART1->ISR & USART_ISR_ORE){
@@ -76,6 +77,7 @@ void USART1_IRQHandler(void)
 
     if (message_available) {
         debug_printf("EMOLOG_EMBEDDED: Unexpected bytes from PC before having processed last message\n");
+        // GPIOB->BSRR = 1 << 13 << 16; // DEBUG_1 DOWN
         return; // not our turn
     }
 
@@ -100,5 +102,6 @@ void USART1_IRQHandler(void)
         }
     }
     assert(needed >= 0); // missing bytes, will wait for next call to the interrupt
+    // GPIOB->BSRR = 1 << 13 << 16; // DEBUG_1 DOWN
 }
 
