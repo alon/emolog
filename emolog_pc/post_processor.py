@@ -547,7 +547,7 @@ def calc_comm_advances(data):
 def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data=False):
     if truncate_data:  # for quick debug runs
-        data = data[0:5000]
+        data = data[0:10000]
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
     wb_formats = add_workbook_formats(workbook)
@@ -958,7 +958,7 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
     parser.add_argument('input_csv', help='CSV file to parse')
-    parser.add_argument('--truncate', action="store_true", help='Only save first 5000 samples for quick debug runs.')
+    parser.add_argument('--truncate', action="store_true", help='Only save first 10000 samples for quick debug runs.')
     args = parser.parse_args()
 
     out_filename = post_process(args.input_csv, truncate_data=args.truncate)
