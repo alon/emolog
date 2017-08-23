@@ -9,6 +9,8 @@ import numpy as np
 
 import time  # for profiling
 from xlsxwriter.utility import xl_rowcol_to_cell
+import glob
+import configparser
 
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
@@ -18,7 +20,7 @@ velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 6
 default_pump_head = 8.0
 
 
-def post_process(input_csv_filename, truncate_data=False):
+def post_process(input_csv_filename, truncate_data=False, silent=False):
     start_time = time.time()
     data = pd.read_csv(input_csv_filename)
     data.columns = [clean_col_name(c) for c in data.columns]
@@ -34,7 +36,8 @@ def post_process(input_csv_filename, truncate_data=False):
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = reorder_columns(data, first_columns)
     end_time = time.time()
-    print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
+    if not silent:
+        print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
     params = process_params_snapshot(input_csv_filename)
 
@@ -46,14 +49,16 @@ def post_process(input_csv_filename, truncate_data=False):
     commutation_stats = calc_commutation_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats, data_before_cropping)
     end_time = time.time()
-    print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
+    if not silent:
+        print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
     output_filename = input_csv_filename[:-4] + '.xlsx'
     save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data)
     end_time = time.time()
-    print("save to excel time: {:.2f} seconds".format(end_time - start_time))
+    if not silent:
+        print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
 
 
@@ -954,12 +959,77 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
     for (col_num, col_name) in enumerate(headers):
         sheet.write(cur_row, col_num, col_name)
 
+CONFIG_FILE_NAME = 'local_machine_config.ini'
+
+        #  print("Configuration file {} not found. "
+        #       "This file is required for specifying local machine configuration such as the output folder."
+        #       "\nExiting.".format(CONFIG_FILE_NAME))
+        # raise SystemExit
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
-    parser.add_argument('input_csv', help='CSV file to parse')
+    parser.add_argument('input_csv', help='CSV file to parse. Wildcards are accepted. If the input is a folder, '
+                                          'all CSV files in the folder are processed. If this parameter is not '
+                                          'supplied, all CSV files in the default outputs folder are processed.', nargs='?')
     parser.add_argument('--truncate', action="store_true", help='Only save first 10000 samples for quick debug runs.')
+    parser.add_argument('--overwrite', action="store_true", help='If a matching .xlsx file exists, overwrite it.')
     args = parser.parse_args()
 
-    out_filename = post_process(args.input_csv, truncate_data=args.truncate)
-    os.startfile(out_filename)
+    if args.input_csv is None:
+        if os.path.exists(CONFIG_FILE_NAME):
+            config = configparser.ConfigParser()
+            config.read(CONFIG_FILE_NAME)
+            print("No specific input was provided - processing all unprocessed CSV files in default output folder.")
+            args.input_csv = os.path.join(config['folders']['output_folder'], '*.csv')
+        else:
+            print("No input was provided and configuration file {} is missing, I don't know what to process. Exiting.".format(CONFIG_FILE_NAME))
+            raise SystemExit
+    elif os.path.isdir(args.input_csv):
+        args.input_csv = os.path.join(args.input_csv, '*.csv')
+
+    print("Looking at: {}".format(args.input_csv))
+    files = glob.glob(args.input_csv)
+    files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
+    if len(files) == 0:
+        print('No CSV files found. Exiting.')
+        raise SystemExit
+    else:
+        print('Found {} CSV files:'.format(len(files)))
+
+    summary = {'processed': 0, 'failed': 0, 'skipped': 0}
+    for filename in files:
+        print(os.path.basename(filename) + ':  ', end='')
+        if os.path.exists(filename[:-4] + '.xlsx'):
+            if not args.overwrite:
+                print('Excel file already exists, skipping file.')
+                summary['skipped'] += 1
+            else:
+                try:
+                    post_process(filename, truncate_data=args.truncate, silent=True)
+                    print('Overwritten existing Excel file.')
+                    summary['processed'] += 1
+                except:
+                    print('Post-processing failed.')
+                    summary['failed'] += 1
+        else:
+            try:
+                post_process(filename, truncate_data=args.truncate, silent=True)
+                print('Finished post-processing.')
+                summary['processed'] += 1
+            except:
+                print('Post-processing failed.')
+                summary['failed'] += 1
+
+    print()
+    print()
+    print('Summary:')
+    print('--------')
+    print('Successfully processed: {}'.format(summary['processed']))
+    print('Failed (may be I/V logs): {}'.format(summary['failed']))
+    print('Skipped (Excel already exists): {}'.format(summary['skipped']))
+
+
+
+
+                # out_filename = post_process(args.input_csv, truncate_data=args.truncate)
+    # os.startfile(out_filename)
