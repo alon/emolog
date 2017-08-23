@@ -375,7 +375,7 @@ def parse_args():
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
     parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
     parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
-    parser.add_argument('--no_post_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
+    parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
     return parser.parse_args()
 
@@ -572,10 +572,10 @@ def main():
         print("no csv file created, exiting before post processing")
         return
     print()
-    if args.no_post_processing is False:
+    if args.no_processing is False:
         import post_processor
-        print("processing {}".format(client.csv_filename))
         print("Running post processor (this may take some time)...")
+        print("processing {}".format(client.csv_filename))
         post_processor.post_process(client.csv_filename, truncate_data=args.truncate)
         print("Post processing done.")
     else:
