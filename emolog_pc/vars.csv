@@ -1,6 +1,6 @@
 controller.state.position,1,0
 controller.state.step_time_prediction,1,0
-controller.state.comm_advance_ms,1,0
+controller.state.commutation_sensors,1,0
 controller.state.motor_state,1,0
 controller.state.required_dir,1,0
 controller.state.actual_dir,1,0
