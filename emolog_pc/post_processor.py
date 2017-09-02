@@ -630,44 +630,35 @@ def add_graphs(wb, data):
         duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
 
     x_axis = {'min_row': min_row,
-              'max_row': max_row,
+              'max_row': short_max_row,
               'col': time_col}
 
     y_axes = []
     y_axes.append({'name': 'Position',
                    'min_row': min_row,
-                   'max_row': max_row,
+                   'max_row': short_max_row,
                    'col': pos_col,
                    'secondary': False,
-                   'line': {'width': 1}
+                   'line': {'width': 1.5}
                    })
 
     y_axes.append({'name': 'Velocity',
                    'min_row': min_row,
-                   'max_row': max_row,
+                   'max_row': short_max_row,
                    'col': vel_col,
                    'secondary': True,
-                   'line': {'width': 1}
+                   'line': {'width': 1.5}
                    })
 
     if 'Estimated Velocity [m/s]' in data.columns.tolist():
         estimated_velocity_col = data.columns.tolist().index('Estimated Velocity [m/s]') + 1
         y_axes.append({'name': 'Estimated Velocity',
                        'min_row': min_row,
-                       'max_row': max_row,
+                       'max_row': short_max_row,
                        'col': estimated_velocity_col,
                        'secondary': True,
-                       'line': {'width': 1, 'color': 'orange'}
+                       'line': {'width': 1.5, 'color': 'orange'}
                        })
-
-    add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos & Vel - Full')
-
-    # short time graph
-
-    x_axis['max_row'] = short_max_row
-    for y_axis in y_axes:
-        y_axis['max_row'] = short_max_row
-        y_axis['line']['width'] = 1.5
 
     y_axes.append({'name': 'Current',
                    'min_row': min_row,
@@ -687,7 +678,7 @@ def add_graphs(wb, data):
                        'line': {'width': 1, 'color': 'purple'}
                        })
 
-    add_scatter_graph(wb, 'Data', x_axis, y_axes, 'Pos, Vel, Current - 0.5s')
+    add_scatter_graph(wb, 'Data', x_axis, y_axes, '0.5s Graph')
 
 
 def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
