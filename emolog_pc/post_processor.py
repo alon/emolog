@@ -66,6 +66,7 @@ output_col_names = \
     {
         'Step time': 'Step Time\n[ms]',
         'Velocity': 'Velocity\n[m/s]',
+        'Commutation sensors': 'Comm.\nSensors',
         'Motor state': 'Motor State',
         'Actual dir': 'Actual\nDirection',
         'Required dir': 'Required\nDirection',
@@ -82,7 +83,7 @@ output_col_names = \
 output_col_names_inv = {v: k for (k, v) in output_col_names.items()}
 
 first_columns = ['Time', 'Position', 'Step time', 'Velocity', 'Estimated Velocity [m/s]',
-                 'Motor state', 'Required dir', 'Actual dir']
+                 'Commutation sensors', 'Motor state', 'Required dir', 'Actual dir']
 
 data_col_formats = \
     {
@@ -91,6 +92,7 @@ data_col_formats = \
         'Step time': {'width': 9, 'format': 'time'},
         'Velocity': {'width': 8, 'format': 'frac'},
         'Estimated Velocity [m/s]': {'width': 12, 'format': 'frac'},
+        'Commutation sensors': {'width': 8, 'format': 'general'},
         'Step time prediction': {'width': 15, 'format': 'frac'},
         'Comm advance ms': {'width': 13, 'format': 'time'},
         'Motor state': {'width': 17, 'format': 'general'},
@@ -509,15 +511,21 @@ def calc_position_stats(data):
 
 def calc_commutation_stats(data):
     stats = calc_comm_advances(data)
-    stats['Intended Commutation Advance [ms]'] = data['Comm advance ms'][stats.index]
-    stats['Mode'] = data['Mode'][stats.index]  # TEMP?
-    stats.loc[data['Mode'][stats.index] != 'MODE_CRUISING', 'Intended Commutation Advance [ms]'] = 0.0
-    # a bit of a hack: current method of determining commutation advance gets confused by dir change (coasting)
-    stats.loc[data['Mode'][stats.index] == 'MODE_DIR_CHANGE', 'Actual Commutation Advance [ms]'] = 0.0
+    stats['Mode'] = data['Mode'][stats.index]
     stats['Position'] = data['Position'][stats.index]
-    stats['Timing Error [ms]'] = (stats['Intended Commutation Advance [ms]'] -
-                                  stats['Actual Commutation Advance [ms]'])
-    stats.loc[stats['Mode'] != 'MODE_CRUISING', 'Timing Error [ms]'] = 'N/A'
+
+    if 'Comm advance ms' in data:
+        stats['Intended Commutation Advance [ms]'] = data['Comm advance ms'][stats.index]
+        stats.loc[data['Mode'][stats.index] != 'MODE_CRUISING', 'Intended Commutation Advance [ms]'] = 0.0
+        # a bit of a hack: current method of determining commutation advance gets confused by dir change (coasting)
+        stats.loc[data['Mode'][stats.index] == 'MODE_DIR_CHANGE', 'Actual Commutation Advance [ms]'] = 0.0
+        stats['Timing Error [ms]'] = (stats['Intended Commutation Advance [ms]'] -
+                                      stats['Actual Commutation Advance [ms]'])
+        stats.loc[stats['Mode'] != 'MODE_CRUISING', 'Timing Error [ms]'] = 'N/A'
+    else:
+        stats['Intended Commutation Advance [ms]'] = 'N/A'
+        stats['Timing Error [ms]'] = 'N/A'
+
     first_cols = ['Position', 'Mode', 'Intended Commutation Advance [ms]', 'Actual Commutation Advance [ms]']
     stats = reorder_columns(stats, first_cols)
     return stats
