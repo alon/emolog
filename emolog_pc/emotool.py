@@ -576,7 +576,7 @@ def main():
         import post_processor
         print("Running post processor (this may take some time)...")
         print("processing {}".format(client.csv_filename))
-        post_processor.post_process(client.csv_filename, truncate_data=args.truncate)
+        post_processor.post_process(client.csv_filename, truncate_data=args.truncate, verbose=True)
         print("Post processing done.")
     else:
         print("No post-processing was requested, exiting.")

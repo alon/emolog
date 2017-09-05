@@ -20,8 +20,9 @@ velocity_to_lpm_scale_factor = pi * (piston_diameter_mm / 2.0) ** 2 / 1000.0 * 6
 default_pump_head = 8.0
 
 
-def post_process(input_csv_filename, truncate_data=False, silent=False):
+def post_process(input_csv_filename, truncate_data=False, verbose=False):
     start_time = time.time()
+    read_config()
     data = pd.read_csv(input_csv_filename)
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
@@ -36,7 +37,7 @@ def post_process(input_csv_filename, truncate_data=False, silent=False):
     data = data.join(calc_step_times_and_vel(data), how='left')
     data = reorder_columns(data, first_columns)
     end_time = time.time()
-    if not silent:
+    if verbose:
         print("Basic processing time: {:.2f} seconds".format(end_time - start_time))
 
     params = process_params_snapshot(input_csv_filename)
@@ -49,7 +50,7 @@ def post_process(input_csv_filename, truncate_data=False, silent=False):
     commutation_stats = calc_commutation_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats, data_before_cropping)
     end_time = time.time()
-    if not silent:
+    if verbose:
         print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
 
     start_time = time.time()
@@ -57,7 +58,7 @@ def post_process(input_csv_filename, truncate_data=False, silent=False):
     save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data)
     end_time = time.time()
-    if not silent:
+    if verbose:
         print("save to excel time: {:.2f} seconds".format(end_time - start_time))
     return output_filename
 
@@ -559,7 +560,7 @@ def calc_comm_advances(data):
 
 def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
                   commutation_stats, output_filename, truncate_data=False):
-    if truncate_data:  # for quick debug runs
+    if truncate_data:  # for faster saving of data
         data = data[0:10000]
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
     workbook = writer.book
@@ -628,23 +629,20 @@ def set_column_formats(ws, cols, wb_formats, col_name_to_format):
 def add_graphs(wb, data):
     time_col = 1
     min_row = 1
-    max_row = data.last_valid_index() + 1
-    short_max_row = 500.0 / tick_time_ms
+    max_row = 500.0 / tick_time_ms
 
     pos_col = data.columns.tolist().index('Position') + 1
     vel_col = data.columns.tolist().index('Velocity') + 1
     current_col = data.columns.tolist().index('Total i') + 1
-    if 'Duty cycle' in data.columns:
-        duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
 
     x_axis = {'min_row': min_row,
-              'max_row': short_max_row,
+              'max_row': max_row,
               'col': time_col}
 
     y_axes = []
     y_axes.append({'name': 'Position',
                    'min_row': min_row,
-                   'max_row': short_max_row,
+                   'max_row': max_row,
                    'col': pos_col,
                    'secondary': False,
                    'line': {'width': 1.5}
@@ -652,7 +650,7 @@ def add_graphs(wb, data):
 
     y_axes.append({'name': 'Velocity',
                    'min_row': min_row,
-                   'max_row': short_max_row,
+                   'max_row': max_row,
                    'col': vel_col,
                    'secondary': True,
                    'line': {'width': 1.5}
@@ -662,7 +660,7 @@ def add_graphs(wb, data):
         estimated_velocity_col = data.columns.tolist().index('Estimated Velocity [m/s]') + 1
         y_axes.append({'name': 'Estimated Velocity',
                        'min_row': min_row,
-                       'max_row': short_max_row,
+                       'max_row': max_row,
                        'col': estimated_velocity_col,
                        'secondary': True,
                        'line': {'width': 1.5, 'color': 'orange'}
@@ -670,7 +668,7 @@ def add_graphs(wb, data):
 
     y_axes.append({'name': 'Current',
                    'min_row': min_row,
-                   'max_row': short_max_row,
+                   'max_row': max_row,
                    'col': current_col,
                    'secondary': True,
                    'line': {'width': 1, 'color': '#98B954'}
@@ -680,7 +678,7 @@ def add_graphs(wb, data):
         duty_cycle_col = data.columns.tolist().index('Duty cycle') + 1
         y_axes.append({'name': 'Duty Cycle',
                        'min_row': min_row,
-                       'max_row': short_max_row,
+                       'max_row': max_row,
                        'col': duty_cycle_col,
                        'secondary': True,
                        'line': {'width': 1, 'color': 'purple'}
@@ -700,13 +698,21 @@ def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name):
             'y2_axis': y_axis['secondary'],
             'line': y_axis['line']
         })
+    # TODO: touching the config directly here breaks modularity. get these options as parameters
+    #       and let the caller worry about the config.
     chart.set_x_axis({'label_position': 'low',
-                      'min': 0,
-                      'max': x_axis['max_row'] * tick_time_ms,
+                      'min': config.getfloat('post_processor', 'graph_t_axis_min', fallback=0),
+                      'max': config.getfloat('post_processor', 'graph_t_axis_max', fallback=x_axis['max_row'] * tick_time_ms),
                       'line': {'none': True},
                       })
-    chart.set_y_axis({'major_gridlines': {'visible': False}})
-    chart.set_y2_axis({'major_gridlines': {'visible': True}})
+    chart.set_y_axis({'major_gridlines': {'visible': False},
+                      'min': config.getfloat('post_processor', 'graph_y1_axis_min', fallback=None),
+                      'max': config.getfloat('post_processor', 'graph_y1_axis_max', fallback=None),
+                      })
+    chart.set_y2_axis({'major_gridlines': {'visible': True},
+                       'min': config.getfloat('post_processor', 'graph_y2_axis_min', fallback=None),
+                       'max': config.getfloat('post_processor', 'graph_y2_axis_max', fallback=None),
+                       })
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
@@ -958,31 +964,38 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
     for (col_num, col_name) in enumerate(headers):
         sheet.write(cur_row, col_num, col_name)
 
-CONFIG_FILE_NAME = 'local_machine_config.ini'
 
-        #  print("Configuration file {} not found. "
-        #       "This file is required for specifying local machine configuration such as the output folder."
-        #       "\nExiting.".format(CONFIG_FILE_NAME))
-        # raise SystemExit
+config = None
+CONFIG_FILE_NAME = 'local_machine_config.ini'
+def read_config():
+    #  post_process() may be called either from emotool or from the command line (__name__ == __main__)
+    #  therefore, to ensure the config is read in both cases, read_config() is called from post_process()
+    #  since there may be many calls to post_process(), the mechanism to run only on first call is required.
+    global config
+    if config is not None:  # already read it before
+        return
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE_NAME):
+        config.read(CONFIG_FILE_NAME)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
     parser.add_argument('input_csv', help='CSV file to parse. Wildcards are accepted. If the input is a folder, '
                                           'all CSV files in the folder are processed. If this parameter is not '
                                           'supplied, all CSV files in the default outputs folder are processed.', nargs='?')
-    parser.add_argument('--truncate', action="store_true", help='Only save first 10000 samples for quick debug runs.')
     parser.add_argument('--overwrite', action="store_true", help='If a matching .xlsx file exists, overwrite it.')
+    parser.add_argument('--verbose', action="store_true", help='prints all processing messages for every file')
     args = parser.parse_args()
+    read_config()
 
     if args.input_csv is None:
-        if os.path.exists(CONFIG_FILE_NAME):
-            config = configparser.ConfigParser()
-            config.read(CONFIG_FILE_NAME)
-            print("No specific input was provided - processing all unprocessed CSV files in default output folder.")
-            args.input_csv = os.path.join(config['folders']['output_folder'], '*.csv')
-        else:
+        output_folder = config.get('folders', 'output_folder')
+        if output_folder is None:
             print("No input was provided and configuration file {} is missing, I don't know what to process. Exiting.".format(CONFIG_FILE_NAME))
             raise SystemExit
+        print("No specific input was provided - processing all unprocessed CSV files in default output folder.")
+        args.input_csv = os.path.join(output_folder, '*.csv')
     elif os.path.isdir(args.input_csv):
         args.input_csv = os.path.join(args.input_csv, '*.csv')
 
@@ -995,6 +1008,7 @@ if __name__ == '__main__':
     else:
         print('Found {} CSV files:'.format(len(files)))
 
+    truncate = config.getboolean('post_processor', 'truncate_data', fallback=False)
     summary = {'processed': 0, 'failed': 0, 'skipped': 0}
     for filename in files:
         print(os.path.basename(filename) + ':  ', end='')
@@ -1004,7 +1018,7 @@ if __name__ == '__main__':
                 summary['skipped'] += 1
             else:
                 try:
-                    post_process(filename, truncate_data=args.truncate, silent=True)
+                    post_process(filename, truncate_data=truncate, verbose=args.verbose)
                     print('Overwritten existing Excel file.')
                     summary['processed'] += 1
                 except:
@@ -1012,7 +1026,7 @@ if __name__ == '__main__':
                     summary['failed'] += 1
         else:
             try:
-                post_process(filename, truncate_data=args.truncate, silent=True)
+                post_process(filename, truncate_data=truncate, verbose=args.verbose)
                 print('Finished post-processing.')
                 summary['processed'] += 1
             except:
@@ -1026,9 +1040,3 @@ if __name__ == '__main__':
     print('Successfully processed: {}'.format(summary['processed']))
     print('Failed (may be I/V logs): {}'.format(summary['failed']))
     print('Skipped (Excel already exists): {}'.format(summary['skipped']))
-
-
-
-
-                # out_filename = post_process(args.input_csv, truncate_data=args.truncate)
-    # os.startfile(out_filename)
