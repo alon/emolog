@@ -253,7 +253,6 @@ class VarDescriptor:
     def _create_children(self):
         all_but_last, last = self.visit_type_chain()
         if last.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'} and last.has_children:
-            assert last.has_children
             return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member' and 'DW_AT_type' in v.attributes]
         return []
 
