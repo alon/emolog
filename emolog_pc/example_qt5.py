@@ -17,7 +17,7 @@ from datetime import datetime
 
 #from matplotlib.backends import qt_compat
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from Qt import QtGui, QtCore, QtWidgets
 
 from numpy import arange, sin, pi
 from matplotlib.backends.backend_qt5agg import FigureCanvas
@@ -33,8 +33,6 @@ class MyMplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
-        # We want the axes cleared every time plot() is called
-        self.axes.hold(False)
 
         self.compute_initial_figure()
 
@@ -57,10 +55,23 @@ class MyStaticMplCanvas(MyMplCanvas):
     def compute_initial_figure(self):
         t = arange(0.0, 3.0, 0.01)
         s = sin(2*pi*t)
+        self.axes.clear()
         self.axes.plot(t, s)
 
 
-callback = None
+class ValuesGenerator:
+    def __init__(self):
+        self.t = 0
+
+    def callback(self):
+        self.t += 0.1
+        t = self.t
+        st = sin(t)
+        st2 = st * st
+        return [4 + st, 2 + st + st2, 4 - st, 2 - st2 + st]
+
+vg = ValuesGenerator()
+callback = vg.callback
 
 class MyDynamicMplCanvas(MyMplCanvas):
     """A canvas that updates itself every second with a new plot."""
@@ -80,20 +91,19 @@ class MyDynamicMplCanvas(MyMplCanvas):
         self.axes.plot([0, 1, 2, 3], [1, 2, 0, 4], 'r')
 
     def update_figure(self):
-        global callback
         # Build a list of 4 random integers between 0 and 10 (both inclusive)
 
         self.t = (self.t + [(datetime.now() - self.start).total_seconds()])[-50:]
         new_vals = callback()
         #new_vals = [1, 1.2]
         if len(self.vals) == 0:
-            self.vals = [[x] for x in self.new_vals]
+            self.vals = [[x] for x in new_vals]
         else:
             self.vals = [(vs + [new_x])[-50:] for vs, new_x in zip(self.vals, new_vals)]
         args = sum([[self.t, l] for l in self.vals], [])
 
         self.axes.plot(*args)
-        self.axes.set_ylim([-100, 100])
+        self.axes.set_ylim([-2, 10])
         self.draw()
 
 
@@ -150,3 +160,7 @@ def main():
     aw.setWindowTitle("%s" % progname)
     aw.show()
     sys.exit(qApp.exec_())
+
+
+if __name__ == '__main__':
+    main()
