@@ -37,8 +37,8 @@ callback = vg.callback
 class MyPlotWindow(pg.PlotWidget):
     """A canvas that updates itself every second with a new plot."""
 
-    def __init__(self, parent):
-        pg.PlotWindow.__init__(self, parent=parent, title="my plot widget")
+    def __init__(self):
+        pg.PlotWidget.__init__(self, title="my plot widget")
         timer = QtCore.QTimer(self)
         self.t = []
         self.vals = []
@@ -60,17 +60,14 @@ class MyPlotWindow(pg.PlotWidget):
         self.t = (self.t + t)[-5000:]
         new_vals = callback(t)
         #new_vals = [1, 1.2]
-        if len(self.vals) == 0:
-            self.vals = [x for x in new_vals]
-        else:
-            print(f'len(self.vals) = {len(self.vals)}')
-            print(f'len(new_vals) = {len(new_vals)}')
-            cur_vals = self.vals
-            del self.vals[:]
-            for vs, new_x in zip(cur_vals, new_vals):
-                print(f'len(vs) = {len(vs)}')
-                print(f'len(new_x = {len(new_x)}')
-                self.vals.append((vs + new_x)[-5000:])
+        print(f'len(self.vals) = {len(self.vals)}')
+        print(f'len(new_vals) = {len(new_vals)}')
+        cur_vals = self.vals
+        del self.vals[:]
+        for vs, new_x in zip(cur_vals, new_vals):
+            print(f'len(vs) = {len(vs)}')
+            print(f'len(new_x = {len(new_x)}')
+            self.vals.append((vs + new_x)[-5000:])
 
     def redraw(self):
         args = sum([[self.t, l] for l in self.vals], [])
@@ -98,7 +95,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.main_widget = QtWidgets.QWidget(self)
 
         l = QtWidgets.QVBoxLayout(self.main_widget)
-        plot_widget = MyPlotWindow(self.main_widget)
+        plot_widget = MyPlotWindow()
         l.addWidget(plot_widget)
 
         self.main_widget.setFocus()
@@ -128,7 +125,6 @@ def main():
     qApp = QtWidgets.QApplication(sys.argv)
 
     aw = ApplicationWindow()
-    aw.setWindowTitle("%s" % progname)
     aw.show()
     sys.exit(qApp.exec_())
 
