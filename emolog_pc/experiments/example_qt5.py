@@ -43,40 +43,27 @@ class MyPlotWindow(pg.PlotWidget):
 
     def __init__(self):
         pg.PlotWidget.__init__(self, title="my plot widget")
-        timer = QtCore.QTimer(self)
         self.t = []
         self.vals = []
         self.start = datetime.now()
-        timer.timeout.connect(self.update_figure)
-        timer.start(200)
 
-    def update_figure(self):
+    def add_point(self, x):
         now = datetime.now()
-        dt = (now - self.start).total_seconds()
-        t0 = self.t[-1] if len(self.t) > 0 else 0
-        t = [t0 + float(i) * 200 / dt for i in range(200)]
-        self.call_callback(t)
+        t = (now - self.start).total_seconds()
+        self.t.append(t)
+        self.vals.append(x)
         self.redraw()
 
-    def call_callback(self, t):
-        # Build a list of 4 random integers between 0 and 10 (both inclusive)
-
-        self.t = (self.t + t)[-5000:]
-        new_vals = callback(t)
-        #new_vals = [1, 1.2]
-        print(f'len(self.vals) = {len(self.vals)}')
-        print(f'len(new_vals) = {len(new_vals)}')
-        cur_vals = self.vals
-        del self.vals[:]
-        for vs, new_x in zip(cur_vals, new_vals):
-            print(f'len(vs) = {len(vs)}')
-            print(f'len(new_x = {len(new_x)}')
-            self.vals.append((vs + new_x)[-5000:])
-
     def redraw(self):
-        args = sum([[self.t, l] for l in self.vals], [])
-        self.plot(*args, clear=True)
-        #self.axes.set_ylim([-2, 10])
+        if len(self.t) == 0 or len(self.vals) == 0:
+            return
+        if len(self.t) != len(self.vals):
+            print(f"error: {len(self.t)} != {len(self.vals)}")
+            return
+        print(f"drawing #{len(self.t)} elements")
+        self.plot(self.t, self.vals, clear=True)
+        #self.axes.set_ylim([min(self.vals), max(self.vals)])
+        #self.axes.set_xlim([min(self.t), max(self.t)])
 
 
 class ApplicationWindow(QtWidgets.QMainWindow):
@@ -101,11 +88,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         l = QtWidgets.QVBoxLayout(self.main_widget)
         plot_widget = MyPlotWindow()
         l.addWidget(plot_widget)
+        self.plot_widget = plot_widget
 
         self.main_widget.setFocus()
         self.setCentralWidget(self.main_widget)
 
         self.statusBar().showMessage("All hail streamplot!", 2000)
+
+    def add_point(self, x):
+        self.plot_widget.add_point(x)
 
     def fileQuit(self):
         self.close()
@@ -136,22 +127,27 @@ class MyClient(asyncio.Protocol):
 
     def data_received(self, data):
         print("got data; {}".format(repr(data)))
+        self.aw.add_point(len(data))
 
 
-async def amain(app, loop):
+async def amain(app, loop, aw):
     client = MyClient()
     port = 9988
     print("connecting to localhost:{}".format(port))
-    await loop.create_connection(lambda: client, '127.0.0.1', port)
+    def create_client():
+        client = MyClient()
+        client.aw = aw
+        return client
+    await loop.create_connection(create_client, '127.0.0.1', port)
 
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(amain(app, loop))
     aw = ApplicationWindow()
     aw.show()
+    loop.run_until_complete(amain(app, loop, aw))
     loop.run_forever()
     #sys.exit(qApp.exec_())
 
