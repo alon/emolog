@@ -14,7 +14,11 @@ import sys
 import os
 from datetime import datetime
 
+import asyncio
+
 from Qt import QtGui, QtCore, QtWidgets
+from Qt.QtWidgets import QApplication, QProgressBar
+from quamash import QEventLoop, QThreadExecutor
 
 from numpy import sin
 import pyqtgraph as pg
@@ -121,12 +125,35 @@ It may be used and modified with no restriction; raw copies as well as
 modified versions may be distributed without limitation."""
                                 )
 
-def main():
-    qApp = QtWidgets.QApplication(sys.argv)
 
+class MyClient(asyncio.Protocol):
+    def connection_lost(self, exc):
+        print("connection lost")
+
+    def connection_made(self, transport):
+        self.transport = transport
+        print("connection made")
+
+    def data_received(self, data):
+        print("got data; {}".format(repr(data)))
+
+
+async def amain(app, loop):
+    client = MyClient()
+    port = 9988
+    print("connecting to localhost:{}".format(port))
+    await loop.create_connection(lambda: client, '127.0.0.1', port)
+
+
+def main():
+    app = QtWidgets.QApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(amain(app, loop))
     aw = ApplicationWindow()
     aw.show()
-    sys.exit(qApp.exec_())
+    loop.run_forever()
+    #sys.exit(qApp.exec_())
 
 
 if __name__ == '__main__':
