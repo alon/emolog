@@ -355,7 +355,7 @@ def parse_args():
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
     parser.add_argument('--elf', default=None, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
-                        help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
+                        help='add a single var, example "foo,1,0" = "varname,ticks,tickphase"')
     parser.add_argument('--snapshotfile', help='file containing variable definitions to be taken once at startup')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
     group = parser.add_mutually_exclusive_group()
@@ -407,7 +407,7 @@ def read_elf_variables(vars, varfile):
     for v, orig in zip(split_vars, args.var):  # TODO: bug - args.var isn't usually relevant
         if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
             logger.error("problem with '--var' argument {!r}".format(orig))
-            logger.error("--var parameter must be a 4 element comma separated list of: <name>,<period:int>,<phase:int>")
+            logger.error("--var parameter must be a 3 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
