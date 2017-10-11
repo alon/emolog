@@ -25,3 +25,5 @@ emo*.csv
 local_machine_config.ini
 profile*.txt
 *.launch
+.ropeproject
+driverlib
