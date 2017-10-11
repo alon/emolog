@@ -480,14 +480,14 @@ async def record_snapshot(client, csvfile, varsfile):
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 
 async def amain():
-    if os.path.exists(CONFIG_FILE_NAME):
-        config = configparser.ConfigParser()
-        config.read(CONFIG_FILE_NAME)
-    else:
+    if not os.path.exists(CONFIG_FILE_NAME):
         print("Configuration file {} not found. "
               "This file is required for specifying local machine configuration such as the output folder."
               "\nExiting.".format(CONFIG_FILE_NAME))
         raise SystemExit
+
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE_NAME)
 
     setup_logging(args.log, args.silent)
 
