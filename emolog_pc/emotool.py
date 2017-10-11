@@ -353,7 +353,7 @@ def parse_args():
     parser.add_argument('--serial', default='auto', help='serial port to use')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
-    parser.add_argument('--elf', default=None, required=True, help='elf executable running on embedded side')
+    parser.add_argument('--elf', default=None, help='elf executable running on embedded side')
     parser.add_argument('--var', default=[], action='append',
                         help='add a single var, example "foo,float,1,0" = "varname,vartype,ticks,tickphase"')
     parser.add_argument('--snapshotfile', help='file containing variable definitions to be taken once at startup')
@@ -377,7 +377,15 @@ def parse_args():
     parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
     parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
-    return parser.parse_args()
+    ret = parser.parse_args()
+
+    if not ret.fake_sine:
+        if not ret.elf:
+            # elf required unless fake_sine in effect
+            parser.print_usage()
+            print(f"{sys.argv[0]}: error: the following missing argument is required: --elf")
+            raise SystemExit
+    return ret
 
 
 def bandwidth_calc(variables):
