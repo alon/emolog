@@ -289,7 +289,7 @@ def start_serial_process(serial, baudrate, hw_flow_control, port):
 async def start_transport(client):
     global serial_process
     loop = asyncio.get_event_loop()
-    if args.fake_sine:
+    if args.fake:
         client_end = await start_fake_sine()
         client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
         return
@@ -348,8 +348,8 @@ async def cleanup(client):
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
-    parser.add_argument('--fake-sine', default=False, action='store_true',
-                        help='debug only - use a fake sine producing client')
+    parser.add_argument('--fake', default=False, action='store_true',
+                        help='debug only - fake a client - no serial nor elf required')
     parser.add_argument('--serial', default='auto', help='serial port to use')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
@@ -375,16 +375,23 @@ def parse_args():
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
     parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
     parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
+    parser.add_argument('--no-processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
     parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
     ret = parser.parse_args()
 
-    if not ret.fake_sine:
+    if not ret.fake:
         if not ret.elf:
             # elf required unless fake_sine in effect
             parser.print_usage()
             print(f"{sys.argv[0]}: error: the following missing argument is required: --elf")
             raise SystemExit
+    else:
+        # fill in fake vars
+        ret.var = [
+            # name, ticks, phase
+            'fake,1,0'
+        ]
     return ret
 
 
@@ -399,6 +406,35 @@ def bandwidth_calc(variables):
     return (header_average + payload_average) * 10
 
 
+class DwarfFakeVariable:
+    type_data = {float: dict(type_str='float', size=4)}
+
+    next_address = 0
+
+    @classmethod
+    def allocate(cls, size):
+        ret = cls.next_address
+        cls.next_address += size
+        return ret
+
+    def __init__(self, name, type):
+        self.type = type
+        self.type_str = self.type_data[type]['type_str']
+        self.name = name
+        size = self.type_data[type]['size']
+        self.address = DwarfFakeVariable.allocate(size)
+        self.size = size
+
+    def get_type_str(self):
+        return self.type_str
+
+
+def fake_dwarf(names):
+    def fake_variable(name):
+        return DwarfFakeVariable(name, type=float)
+    return {name: fake_variable(name) for name in names}
+
+
 def read_elf_variables(vars, varfile):
     if varfile is not None:
         with open(varfile) as fd:
@@ -411,7 +447,10 @@ def read_elf_variables(vars, varfile):
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    dwarf_variables = dwarf_get_variables_by_name(args.elf, names)  # TODO does this really have to access args?
+    if args.elf is None:
+        dwarf_variables = fake_dwarf(names)
+    else:
+        dwarf_variables = dwarf_get_variables_by_name(args.elf, names)  # TODO does this really have to access args?
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
