@@ -17,7 +17,7 @@ import struct
 import sys
 from socket import socketpair
 import subprocess
-from time import sleep, clock  # more accurate on windows, vs time.time on linux
+from time import sleep, time
 from functools import reduce
 
 import emolog
@@ -152,13 +152,13 @@ class EmoToolClient(emolog.Client):
         self.initialize_file()
         # TODO - decode variables (integer/float) in emolog VariableSampler
         vs = msg.variables
-        self.csv.writerow([msg.seq, msg.ticks, clock() * 1000] +
+        self.csv.writerow([msg.seq, msg.ticks, time() * 1000] +
                           [vs[name] if name in vs else '' for name in self.names])
         self.fd.flush()
         self.samples_received += 1
         if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
             print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
-                clock(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
+                time(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
             self.ticks_lost += msg.ticks - self.last_ticks - self.min_ticks
         self.last_ticks = msg.ticks
         if self.first_ticks is None:
@@ -575,7 +575,7 @@ async def amain():
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
     await run_client(client=client, variables=variables, allow_kb_stop=True)
 
-    logger.debug("stopped at clock={} ticks={}".format(clock(), client.total_ticks))
+    logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
 
