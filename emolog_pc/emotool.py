@@ -22,6 +22,7 @@ from functools import reduce
 
 import emolog
 from dwarf import FileParser
+from util import version
 
 logger = logging.getLogger()
 
@@ -578,19 +579,6 @@ async def amain():
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
 
-def version():
-    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '.git'))
-    if not os.path.exists(gitroot):
-        return "unknown version"
-    try:
-        orig_path = os.getcwd()
-        os.chdir(gitroot)
-        output = subprocess.check_output("git describe --tags".split()).strip()
-    except:
-        return "unknown version"
-    finally:
-        os.chdir(orig_path)
-    return output.strip().decode('utf-8')
 
 
 def main():

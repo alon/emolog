@@ -1,4 +1,6 @@
+import subprocess
 import os
+
 
 def which(filename):
     path = os.environ.get('PATH', '.').split(os.pathsep)
@@ -7,3 +9,22 @@ def which(filename):
             return os.path.join(d, filename)
     return None
 
+
+def version():
+    """
+    get git defined version. later: return version of program encoded in a install
+    produced variable.
+    :return:
+    """
+    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '.git'))
+    if not os.path.exists(gitroot):
+        return "unknown version"
+    try:
+        orig_path = os.getcwd()
+        os.chdir(gitroot)
+        output = subprocess.check_output("git describe --tags".split()).strip()
+    except:
+        return "unknown version"
+    finally:
+        os.chdir(orig_path)
+    return output.strip().decode('utf-8')
