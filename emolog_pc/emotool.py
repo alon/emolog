@@ -22,8 +22,7 @@ from functools import reduce
 
 import emolog
 from dwarf import FileParser
-from util import version, coalesce_meth
-import main_window
+from util import version
 
 logger = logging.getLogger()
 
@@ -98,7 +97,7 @@ class EmoToolClient(emolog.Client):
 
     instance = None
 
-    def __init__(self, verbose, dump, window):
+    def __init__(self, verbose, dump):
         if EmoToolClient.instance is not None:
             raise Exception("EmoToolClient is a singleton, can't create another instance")
         super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
@@ -113,7 +112,6 @@ class EmoToolClient(emolog.Client):
         self.max_ticks = None
         self._running = False
         self.fd = None
-        self.window = window
         EmoToolClient.instance = self  # for singleton
 
     def reset(self, csv_filename, names, min_ticks, max_ticks):
@@ -157,7 +155,6 @@ class EmoToolClient(emolog.Client):
         self.csv.writerow([msg.seq, msg.ticks, time() * 1000] +
                           [vs[name] if name in vs else '' for name in self.names])
         self.fd.flush()
-        self.plot(msg)
         self.samples_received += 1
         if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
             print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
@@ -168,17 +165,6 @@ class EmoToolClient(emolog.Client):
             self.first_ticks = self.last_ticks
         if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
             self.stop()
-
-    def plot(self, msg):
-        if not self.window:
-            return
-        self.do_plot(msg)
-
-    @coalesce_meth(hertz=10) # Limit refreshes, they can be costly
-    def do_plot(self, msgs):
-        ticks = [msg.ticks for msg in msgs]
-        vars = [[(k, v) for k, v in msg.variables.items()] for msg in msgs]
-        self.window.log_variables(ticks=ticks, vars=vars)
 
 
 def iterate(prefix, initial):
@@ -393,11 +379,6 @@ def parse_args():
     parser.add_argument('--no-processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
     parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
-    # GUI
-    parser.add_argument('--no-gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
-    parser.add_argument('--no_gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
-    parser.add_argument('--wait-for-gui', default=False, action='store_true', help='wait for user closing the main window before quitting')
-
     ret = parser.parse_args()
 
     if not ret.fake:
@@ -514,8 +495,8 @@ def banner(s):
     print("=" * len(s))
 
 
-async def init_client(verbose, dump, window):
-    client = EmoToolClient(verbose=verbose, dump=dump, window=window)
+async def init_client(verbose, dump):
+    client = EmoToolClient(verbose=verbose, dump=dump)
     await start_transport(client=client)
     return client
 
@@ -546,7 +527,7 @@ async def record_snapshot(client, csvfile, varsfile):
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 
-async def amain(window):
+async def amain():
     if not os.path.exists(CONFIG_FILE_NAME):
         print("Configuration file {} not found. "
               "This file is required for specifying local machine configuration such as the output folder."
@@ -558,7 +539,6 @@ async def amain(window):
 
     setup_logging(args.log, args.silent)
 
-    # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
     names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
@@ -571,7 +551,7 @@ async def amain(window):
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(output_folder, args.out_prefix)
 
-    client = await init_client(verbose=not args.silent, dump=args.dump, window=window)
+    client = await init_client(verbose=not args.silent, dump=args.dump)
     logger.info('Client initialized')
 
     if args.snapshotfile:
@@ -599,16 +579,17 @@ async def amain(window):
     print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
 
 
-def start_gui(args):
-    main_window.run_forever(start_gui_callback, create_main_window=args.gui)
 
 
-def start_gui_callback(loop, window):
+def main():
     global args
+    args = parse_args()
+
+    loop = asyncio.get_event_loop()
     loop.set_debug(args.debug)
 
     def call_main():
-        loop.run_until_complete(amain(window))
+        loop.run_until_complete(amain())
 
     if args.profile:
         import cProfile as profile
@@ -622,15 +603,6 @@ def start_gui_callback(loop, window):
             logger.error("got exception {!r}".format(e))
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
-    if args.wait_for_gui:
-        async def sleep_forever():
-            while True:
-                await asyncio.sleep(1000)
-        loop.run_until_complete(sleep_forever())
-    return client
-
-
-def post_process(args, client):
     if client.csv_filename is None or not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
@@ -643,13 +615,6 @@ def post_process(args, client):
         print("Post processing done.")
     else:
         print("No post-processing was requested, exiting.")
-
-
-def main():
-    global args # TODO - remove this global, pass explicitly
-    args = parse_args()
-    client = start_gui(args)
-    post_process(args, client)
 
 
 if __name__ == '__main__':
