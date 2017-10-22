@@ -611,14 +611,17 @@ async def amain(window):
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
+    start_time = time()
     await run_client(client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
-    print("samples received: {}\nticks lost: {}".format(client.samples_received, client.ticks_lost))
+    total_time = time() - start_time
+    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time}")
+    return client
 
 
 def start_gui(args):
-    main_window.run_forever(start_gui_callback, create_main_window=args.gui)
+    return main_window.run_forever(start_gui_callback, create_main_window=args.gui)
 
 
 def start_gui_callback(loop, window):
