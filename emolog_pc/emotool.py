@@ -15,7 +15,7 @@ import random
 import string
 import struct
 import sys
-from socket import socketpair
+import socket
 import subprocess
 from time import sleep, time
 from functools import reduce
@@ -83,11 +83,10 @@ def dwarf_get_variables_by_name(filename, names):
     return sampled_vars
 
 
-async def start_fake_sine():
-    loop = asyncio.get_event_loop()
-    rsock, wsock = socketpair()
-    await loop.create_connection(emolog.FakeSineEmbedded, sock=rsock)
-    return wsock
+async def start_fake_sine(port):
+    # Run in a separate process so it doesn't hog the CPython lock
+    cmdline = create_python_process_cmdline('embedded.py')
+    create_process(cmdline + [str(port)])
 
 
 class EmoToolClient(emolog.Client):
@@ -289,33 +288,52 @@ def start_serial_process(serial, baudrate, hw_flow_control, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
-    emolog_pc_path = os.path.dirname(os.path.realpath(__file__))
-    serial2tcp_path = os.path.join(emolog_pc_path, 'serial2tcp.py')
-    serial2tcp_cmd = ['python', serial2tcp_path]
+    serial2tcp_cmd = create_python_process_cmdline('serial2tcp.py')
     if hw_flow_control is True:
         serial2tcp_cmd += ['-r']
     serial2tcp_cmd += ' -b {} -p {} -P {}'.format(baudrate, serial, port).split()
 
-    serial_subprocess = subprocess.Popen(serial2tcp_cmd)
-    sleep(0.1)
+    serial_subprocess = create_process(serial2tcp_cmd)
     return serial_subprocess
 
 
+def create_python_process_cmdline(script):
+    emolog_pc_path = os.path.dirname(os.path.realpath(__file__))
+    script_path = os.path.join(emolog_pc_path, script)
+    return ['python', script_path]
+
+
 async def start_transport(client):
-    global serial_process
     loop = asyncio.get_event_loop()
-    if args.fake:
-        client_end = await start_fake_sine()
-        client_transport, client = await loop.create_connection(lambda: client, sock=client_end)
-        return
     port = random.randint(10000, 50000)
-    serial_process = start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
+    if args.fake:
+        await start_fake_sine(port)
+    else:
+        start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
+    attempt = 0
+    while attempt < 10:
+        attempt += 1
+        sleep(0.1)
+        s = socket.socket()
+        try:
+            s.connect(('127.0.0.1', port))
+        except:
+            pass
+        else:
+            s.close()
+            break
     client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', port)
     assert client2 is client
 
 
 args = None
-serial_process = None
+processes = []
+
+def create_process(cmdline):
+    print(f"starting subprocess: {cmdline}")
+    process = subprocess.Popen(cmdline)
+    processes.append(process)
+    return process
 
 
 def cancel_outstanding_tasks():
@@ -353,11 +371,11 @@ async def cleanup(client):
     client.exit_gracefully()
     if client.transport is not None:
         client.transport.close()
-    if serial_process is not None:
-        if hasattr(serial_process, 'send_ctrl_c'):
-            serial_process.send_ctrl_c()
+    for process in processes:
+        if hasattr(process, 'send_ctrl_c'):
+            process.send_ctrl_c()
         else:
-            serial_process.terminate()
+            process.terminate()
 
 
 def parse_args():
