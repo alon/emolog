@@ -843,7 +843,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         if not self.running:
             return
         self.ticks += 1
-        t = time() - self.start_time
+        t = self.ticks * self.TICK_TIME
         var_size_pairs = []
         for sine in self.sines:
             if self.ticks % sine.period_ticks == sine.phase_ticks:
@@ -851,7 +851,8 @@ class FakeSineEmbedded(asyncio.Protocol):
         # We could use the gcd to find the minimal tick size but this is good enough
         if len(var_size_pairs) > 0:
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
-        self.eventloop.call_later(self.TICK_TIME, self.handle_time_event)
+        dt = max(0.0, self.TICK_TIME * self.ticks + self.start_time - time())
+        self.eventloop.call_later(dt, self.handle_time_event)
 
 
 def ctypes_mem_from_size_and_val(val, size):
