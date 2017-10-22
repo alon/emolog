@@ -148,6 +148,9 @@ class Message(metaclass=ABCMeta):
         s = self.buf[:self.encode_inner()]
         return s
 
+    def handle_by(self, handler):
+        logger.debug(f"ignoring a {self}")
+
     def __str__(self):
         return '<{}>'.format(emo_message_type_to_str[self.type])
 
@@ -163,6 +166,10 @@ class Version(Message):
 
     def encode_inner(self):
         return lib.emo_encode_version(self.buf)
+
+    def handle_by(self, handler):
+        logger.debug(f"Got Version: {self.version}")
+        handler.set_future_result(handler.ack, True)
 
 
 class Ping(Message):
@@ -180,6 +187,11 @@ class Ack(Message):
 
     def encode_inner(self):
         return lib.emo_encode_ack(self.buf, self.reply_to_seq, self.error)
+
+    def handle_by(self, handler):
+        if self.error != 0:
+            logger.error(f"embedded responded to {self.reply_to_seq} with ERROR: {self.error}")
+        handler.set_future_result(handler.ack, True)
 
     def __str__(self):
         # TODO - string for error
@@ -255,6 +267,15 @@ class SamplerSample(Message):
             p = ctypes_mem_from_size_and_val(var, size)
             lib.emo_encode_sampler_sample_add_var(self.buf, ctypes.byref(p), size)
         return lib.emo_encode_sampler_sample_end(self.buf, self.ticks)
+
+    def handle_by(self, handler):
+        if handler.sampler.running:
+            self.update_with_sampler(handler.sampler)
+            handler.received_samples += 1
+            logger.debug(f"Got Sample: {self}")
+            handler.handle_sampler_sample(self)
+        else:
+            logger.debug("ignoring sample since PC sampler is not primed")
 
     def update_with_sampler(self, sampler):
         self.variables = sampler.variables_from_ticks_and_payload(ticks=self.ticks, payload=self.payload)
@@ -654,26 +675,7 @@ class Client(asyncio.Protocol):
         if self.dump:
             self.dump_buf(data)
         for msg in self.parser.iter_available_messages(data):
-            self.handle_message(msg)
-
-    def handle_message(self, msg):
-        if isinstance(msg, Version):
-            logger.debug("Got Version: {}".format(msg.version))
-            self.set_future_result(self.ack, True)
-        elif isinstance(msg, SamplerSample):
-            if self.sampler.running:
-                msg.update_with_sampler(self.sampler)
-                self.received_samples += 1
-                logger.debug("Got Sample: {}".format(msg))
-                self.handle_sampler_sample(msg)
-            else:
-                logger.debug("ignoring sample since PC sampler is not primed")
-        elif isinstance(msg, Ack):
-            if msg.error != 0:
-                logger.error("embedded responded to {} with ERROR: {}".format(msg.reply_to_seq, msg.error))
-            self.set_future_result(self.ack, True)
-        else:
-            logger.debug("ignoring a {}".format(msg))
+            msg.handle_by(self)
 
     def handle_sampler_sample(self, msg):
         """
