@@ -8,7 +8,7 @@ It consists of:
 Usage for real life:
     1. link c library into your program
     2. call init
-    3. select a serial channel for transport,
+    3. select a serial channel for transport
     4. call handler on arriving data
     5. implement sending of response messages
 
