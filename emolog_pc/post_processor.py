@@ -24,6 +24,11 @@ def post_process(input_csv_filename, truncate_data=False, verbose=False):
     start_time = time.time()
     read_config()
     data = pd.read_csv(input_csv_filename)
+    # check for required keys for post processing
+    for k in ['Power In [W]', 'Dc bus v', 'Total i']:
+        if k not in data:
+            print(f"cannot run post processing, missing key {k!r}")
+            return
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
