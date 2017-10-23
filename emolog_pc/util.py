@@ -4,6 +4,12 @@ from time import time
 from functools import wraps
 
 
+# for kernprof
+import builtins
+if 'profile' not in builtins.__dict__:
+    builtins.__dict__['profile'] = lambda x: x
+
+
 def which(filename):
     path = os.environ.get('PATH', '.').split(os.pathsep)
     for d in path:

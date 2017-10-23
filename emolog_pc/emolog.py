@@ -36,6 +36,13 @@ import logging
 
 from util import which
 
+import builtins # profile will be here when run via kernprof
+
+if 'profile' not in builtins.__dict__:
+    def nop_decorator(f):
+        return f
+    builtins.__dict__['profile'] = nop_decorator
+
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            'decode_emo_header_unsafe',
            'encode_version',
