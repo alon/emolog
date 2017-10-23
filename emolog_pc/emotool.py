@@ -576,8 +576,9 @@ CONFIG_FILE_NAME = 'local_machine_config.ini'
 async def amain(window):
     if not os.path.exists(CONFIG_FILE_NAME):
         print("Configuration file {} not found. "
-              "This file is required for specifying local machine configuration such as the output folder."
-              "\nExiting.".format(CONFIG_FILE_NAME))
+              "This file is required for specifying local machine configuration such as the output folder.\n"
+              "Please start from the example {}.example.\n"
+              "Exiting.".format(CONFIG_FILE_NAME, CONFIG_FILE_NAME))
         raise SystemExit
 
     config = configparser.ConfigParser()
