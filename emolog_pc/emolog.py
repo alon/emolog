@@ -803,7 +803,7 @@ class FakeSineEmbedded(asyncio.Protocol):
     """
 
     VERSION = 1
-    TICK_TIME = 0.00001 # 10kHz - enough for testing I hope.
+    TICK_TIME = 0.00005 # 20kHz - this is out target
 
     # we ignore address, and size is used to return the same size as requested
     Sine = namedtuple('Sine', [
