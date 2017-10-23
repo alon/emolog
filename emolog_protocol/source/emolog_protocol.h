@@ -28,6 +28,19 @@ extern "C" {
 // protocol version - ever increasing
 #define EMOLOG_PROTOCOL_VERSION 1
 
+#ifdef BUILD_DLL
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT
+#endif
+
+
+#ifdef GCC
+#define PACKED __attribute__((packed))
+#else
+#define PACKED
+#endif
+
 
 #pragma pack(1) // mingw version-sheker doesn't honor __attribute__((packed))
 
@@ -38,7 +51,7 @@ typedef struct emo_header {
     uint8_t  seq;         // used to tell ack/nacks targets
     uint8_t  payload_crc; // CRC8 of the payload only
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
-} __attribute__((packed)) emo_header;
+}  emo_header;
 
 
 #define EMO_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
@@ -53,7 +66,7 @@ typedef enum {
 typedef struct emo_ ## payload_name {    \
     emo_header h;                   \
     emo_ ## payload_name ## _payload p;             \
-} __attribute__((packed)) emo_ ## payload_name;
+}  emo_ ## payload_name;
 
 
 /** version */
@@ -63,7 +76,7 @@ typedef struct emo_version_payload {
     uint16_t   protocol_version;
     uint8_t    reply_to_seq; // -1 if initiating, seq of replied to message if responding
     uint8_t    reserved;
-} __attribute__((packed)) emo_version_payload;
+}  emo_version_payload;
 
 MAKE_STRUCT(version)
 
@@ -72,7 +85,7 @@ MAKE_STRUCT(version)
 
 
 typedef struct emo_ping_payload {
-} __attribute__((packed)) emo_ping_payload;
+}  emo_ping_payload;
 
 MAKE_STRUCT(ping)
 
@@ -88,7 +101,7 @@ MAKE_STRUCT(ping)
 typedef struct emo_ack_payload {
     uint16_t error;
     uint8_t  reply_to_seq;
-} __attribute__((packed)) emo_ack_payload;
+}  emo_ack_payload;
 
 MAKE_STRUCT(ack);
 
@@ -104,25 +117,25 @@ typedef struct emo_sampler_register_variable_payload {
     uint32_t address;
     uint16_t size;
     uint16_t reserved;
-} __attribute__((packed)) emo_sampler_register_variable_payload;
+}  emo_sampler_register_variable_payload;
 
 MAKE_STRUCT(sampler_register_variable)
 
 
 typedef struct emo_sampler_clear_payload {
-} __attribute__((packed)) emo_sampler_clear_payload;
+}  emo_sampler_clear_payload;
 
 MAKE_STRUCT(sampler_clear)
 
 
 typedef struct emo_sampler_start_payload {
-} __attribute__((packed)) emo_sampler_start_payload;
+}  emo_sampler_start_payload;
 
 MAKE_STRUCT(sampler_start)
 
 
 typedef struct emo_sampler_stop_payload {
-} __attribute__((packed)) emo_sampler_stop_payload;
+}  emo_sampler_stop_payload;
 
 MAKE_STRUCT(sampler_stop)
 
@@ -132,7 +145,7 @@ typedef struct emo_sampler_sample_payload {
     // here come the variables themselves.
     // host sees the ticks, calculates which variables are contained (see XXX)
     // and then can parse the variables (length is known from header as well as additional redundant information)
-} __attribute__((packed)) emo_sampler_sample_payload;
+}  emo_sampler_sample_payload;
 
 MAKE_STRUCT(sampler_sample)
 
@@ -146,19 +159,19 @@ MAKE_STRUCT(sampler_sample)
  * reply_to_seq: -1 if not replying, otherwise the sequence number
  * of the version message being replied to.
  */
-uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq);
+EXPORT uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq);
 
 
 /*
  * The simplest message that the sending of requires an ack.
  */
-uint16_t emo_encode_ping(uint8_t *dest);
+EXPORT uint16_t emo_encode_ping(uint8_t *dest);
 
 
 /*
  * ack.
  */
-uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error);
+EXPORT uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error);
 
 
 typedef enum {
@@ -175,15 +188,15 @@ typedef enum {
 /**
  *
  */
-uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
+EXPORT uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
         uint32_t period_ticks, uint32_t address, uint16_t size);
 
 /*
  * All three (clear, start, stop) are sent by the Host, and the Embedded must ack
  */
-uint16_t emo_encode_sampler_clear(uint8_t *dest);
-uint16_t emo_encode_sampler_start(uint8_t *dest);
-uint16_t emo_encode_sampler_stop(uint8_t *dest);
+EXPORT uint16_t emo_encode_sampler_clear(uint8_t *dest);
+EXPORT uint16_t emo_encode_sampler_start(uint8_t *dest);
+EXPORT uint16_t emo_encode_sampler_stop(uint8_t *dest);
 
 /*
  * encoding a sample uses three separate function calls:
@@ -193,9 +206,9 @@ uint16_t emo_encode_sampler_stop(uint8_t *dest);
  *
  * Sent by the Embedded, Host does not reply
  */
-void emo_encode_sampler_sample_start(uint8_t *dest);
-void emo_encode_sampler_sample_add_var(uint8_t *dest, const uint8_t *p, uint16_t size);
-uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
+EXPORT void emo_encode_sampler_sample_start(uint8_t *dest);
+EXPORT void emo_encode_sampler_sample_add_var(uint8_t *dest, const uint8_t *p, uint16_t size);
+EXPORT uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
 
 
 /**
@@ -235,9 +248,11 @@ uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
  *  ...
  * }
  */
-int16_t emo_decode(const uint8_t *src, uint16_t size);
+EXPORT int16_t emo_decode(const uint8_t *src, uint16_t size);
 
-void crc_init(void);
+EXPORT int16_t emo_decode_with_offset(const uint8_t *src, unsigned offset, uint16_t size);
+
+EXPORT void crc_init(void);
 
 
 #ifdef __cplusplus

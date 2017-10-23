@@ -139,11 +139,11 @@ uint16_t emo_encode_version(uint8_t *dest, uint8_t reply_to_seq)
 uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_ticks,
         uint32_t period_ticks, uint32_t address, uint16_t size)
 {
-    emo_sampler_register_variable_payload payload = {
-            .phase_ticks=phase_ticks,
-            .period_ticks=period_ticks,
-            .address=address,
-            .size=size};
+	emo_sampler_register_variable_payload payload;
+	payload.phase_ticks = phase_ticks;
+	payload.period_ticks = period_ticks;
+	payload.address = address;
+	payload.size = size;
 
     write_message(dest, EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_sampler_register_variable);
@@ -167,7 +167,9 @@ EMPTY_MESSAGE_ENCODER(ping, EMO_MESSAGE_TYPE_PING)
 
 uint16_t emo_encode_ack(uint8_t *dest, uint8_t reply_to_seq, uint16_t error)
 {
-    emo_ack_payload payload = { .error = error, .reply_to_seq = reply_to_seq };
+	emo_ack_payload payload;
+	payload.error = error;
+	payload.reply_to_seq = reply_to_seq;
 
     write_message(dest, EMO_MESSAGE_TYPE_ACK, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_ack);
