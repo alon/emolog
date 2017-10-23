@@ -45,7 +45,8 @@ def coalesce_meth(hertz):
         def wrapper(self, msg):
             msgs.append(msg)
             cur_time = time()
-            if last_time[0] is None or cur_time - last_time[0] >= dt:
+            lt = last_time[0]
+            if lt is None or cur_time - lt >= dt:
                 last_time[0] = cur_time
             else:
                 return

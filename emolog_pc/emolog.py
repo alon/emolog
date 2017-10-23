@@ -37,7 +37,7 @@ import logging
 from util import which
 
 __all__ = ['EMO_MESSAGE_TYPE_VERSION',
-           'decode_emo_header',
+           'decode_emo_header_unsafe',
            'encode_version',
            'write_version',
            'Client',
@@ -55,7 +55,7 @@ __all__ = ['EMO_MESSAGE_TYPE_VERSION',
            ]
 
 
-endianess = '<'
+ENDIANESS = '<'
 
 
 logger = logging.getLogger('emolog')
@@ -123,10 +123,10 @@ def initialize_emo_message_type_to_str():
 initialize_emo_message_type_to_str()
 
 
-header_size = 8  # TODO - check this for consistency with library (add a test)
+HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
 
 
-MAGIC_VALUES = list(map(ord, 'EM'))
+MAGIC = struct.unpack(ENDIANESS + 'H', b'EM')[0]
 
 ### Messages
 
@@ -250,11 +250,16 @@ class SamplerSample(Message):
         """
         if var_size_pairs is None:
             var_size_pairs = []
-        super(SamplerSample, self).__init__(seq=seq)
+        super().__init__(seq=seq)
         self.ticks = ticks
         self.payload = payload
         self.var_size_pairs = var_size_pairs
         self.variables = None
+
+    def reset(self, seq, ticks, payload):
+        self.seq = seq
+        self.ticks = ticks
+        self.payload = payload
 
     @classmethod
     def empty_size(cls):
@@ -272,8 +277,8 @@ class SamplerSample(Message):
         if handler.sampler.running:
             self.update_with_sampler(handler.sampler)
             handler.received_samples += 1
+            handler.pending_samples.append((self.seq, self.ticks, self.variables))
             logger.debug(f"Got Sample: {self}")
-            handler.handle_sampler_sample(self)
         else:
             logger.debug("ignoring sample since PC sampler is not primed")
 
@@ -340,16 +345,28 @@ def get_seq():
     return lib.get_seq()
 
 
+HEADER_FORMAT = ENDIANESS + 'HBHBBB'
+
+
+def decode_emo_header_unsafe(s):
+    """
+    Decode emolog header assuming the MAGIC is correct
+    :param s: bytes of header
+    :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
+    """
+    _magic, _type, length, seq, payload_crc, header_crc = struct.unpack(HEADER_FORMAT, s)
+    return _type, length, seq
+
+
 def decode_emo_header(s):
     """
     Decode emolog header
     :param s: bytes of header
     :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
     """
-    assert len(s) >= header_size
-    m1, m2, _type, length, seq, payload_crc, header_crc = struct.unpack(endianess + 'BBBHBBB', s[:header_size])
-    if [m1, m2] != MAGIC_VALUES:
-        error = "bad magic: {}, {} (expected {}, {})".format(m1, m2, *MAGIC_VALUES)
+    magic, _type, length, seq, payload_crc, header_crc = struct.unpack(HEADER_FORMAT, s)
+    if magic != MAGIC:
+        error = "bad magic: {} (expected {})".format(magic, MAGIC)
         return error, None, None, None
     return None, _type, length, seq
 
@@ -397,25 +414,33 @@ class VariableSampler(object):
         return variables
 
 
+SAMPLER_SAMPLE_TICKS_FORMAT = ENDIANESS + 'L'
+
+
+# in the interest of speed, we keep a single SamplerSample instance and reset it
+sampler_sample = SamplerSample(0, 0, b'')
+
+
 def emo_decode(buf, i_start):
-    assert i_start < len(buf)
-    needed = lib.emo_decode_with_offset(buf, i_start, min(len(buf) - i_start, 0xffff))
+    n = len(buf)
+    needed = lib.emo_decode_with_offset(buf, i_start, min(n - i_start, 0xffff))
     error = None
     if needed == 0:
-        error, emo_type, emo_len, seq = decode_emo_header(buf[i_start : i_start + header_size])
-        if error:
-            return None, i_start + 1, error
-        payload = buf[i_start + header_size : i_start + header_size + emo_len]
-        i_next = i_start + header_size + emo_len
+        payload_start = i_start + HEADER_SIZE
+        header = buf[i_start : payload_start]
+        emo_type, emo_len, seq = decode_emo_header_unsafe(header)
+        i_next = payload_start + emo_len
+        payload = buf[payload_start : i_next]
         if emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
-            ticks = struct.unpack(endianess + 'L', payload[:4])[0]
-            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
+            ticks = struct.unpack(SAMPLER_SAMPLE_TICKS_FORMAT, payload[:4])[0]
+            sampler_sample.reset(seq=seq, ticks=ticks, payload=payload[4:])
+            msg = sampler_sample # SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
         elif emo_type == emo_message_types.version:
-            (client_version, reply_to_seq, reserved) = struct.unpack(endianess + 'HBB', payload)
+            (client_version, reply_to_seq, reserved) = struct.unpack(ENDIANESS + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
         elif emo_type == emo_message_types.ack:
-            (error, reply_to_seq) = struct.unpack(endianess + 'HB', payload)
+            (error, reply_to_seq) = struct.unpack(ENDIANESS + 'HB', payload)
             msg = Ack(seq=seq, error=error, reply_to_seq=reply_to_seq)
         elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
                           emo_message_types.sampler_start, emo_message_types.sampler_stop]:
@@ -425,13 +450,13 @@ def emo_decode(buf, i_start):
                    emo_message_types.sampler_start: SamplerStart,
                    emo_message_types.sampler_stop: SamplerStop}[emo_type](seq=seq)
         elif emo_type == emo_message_types.sampler_register_variable:
-            phase_ticks, period_ticks, address, size, _reserved = struct.unpack(endianess + 'LLLHH', payload)
+            phase_ticks, period_ticks, address, size, _reserved = struct.unpack(ENDIANESS + 'LLLHH', payload)
             msg = SamplerRegisterVariable(seq=seq, phase_ticks=phase_ticks, period_ticks=period_ticks,
                                           address=address, size=size)
         else:
             msg = UnknownMessage(seq=seq, type=emo_type, buf=Message.buf)
     elif needed > 0:
-        msg = MissingBytes(message=buf, header=buf[i_start : i_start + header_size], needed=needed)
+        msg = MissingBytes(message=buf, header=buf[i_start : i_start + HEADER_SIZE], needed=needed)
         i_next = i_start + needed
     else:
         msg = SkipBytes(-needed)
@@ -465,22 +490,22 @@ class Parser(object):
                 raise SystemExit()
         self.buf = self.buf + s
         i = 0
-        while i < len(self.buf):
-            msg, i_next, error = emo_decode(self.buf, i_start=i)
+        buf = self.buf
+        n = len(buf)
+        while i < n:
+            msg, i_next, error = emo_decode(buf, i_start=i)
             if error:
                 logger.error(error)
             if self.debug_message_decoding:
                 if error:
-                    logger.error("decoding error, buf length {}, error: {}".format(
-                        len(self.buf), error))
+                    logger.error("decoding error, buf length {}, error: {}".format(n, error))
                 elif not hasattr(msg, 'type'):
                     logger.debug("decoded {}".format(msg))
                 else:
                     logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
-                        emo_message_type_to_str[msg.type], i_next - i, msg.seq,
-                        len(self.buf)))
-            parsed_buf = self.buf[i:i_next]
+                        emo_message_type_to_str[msg.type], i_next - i, msg.seq, n))
             if isinstance(msg, SkipBytes):
+                parsed_buf = buf[i:i_next]
                 logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
@@ -534,6 +559,7 @@ class Client(asyncio.Protocol):
         self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
+        self.pending_samples = []
         self.reset_ack()
         self.parser = None
         self.transport = None
@@ -676,8 +702,11 @@ class Client(asyncio.Protocol):
             self.dump_buf(data)
         for msg in self.parser.iter_available_messages(data):
             msg.handle_by(self)
+        if len(self.pending_samples) > 0:
+            self.handle_sampler_samples(self.pending_samples)
+            del self.pending_samples[:]
 
-    def handle_sampler_sample(self, msg):
+    def handle_sampler_samples(self, msgs):
         """
         Override me
         """

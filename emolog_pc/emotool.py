@@ -25,6 +25,7 @@ from dwarf import FileParser
 from util import version, coalesce_meth
 import main_window
 
+
 logger = logging.getLogger()
 
 
@@ -147,36 +148,44 @@ class EmoToolClient(emolog.Client):
     def stop(self):
         self._running = False
 
-    def handle_sampler_sample(self, msg):
+    def handle_sampler_samples(self, msgs):
+        """
+        Write to CSV, add points to plots
+        :param msgs: [(seq, ticks, {name: value})]
+        :return: None
+        """
         if not self.running:
             return
-        self.initialize_file()
+        if not self.csv:
+            self.initialize_file()
         # TODO - decode variables (integer/float) in emolog VariableSampler
-        vs = msg.variables
-        self.csv.writerow([msg.seq, msg.ticks, time() * 1000] +
-                          [vs[name] if name in vs else '' for name in self.names])
+        now = time() * 1000
+        self.csv.writerows([[seq, ticks, now] +
+                          [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
         self.fd.flush()
-        self.plot(msg)
-        self.samples_received += 1
-        if self.last_ticks is not None and msg.ticks - self.last_ticks != self.min_ticks:
-            print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
-                time(), self.last_ticks, msg.ticks, msg.ticks - self.last_ticks))
-            self.ticks_lost += msg.ticks - self.last_ticks - self.min_ticks
-        self.last_ticks = msg.ticks
+        if self.window:
+            for msg in msgs:
+                self.plot(msg)
+        self.samples_received += len(msgs)
+        for seq, ticks, variables in msgs:
+            if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
+                print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
+                    now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
+                self.ticks_lost += ticks - self.last_ticks - self.min_ticks
+            self.last_ticks = ticks
         if self.first_ticks is None:
             self.first_ticks = self.last_ticks
         if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
             self.stop()
 
     def plot(self, msg):
-        if not self.window:
-            return
-        self.do_plot(msg)
+        (_seq, ticks, variables) = msg
+        self.do_plot((ticks, list(variables.items())))
 
     @coalesce_meth(hertz=10) # Limit refreshes, they can be costly
     def do_plot(self, msgs):
-        ticks = [msg.ticks for msg in msgs]
-        vars = [[(k, v) for k, v in msg.variables.items()] for msg in msgs]
+        ticks = [ticks for (ticks, varitems) in msgs]
+        vars = [[(k, v) for k, v in varitems] for (ticks, varitems) in msgs]
         self.window.log_variables(ticks=ticks, vars=vars)
 
 
