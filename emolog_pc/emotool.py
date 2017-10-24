@@ -84,10 +84,10 @@ def dwarf_get_variables_by_name(filename, names):
     return sampled_vars
 
 
-async def start_fake_sine(port):
+async def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
     cmdline = create_python_process_cmdline('embedded.py')
-    create_process(cmdline + [str(port)])
+    create_process(cmdline + [str(ticks_per_second), str(port)])
 
 
 class EmoToolClient(emolog.Client):
@@ -316,7 +316,7 @@ async def start_transport(client):
     loop = asyncio.get_event_loop()
     port = random.randint(10000, 50000)
     if args.fake:
-        await start_fake_sine(port)
+        await start_fake_sine(args.ticks_per_second, port)
     else:
         start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     attempt = 0
@@ -437,7 +437,14 @@ def parse_args():
         # fill in fake vars
         ret.var = [
             # name, ticks, phase
-            'fake,1,0'
+            'a,1,0',
+            'b,1,0',
+            'c,1,0',
+            'd,1,0',
+            'e,1,0',
+            'f,1,0',
+            'g,1,0',
+            'h,1,0',
         ]
     return ret
 

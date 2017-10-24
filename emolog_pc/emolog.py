@@ -810,7 +810,6 @@ class FakeSineEmbedded(asyncio.Protocol):
     """
 
     VERSION = 1
-    TICK_TIME = 0.00005 # 20kHz - this is out target
 
     # we ignore address, and size is used to return the same size as requested
     Sine = namedtuple('Sine', [
@@ -819,8 +818,10 @@ class FakeSineEmbedded(asyncio.Protocol):
         # Sampling parameters
         'period_ticks', 'phase_ticks', 'size', 'address'])
 
-    def __init__(self, *args, **kw):
-        super(FakeSineEmbedded, self).__init__(*args, **kw)
+    def __init__(self, ticks_per_second, **kw):
+        super().__init__(**kw)
+        self.ticks_per_second = ticks_per_second
+        self.tick_time = 1.0 / ticks_per_second
         self.verbose = True
         self.parser = None
         self.sines = []
@@ -870,8 +871,9 @@ class FakeSineEmbedded(asyncio.Protocol):
     def on_sampler_register_variable(self, msg):
         phase_ticks, period_ticks, address, size = (
             msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
+        n = len(self.sines) + 1
         self.sines.append(self.Sine(size=size, address=address,
-                               freq=100, amp=100, phase=0.0,
+                               freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
                                phase_ticks=phase_ticks,
                                period_ticks=period_ticks))
 
@@ -881,7 +883,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         if not self.running:
             return
         self.ticks += 1
-        t = self.ticks * self.TICK_TIME
+        t = self.ticks * self.tick_time
         var_size_pairs = []
         for sine in self.sines:
             if self.ticks % sine.period_ticks == sine.phase_ticks:
@@ -889,7 +891,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         # We could use the gcd to find the minimal tick size but this is good enough
         if len(var_size_pairs) > 0:
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
-        dt = max(0.0, self.TICK_TIME * self.ticks + self.start_time - time())
+        dt = max(0.0, self.tick_time * self.ticks + self.start_time - time())
         self.eventloop.call_later(dt, self.handle_time_event)
 
 
