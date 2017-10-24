@@ -13,7 +13,8 @@ choose arm all (include gcc)
 choose all debuggers except blackhawk
 choose gui composer (but not EVE)
 4. git clone https://github.com/alon/emolog.git
-5. pip install -r requirements.txt
+5. cd emolog_pc; // NB: You should create a virtualenv; The following will install packages globally!
+6. pip install -r requirements.txt
 
 The following is needed if a C compiler and 'make' utility are not available in the system:
 6. install msys2 64bit 

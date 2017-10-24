@@ -184,9 +184,7 @@ class EmoToolClient(emolog.Client):
 
     @coalesce_meth(hertz=10) # Limit refreshes, they can be costly
     def do_plot(self, msgs):
-        ticks = [ticks for (ticks, varitems) in msgs]
-        vars = [[(k, v) for k, v in varitems] for (ticks, varitems) in msgs]
-        self.window.log_variables(ticks=ticks, vars=vars)
+        self.window.log_variables(msgs=msgs)
 
 
 def iterate(prefix, initial):

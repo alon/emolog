@@ -2,13 +2,23 @@ import sys
 import asyncio
 import time
 from bisect import bisect_left
+from collections import defaultdict
 
 from Qt import QtGui, QtCore, QtWidgets
 from quamash import QEventLoop
 import pyqtgraph as pg
 import pyqtgraph.console
 
+from numpy import zeros, nan
+
 from util import version
+
+from cython_util import to_dicts
+
+# for kernprof
+import builtins
+if 'profile' not in builtins.__dict__:
+    builtins.__dict__['profile'] = lambda x: x
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -20,7 +30,7 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_tab = QtWidgets.QWidget(self.main_widget)
         self.main_widget.addTab(plot_tab, "plot")
         l = QtWidgets.QVBoxLayout(plot_tab)
-        plot_widget = pg.PlotWidget()
+        self.plot_widget = plot_widget = pg.PlotWidget()
         l.addWidget(plot_widget)
         self.plot_widget = plot_widget
         # TODO - make a menu action, not open by default
@@ -31,27 +41,38 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage("Starting", 2000)
 
-        self.ticks = []
-        self.vals = []
+        self.ticks = defaultdict(list)
+        self.vals = defaultdict(list)
+        self.data_items = defaultdict(pg.PlotDataItem)
 
-    def log_variables(self, ticks, vars):
+    @profile
+    def log_variables(self, msgs):
         """
         Show points on log window. both @ticks and @vars are arrays
 
-        :param ticks: [ticks]
-        :param vars: [[(name, value)]]
+        :param msgs: [(ticks_scalar, [(name, value)])]
         :return:
         """
-        if max(len(vs) for vs in vars) > 1:
-            print("TODO: ignoring everything except first variable")
-        vals = [vs[0][1] for vs in vars]
+        new_ticks, new_vals = to_dicts(msgs)
         # TODO - better logic. Right now just shows last second, no zoom in possible. Plus second[ticks] is fixed
-        cutoff_ticks = ticks[-1] - 5000
-        i_cutoff = bisect_left(self.ticks, cutoff_ticks)
-        self.ticks = self.ticks[i_cutoff:] + ticks # list concatenation
-        self.vals = self.vals[i_cutoff:] + vals # list concatenation
-        self.plot_widget.plot(self.ticks, self.vals, clear=True)
-        self.plot_widget.setXRange(self.ticks[-1] - 8000, self.ticks[-1])
+        last_tick = msgs[-1][0]
+        cutoff_tick = last_tick - 8000
+        for name in set(self.ticks.keys()) | set(new_ticks.keys()):
+            if name not in self.data_items:
+                item = self.data_items[name]
+                self.plot_widget.addItem(item)
+            else:
+                item = self.data_items[name]
+            ticks = self.ticks[name]
+            vals = self.vals[name]
+            i_cutoff = bisect_left(ticks, cutoff_tick)
+            del ticks[:i_cutoff]
+            del vals[:i_cutoff]
+            ticks.extend(new_ticks[name])
+            vals.extend(new_vals[name])
+            item.setData(ticks, vals)
+        first_tick = min([ticks[0] for ticks in self.ticks.values()])
+        self.plot_widget.setXRange(first_tick, last_tick)
 
     def fileQuit(self):
         self.close()
