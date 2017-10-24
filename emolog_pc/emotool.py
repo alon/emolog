@@ -154,7 +154,7 @@ class EmoToolClient(emolog.Client):
         :param msgs: [(seq, ticks, {name: value})]
         :return: None
         """
-        if not self.running:
+        if not self._running:
             return
         if not self.csv:
             self.initialize_file()
