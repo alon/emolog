@@ -1,5 +1,7 @@
+#!/bin/env python
+
 import os
-import sys
+from argparse import ArgumentParser
 
 import xlsxwriter as xlwr
 import xlrd
@@ -211,8 +213,10 @@ def consolidate(dir):
 
 
 def main():
-    dir = os.getcwd() if len(sys.argv) < 2 else sys.argv[1]
-    output = consolidate(dir)
+    parser = ArgumentParser()
+    parser.add_argument('dir')
+    args = parser.parse_args()
+    output = consolidate(args.dir)
     if not output:
         return
     print(f"wrote {output}")
