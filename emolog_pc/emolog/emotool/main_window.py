@@ -11,9 +11,9 @@ import pyqtgraph.console
 
 from numpy import zeros, nan
 
-from util import version
+from ..util import version
 
-from cython_util import to_dicts
+from ..cython_util import to_dicts
 
 # for kernprof
 import builtins

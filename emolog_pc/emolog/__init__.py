@@ -34,7 +34,7 @@ from math import sin
 from abc import ABCMeta, abstractmethod
 import logging
 
-from util import which
+from .util import which
 
 import builtins # profile will be here when run via kernprof
 
@@ -43,23 +43,27 @@ if 'profile' not in builtins.__dict__:
         return f
     builtins.__dict__['profile'] = nop_decorator
 
-__all__ = ['EMO_MESSAGE_TYPE_VERSION',
-           'decode_emo_header_unsafe',
-           'encode_version',
-           'write_version',
-           'Client',
-           'Parser',
-           'FakeSineEmbedded',
-           'Version',
-           'Ack',
-           'Ping',
-           'SamplerSample',
-           'SamplerRegisterVariable',
-           'SamplerClear',
-           'SamplerStart',
-           'SamplerStop',
-           'SamplerEnd',
-           ]
+__all__ = [
+    'EMO_MESSAGE_TYPE_VERSION',
+    'decode_emo_header_unsafe',
+    'encode_version',
+    'write_version',
+    'Client',
+    'Parser',
+    'FakeSineEmbedded',
+    'Version',
+    'Ack',
+    'Ping',
+    'SamplerSample',
+    'SamplerRegisterVariable',
+    'SamplerClear',
+    'SamplerStart',
+    'SamplerStop',
+    'SamplerEnd',
+    'build_protocol_library',
+    'LIB_FILENAME',
+    'DEVEL_EMO_MESSAGE_TYPE_H_FILENAME',
+]
 
 
 ENDIANESS = '<'
@@ -69,17 +73,30 @@ logger = logging.getLogger('emolog')
 
 
 if 'win' in sys.platform:
-    LIB_RELATIVE_DIR = '../emolog_protocol'
+    LIB_RELATIVE_DIR = '../../emolog_protocol'
     LIB_FILENAME = 'emolog_protocol.dll'
     MAKE_EXEC = 'make.exe'
 else:
-    LIB_RELATIVE_DIR = '../emolog_protocol'
+    LIB_RELATIVE_DIR = '../../emolog_protocol'
     LIB_FILENAME = 'libemolog_protocol.so'
     MAKE_EXEC = 'make'
-LIB_ABS_DIR = os.path.realpath(os.path.join(os.path.split(__file__)[0], LIB_RELATIVE_DIR))
+is_development_package = os.path.exists(os.path.join('..', '.git'))
+module_dir = os.path.split(__file__)[0]
+
+DEVEL_LIB_ABS_DIR = os.path.realpath(os.path.join(module_dir, LIB_RELATIVE_DIR))
+DEVEL_PROTOCOL_LIB = os.path.join(DEVEL_LIB_ABS_DIR, LIB_FILENAME)
+DEVEL_EMO_MESSAGE_TYPE_H_FILENAME = os.path.join(DEVEL_LIB_ABS_DIR, 'source/emo_message_t.h')
+
+if is_development_package:
+    LIB_ABS_DIR = DEVEL_LIB_ABS_DIR
+    EMO_MESSAGE_TYPE_H_FILENAME = DEVEL_EMO_MESSAGE_TYPE_H_FILENAME
+else:
+    LIB_ABS_DIR = os.path.realpath(module_dir)
+    EMO_MESSAGE_TYPE_H_FILENAME = os.path.join(LIB_ABS_DIR, 'emo_message_t.h')
+PROTOCOL_LIB = os.path.join(LIB_ABS_DIR, LIB_FILENAME)
 
 
-def build_library():
+def build_protocol_library():
     # chdir to path of library
     orig_path = os.getcwd()
     os.chdir(LIB_ABS_DIR)
@@ -91,12 +108,14 @@ def build_library():
         assert ret == 0, "make failed with error code {}, see above.".format(ret)
     assert os.path.exists(LIB_FILENAME)
     os.chdir(orig_path)
+    return PROTOCOL_LIB
 
 
 def emolog_lib():
-    build_library()
-    assert os.path.exists(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
-    lib = ctypes.CDLL(os.path.join(LIB_ABS_DIR, LIB_FILENAME))
+    if is_development_package:
+        build_protocol_library()
+    assert os.path.exists(PROTOCOL_LIB), f"missing {PROTOCOL_LIB}"
+    lib = ctypes.CDLL(PROTOCOL_LIB)
     lib.crc_init()
     return lib
 
@@ -119,7 +138,7 @@ emo_message_type_to_str = {}
 
 
 def initialize_emo_message_type_to_str():
-    with open(os.path.join(LIB_ABS_DIR, 'source/emo_message_t.h')) as fd:
+    with open(EMO_MESSAGE_TYPE_H_FILENAME) as fd:
         lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
         lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
         for name, value in lines:

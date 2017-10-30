@@ -6,24 +6,25 @@
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
 import argparse
-import configparser
-import asyncio
-import csv
-import logging
 import os
-import random
-import string
-import struct
 import sys
-import socket
-import subprocess
-from time import sleep, time
+import string
+import logging
+import csv
+import struct
+import random
+import asyncio
 from functools import reduce
+from time import time, sleep
+from socket import socket
+from subprocess import Popen
+from configparser import ConfigParser
 
-import emolog
-from dwarf import FileParser
-from util import version, coalesce_meth
-import main_window
+from .. import Client, SamplerSample, AckTimeout
+from ..dwarf import FileParser
+from ..util import version, coalesce_meth
+from .post_processor import post_process
+from .main_window import run_forever
 
 
 logger = logging.getLogger()
@@ -86,11 +87,11 @@ def dwarf_get_variables_by_name(filename, names):
 
 async def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
-    cmdline = create_python_process_cmdline('embedded.py')
+    cmdline = create_python_process_cmdline_command('import emolog.emotool.embedded as emb; emb.main()')
     create_process(cmdline + [str(ticks_per_second), str(port)])
 
 
-class EmoToolClient(emolog.Client):
+class EmoToolClient(Client):
     # must be singleton!
     # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
     # currently the serial subprocess only accepts a connection once, and the transport is never properly released
@@ -310,6 +311,10 @@ def create_python_process_cmdline(script):
     return ['python', script_path]
 
 
+def create_python_process_cmdline_command(command):
+    return ['python', '-c', command]
+
+
 async def start_transport(client):
     loop = asyncio.get_event_loop()
     port = random.randint(10000, 50000)
@@ -321,7 +326,7 @@ async def start_transport(client):
     while attempt < 10:
         attempt += 1
         sleep(0.1)
-        s = socket.socket()
+        s = socket()
         try:
             s.connect(('127.0.0.1', port))
         except:
@@ -338,7 +343,7 @@ processes = []
 
 def create_process(cmdline):
     print(f"starting subprocess: {cmdline}")
-    process = subprocess.Popen(cmdline)
+    process = Popen(cmdline)
     processes.append(process)
     return process
 
@@ -453,7 +458,7 @@ def bandwidth_calc(variables):
     :return: average baud rate (considering 8 data bits, 1 start & stop bits)
     """
     packets_per_second = args.ticks_per_second # simplification: assume a packet every tick (upper bound)
-    header_average = packets_per_second * emolog.SamplerSample.empty_size()
+    header_average = packets_per_second * SamplerSample.empty_size()
     payload_average = sum(args.ticks_per_second / v['period_ticks'] * v['size'] for v in variables)
     return (header_average + payload_average) * 10
 
@@ -534,7 +539,7 @@ async def initialize_board(client, variables):
             await client.send_sampler_start()
             logger.debug("client initiated, starting to log data at rate TBD")
             break
-        except emolog.AckTimeout:
+        except AckTimeout:
             retries -= 1
             logger.info("Ack Timeout. Retry {}".format(max_retries - retries))
     return retries != 0
@@ -586,7 +591,7 @@ async def amain(window):
               "Exiting.".format(CONFIG_FILE_NAME, CONFIG_FILE_NAME))
         raise SystemExit
 
-    config = configparser.ConfigParser()
+    config = ConfigParser()
     config.read(CONFIG_FILE_NAME)
 
     setup_logging(args.log, args.silent)
@@ -636,7 +641,7 @@ async def amain(window):
 
 
 def start_gui(args):
-    return main_window.run_forever(start_gui_callback, create_main_window=args.gui)
+    return run_forever(start_gui_callback, create_main_window=args.gui)
 
 
 def start_gui_callback(loop, window):
@@ -666,26 +671,27 @@ def start_gui_callback(loop, window):
     return client
 
 
-def post_process(args, client):
+def do_post_process(args, client):
     if client.csv_filename is None or not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
     print()
     if args.no_processing is False:
-        import post_processor
         print("Running post processor (this may take some time)...")
         print("processing {}".format(client.csv_filename))
-        post_processor.post_process(client.csv_filename, truncate_data=args.truncate, verbose=True)
+        post_process(client.csv_filename, truncate_data=args.truncate, verbose=True)
         print("Post processing done.")
     else:
         print("No post-processing was requested, exiting.")
 
 
-def main():
+def main(cmdline=None):
     global args # TODO - remove this global, pass explicitly
+    if cmdline is not None:
+        sys.argv = cmdline
     args = parse_args()
     client = start_gui(args)
-    post_process(args, client)
+    do_post_process(args, client)
 
 
 if __name__ == '__main__':

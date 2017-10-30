@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 
 import colorama
 
-import serial_util
+from .serial_util import find_serial
 
 
 log = logging.getLogger('serial2tcp')
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     options = parser.parse_args()
 
     if options.serial == 'auto':
-        options.serial = serial_util.find_serial()
+        options.serial = find_serial()
 
     access_list = set([ip.strip(" ") for ip in options.acl.split(',')])
 

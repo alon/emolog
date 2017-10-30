@@ -24,7 +24,7 @@ def version():
     produced variable.
     :return:
     """
-    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '.git'))
+    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '..', '.git'))
     if not os.path.exists(gitroot):
         return "unknown version"
     try:
