@@ -12,6 +12,7 @@ from xlsxwriter.utility import xl_rowcol_to_cell
 import glob
 import configparser
 
+
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
 piston_diameter_mm = 25.4
