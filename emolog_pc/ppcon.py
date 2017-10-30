@@ -91,18 +91,36 @@ def small_int_dict(arrays):
     return ret
 
 
-def layout(points):
+class Render():
     """
-    Take points = [(index, text)] and place them in a single row, i.e.:
-    [(2, 'a'), (5, 'b')] => [None, None, 'a', None, None, 'b']
-    :param points:
-    :return:
+    Utilities for creating rows or columns from shorter descriptions
     """
-    max_i = max(i for i, v in points)
-    ret = [None] * (max_i + 1)
-    for i, v in points:
-        ret[i] = v
-    return ret
+    @staticmethod
+    def points(points):
+        """
+        Take points = [(index, text)] and place them in a single row, i.e.:
+        [(2, 'a'), (5, 'b')] => [None, None, 'a', None, None, 'b']
+        :param points:
+        :return:
+        """
+        max_i = max(i for i, v in points)
+        ret = [None] * (max_i + 1)
+        for i, v in points:
+            ret[i] = v
+        return ret
+
+    @staticmethod
+    def points_add(deltas):
+        data = []
+        ind = 0
+        for d, v in deltas:
+            ind += d
+            data.append((ind, v))
+        return Render.points(data)
+
+    @staticmethod
+    def subset(key_ind_dict, d, default=None):
+        return [d.get(param, default) for param in key_ind_dict]
 
 
 def consolidate(dir):
@@ -110,15 +128,16 @@ def consolidate(dir):
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new consolidated_{start_date}_{end_date}.xls file from them
     :param dir:
-    :return:
+    :return: written xlsx filename full path
     """
-    output_filename = 'consolidated.xlsx'
+    output_filename = os.path.join(dir, 'consolidated.xlsx')
     if os.path.exists(output_filename):
         print(f"not overwriting {output_filename}")
         return
     readers, filenames = get_readers_and_filenames(dir)
+    N = len(readers)
 
-    if len(readers) == 0:
+    if N == 0:
         print("no files found")
         return
 
@@ -135,32 +154,49 @@ def consolidate(dir):
     parameter_names = list(known_parameters.keys())
     N_par = len(parameter_names)
     N_sum = len(summary_titles)
-    top_titles = layout([(N_par, 'Down'), (N_par + N_sum, 'Up'), (N_par + 2 * N_sum, 'All')])
+    top_titles = Render.points_add([(N_par, 'Down'), (N_sum, 'Up'), (N_sum, 'All')])
     titles = parameter_names + (3 * summary_titles)
 
     # writing starts here. write titles
     writer = xlwr.Workbook(output_filename)
+
+    # formats for titles and cells
+    title_format = writer.add_format(
+        properties=dict(text_wrap=True, align='left', bold=True))
+    col_format = writer.add_format(
+        properties=dict(text_wrap=True, align='left', num_format='0.000'))
+
+    # create sheet
     summary_out = writer.add_worksheet('Summary')
-    summary_out.write_column(row=1, col=0, data=top_titles)
-    summary_out.write_column(row=1, col=1, data=titles)
+
+    # create titles
+    summary_out.write_column(row=1, col=0, data=top_titles, cell_format=title_format)
+    summary_out.write_column(row=1, col=1, data=titles, cell_format=title_format)
 
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
-        params_values = [parameters.get(param, None) for param in known_parameters]
+        params_values = Render.subset(key_ind_dict=known_parameters, d=parameters)
         s_up, s_down, s_all = [
             {k: v for k, v in zip(summary['titles'], summary[key])}
             for key in ('up', 'down', 'all')]
-        summary_rows = [[sum_row.get(title, None) for title in known_summary_titles]
+        summary_rows = [Render.subset(known_summary_titles, sum_row)
                         for sum_row in (s_up, s_down, s_all)]
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
         data = [filename] + params_values + summary_values
-        summary_out.write_column(row=0, col=reader_i + 2, data=data)
+        summary_out.write_column(row=0, col=reader_i + 2, data=data, cell_format=col_format)
+    summary_out.set_column(firstcol=0, lastcol=2, width=8)
+    summary_out.set_column(firstcol=2, lastcol=N + 3, width=8)
+    return output_filename
 
 
 def main():
     dir = os.getcwd() if len(sys.argv) < 2 else sys.argv[1]
-    consolidate(dir)
+    output = consolidate(dir)
+    if not output:
+        return
+    print(f"wrote {output}")
+    os.system(f'xdg-open {output}')
 
 
 if __name__ == '__main__':
