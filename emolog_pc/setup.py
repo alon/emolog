@@ -1,12 +1,9 @@
 import shutil
 import os
 import sys
-from distutils.core import setup
+from setuptools import setup
 
 from Cython.Build import cythonize
-
-if 'win' in sys.platform:
-    import py2exe
 
 from emolog import build_protocol_library, LIB_FILENAME, DEVEL_EMO_MESSAGE_TYPE_H_FILENAME
 
@@ -19,17 +16,23 @@ MESSAGE_TYPE_H_FILENAME = os.path.basename(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME)
 print(f"copying {MESSAGE_TYPE_H_FILENAME}")
 shutil.copy(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME, 'emolog')
 
-kw = dict(
-    name = 'Emotool',
+setup(
+    name='Emotool',
     description='Command & Control side for emolog protocol',
+    version="0.1",
+    install_requires=[
+        'pyelftools(==0.24)',
+        'pyqtgraph(==0.10.0)',
+        'Qt.py(==1.0.0)',
+        'Quamash(==0.5.5)',
+        'PyQt5(==5.9)',
+        'xlrd(==1.1.0)',
+        'XlsxWriter(==1.0.2)',
+        'pandas(==0.21.0)',
+    ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     package_data={'emolog': [LIB_FILENAME, MESSAGE_TYPE_H_FILENAME]},
     ext_modules = cythonize("emolog/cython_util.pyx"),
-    scripts=['scripts/emotool.py'],
     data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
+    scripts=['scripts/emotool.py'],
 )
-
-if 'win' in sys.platform:
-    kw['console'] = ['scripts/emotool.py']
-
-setup(**kw)
