@@ -14,6 +14,7 @@ UP_AVERAGES_TEXT = 'UP Averages'
 ALL_AVERAGES_TEXT = 'ALL Averages'
 HALF_CYCLE_SUMMARY_TEXT = 'Half-Cycle Summary'
 
+USER_DEFINED_FIELDS = ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"]
 
 def get_readers_and_filenames(dir):
     entries = [entry for entry in os.scandir(dir) if entry.is_file() and entry.path.endswith('xlsx')]
@@ -123,6 +124,15 @@ class Render():
         return [d.get(param, default) for param in key_ind_dict]
 
 
+class IntAlloc():
+    def __init__(self):
+        self.val = 0
+
+    def inc(self, delta):
+        self.val += delta
+        return self.val
+
+
 def consolidate(dir):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
@@ -165,13 +175,22 @@ def consolidate(dir):
         properties=dict(text_wrap=True, align='left', bold=True))
     col_format = writer.add_format(
         properties=dict(text_wrap=True, align='left', num_format='0.000'))
+    user_format = writer.add_format(
+        properties=dict(align='left', num_format='0.000'))
 
     # create sheet
     summary_out = writer.add_worksheet('Summary')
 
+    row = IntAlloc()
+    # write user defined fields
+    for field in USER_DEFINED_FIELDS:
+        summary_out.write_row(row=row.val, col=0, data=[field], cell_format=title_format)
+        summary_out.write_row(row=row.val, col=1, data=[''], cell_format=user_format)
+        row.inc(1)
+
     # create titles
-    summary_out.write_column(row=1, col=0, data=top_titles, cell_format=title_format)
-    summary_out.write_column(row=1, col=1, data=titles, cell_format=title_format)
+    summary_out.write_column(row=row.val + 1, col=0, data=top_titles, cell_format=title_format)
+    summary_out.write_column(row=row.val + 1, col=1, data=titles, cell_format=title_format)
 
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
@@ -184,9 +203,10 @@ def consolidate(dir):
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
         data = [filename] + params_values + summary_values
-        summary_out.write_column(row=0, col=reader_i + 2, data=data, cell_format=col_format)
+        summary_out.write_column(row=row.val, col=reader_i + 2, data=data, cell_format=col_format)
     summary_out.set_column(firstcol=0, lastcol=2, width=8)
     summary_out.set_column(firstcol=2, lastcol=N + 3, width=8)
+    writer.close()
     return output_filename
 
 
