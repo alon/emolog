@@ -35,8 +35,8 @@
 							<tool id="com.ti.ccstudio.buildDefinitions.TMS470_16.9.exe.compilerDebug.1612102141" name="ARM Compiler" superClass="com.ti.ccstudio.buildDefinitions.TMS470_16.9.exe.compilerDebug">
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_16.9.compilerID.INCLUDE_PATH.1948447929" name="Add dir to #include search path (--include_path, -I)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_16.9.compilerID.INCLUDE_PATH" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${CG_TOOL_ROOT}/include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${EMOLOG_ROOT}/emolog_protocol/Source&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${EMOLOG_ROOT}/emolog_embedded/Source&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${EMOLOG_ROOT}/emolog_protocol/source&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${EMOLOG_ROOT}/emolog_embedded/source&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${SW_ROOT}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${INHERITED_INCLUDE_PATH}&quot;"/>
 								</option>

@@ -26,9 +26,9 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>Source</name>
+			<name>source</name>
 			<type>2</type>
-			<locationURI>$%7BPARENT-1-PROJECT_LOC%7D/Source</locationURI>
+			<locationURI>$%7BPARENT-1-PROJECT_LOC%7D/source</locationURI>
 		</link>
 	</linkedResources>
 	<variableList>
