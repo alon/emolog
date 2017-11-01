@@ -1,7 +1,11 @@
 #!/bin/env python
 
 import os
+import sys
 from argparse import ArgumentParser
+
+from Qt import QtGui, QtCore
+from Qt.QtWidgets import QPushButton, QWidget, QApplication, QLabel
 
 import xlsxwriter as xlwr
 import xlrd
@@ -18,14 +22,21 @@ HALF_CYCLE_SUMMARY_TEXT = 'Half-Cycle Summary'
 
 USER_DEFINED_FIELDS = ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"]
 
-def get_readers_and_filenames(dir):
-    entries = [entry for entry in os.scandir(dir) if entry.is_file() and entry.path.endswith('xlsx')]
+OUTPUT_FILENAME = 'summary.xlsx'
+
+
+def read_xlsx(d):
+    entries = [entry for entry in os.scandir(d) if entry.is_file() and entry.path.endswith('xlsx')]
     filenames = [entry.path for entry in entries]
-    readers = [xlrd.open_workbook(filename=entry.path) for entry in entries]
+    return filenames
+
+
+def get_readers(filenames):
+    readers = [xlrd.open_workbook(filename=filename) for filename in filenames]
     data = [(reader, filename) for reader, filename in zip(readers, filenames) if
                HALF_CYCLES_SHEET_NAME in reader.sheet_names()]
     readers, filenames = [x[0] for x in data], [x[1] for x in data]
-    return readers, filenames
+    return readers
 
 
 def verify_cell_at(sheet, row, col, contents):
@@ -135,28 +146,32 @@ class IntAlloc():
         return self.val
 
 
-def consolidate(dir):
+def summarize_dir(d):
+    output_filename = os.path.join(d, OUTPUT_FILENAME)
+    filenames = read_xlsx(d)
+    summarize_files(filenames=filenames, output_filename=output_filename)
+
+
+def summarize_files(filenames, output_filename):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
-    create a new consolidated_{start_date}_{end_date}.xls file from them
+    create a new summary.xls file from them
     :param dir:
     :return: written xlsx filename full path
     """
-    output_filename = os.path.join(dir, 'consolidated.xlsx')
-    if os.path.exists(output_filename):
-        print(f"not overwriting {output_filename}")
-        return
-    readers, filenames = get_readers_and_filenames(dir)
+    readers = get_readers(filenames)
     N = len(readers)
 
     if N == 0:
         print("no files found")
         return
 
+    print("reading parameters")
     all_parameters = [get_parameters(reader) for reader in readers]
     all_parameter_names = [p.keys() for p in all_parameters]
     known_parameters = small_int_dict(all_parameter_names)
 
+    print("reading summaries")
     all_summaries = [get_summary_data(reader) for reader in readers]
     all_summary_titles = [x['titles'] for x in all_summaries]
     known_summary_titles = small_int_dict(all_summary_titles)
@@ -212,11 +227,102 @@ def consolidate(dir):
     return output_filename
 
 
+def find_similar_vacancy(base):
+    i = 1
+    d = os.path.dirname(base)
+    filename_with_ext = os.path.basename(base)
+    noext, ext = filename_with_ext.rsplit('.', 1)
+    fname = base
+    while os.path.exists(fname) and i < 1000:
+        fname = os.path.join(d, f'{noext}_{i}.{ext}')
+        i += 1
+    return fname
+
+
+def button(parent, title, callback):
+    class Button(QPushButton):
+        def mousePressEvent(self, e):
+            QPushButton.mousePressEvent(self, e)
+            callback()
+    return Button(title, parent)
+
+
+class GUI(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+        self.files = []
+        self.output = None
+
+    def summarize(self):
+        summarize_files(self.files, self.output)
+        raise SystemExit
+
+
+    def initUI(self):
+        self.setAcceptDrops(True)
+
+        self.summarize_button = button(parent=self, title='Summarize', callback=self.summarize)
+        self.summarize_button.move(100, 65)
+        self.summarize_button.hide()
+
+        self.drag_label = QLabel('drag files over here', self)
+        self.drag_label.move(50, 65)
+
+        self.setWindowTitle('Post Process xlsx summarizer')
+        self.setGeometry(300, 300, 280, 150)
+
+    def dragEnterEvent(self, e):
+        e.accept()
+
+    def dropEvent(self, e):
+        # TODO: hide the drag label, show a button instead to do consolidation
+        # get the relative position from the mime data
+        mime = e.mimeData().text()
+        file_colon_doubleslash = 'file://'
+        files = [x[len(file_colon_doubleslash):] for x in mime.split('\r\n') if x.startswith(file_colon_doubleslash)]
+        if len(files) == 0:
+            print("no files dragged")
+            return
+        directory = os.path.dirname(files[0])
+        self.output = find_similar_vacancy(os.path.join(directory, OUTPUT_FILENAME))
+        if os.path.exists(self.output):
+            # TODO - show error in gui
+            print("failed to find an output filename that doesn't already exist")
+            return
+        print(f"writing output to {self.output}")
+        self.summarize_button.text = f"write {os.path.basename(self.output)}"
+        for file in files:
+            if not os.path.exists(file):
+                print(f"no such file {file}")
+            else:
+                self.files.append(file)
+        if len(self.files) > 0:
+            self.drag_label.hide()
+            self.summarize_button.show()
+        else:
+            print("len(self.files) == 0")
+        e.accept()
+
+
+def start_gui():
+    app = QApplication(sys.argv)
+    ex = GUI()
+    ex.show()
+    app.exec_()
+
+
 def main():
     parser = ArgumentParser()
-    parser.add_argument('dir')
+    parser.add_argument('--dir')
     args = parser.parse_args()
-    output = consolidate(args.dir)
+    if args.dir is None:
+        # gui mode
+        start_gui()
+        return
+
+    # console mode
+    output = summarize_dir(args.dir)
     if not output:
         return
     print(f"wrote {output}")
