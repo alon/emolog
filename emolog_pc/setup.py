@@ -1,6 +1,5 @@
 import shutil
 import os
-import sys
 from setuptools import setup
 
 from Cython.Build import cythonize
@@ -8,6 +7,7 @@ from Cython.Build import cythonize
 from emolog import build_protocol_library, LIB_FILENAME, DEVEL_EMO_MESSAGE_TYPE_H_FILENAME
 
 
+# TODO - turn this into setup commands so it happens during setup (for instance not when run with --help)
 print(f"building {LIB_FILENAME}")
 protocol_lib_path = build_protocol_library()
 print(f"copying {LIB_FILENAME}")
@@ -37,5 +37,10 @@ setup(
     package_data={'emolog': [LIB_FILENAME, MESSAGE_TYPE_H_FILENAME]},
     ext_modules = cythonize("emolog/cython_util.pyx"),
     data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
-    scripts=['scripts/emotool.py'],
+    entry_points={
+        'console_scripts': [
+            'emotool = emolog.emotool.main:main',
+            'summarize = emolog.emotool.summarize:main'
+        ]
+    }
 )
