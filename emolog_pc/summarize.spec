@@ -2,10 +2,7 @@
 
 block_cipher = None
 
-import os
-print(os.getcwd())
 import sys
-print(f"{sys.path}")
 sys.path.insert(0, ".")
 from emolog.setup import build_artifacts
 build_artifacts()
