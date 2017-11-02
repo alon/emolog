@@ -13,7 +13,7 @@ from serial import Serial
 from serial.tools.list_ports import comports
 
 from dwarf import FileParser
-from emolog import ClientParser, Version, get_seq, HostSampler
+from emolog.lib import ClientParser, Version, get_seq, HostSampler
 
 
 class BiDiPipe(object):

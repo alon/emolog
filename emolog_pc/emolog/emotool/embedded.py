@@ -7,7 +7,7 @@ Create an emolog speaking embedded client for testing purposes
 import sys
 import asyncio
 
-from .. import FakeSineEmbedded
+from ..lib import FakeSineEmbedded
 
 
 def main():

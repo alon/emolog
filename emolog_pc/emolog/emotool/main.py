@@ -20,7 +20,7 @@ from socket import socket
 from subprocess import Popen
 from configparser import ConfigParser
 
-from .. import Client, SamplerSample, AckTimeout
+from ..lib import Client, SamplerSample, AckTimeout
 from ..dwarf import FileParser
 from ..util import version, coalesce_meth
 from .post_processor import post_process

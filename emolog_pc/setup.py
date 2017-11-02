@@ -1,20 +1,11 @@
-import shutil
-import os
 from setuptools import setup
 
 from Cython.Build import cythonize
 
-from emolog import build_protocol_library, LIB_FILENAME, DEVEL_EMO_MESSAGE_TYPE_H_FILENAME
-
+from emolog.setup import build_artifacts
 
 # TODO - turn this into setup commands so it happens during setup (for instance not when run with --help)
-print(f"building {LIB_FILENAME}")
-protocol_lib_path = build_protocol_library()
-print(f"copying {LIB_FILENAME}")
-shutil.copy(protocol_lib_path, 'emolog')
-MESSAGE_TYPE_H_FILENAME = os.path.basename(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME)
-print(f"copying {MESSAGE_TYPE_H_FILENAME}")
-shutil.copy(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME, 'emolog')
+artifacts = build_artifacts()
 
 setup(
     name='Emotool',
@@ -32,9 +23,10 @@ setup(
         'Cython(==0.27.2)',
         'pyserial(==3.2.1)',
         'pyserial-asyncio(==0.2)',
+        'cx-Freeze(==5.0.2)',
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
-    package_data={'emolog': [LIB_FILENAME, MESSAGE_TYPE_H_FILENAME]},
+    package_data={'emolog': artifacts},
     ext_modules = cythonize("emolog/cython_util.pyx"),
     data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
     entry_points={

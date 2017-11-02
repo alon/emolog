@@ -1,24 +1,23 @@
 #!/bin/env python
 
-import asyncio
+from asyncio import get_event_loop
 
-import fcntl
-import sys
-import os
+from fcntl import fcntl, F_GETFL, F_SETFL
+from sys import stdin
+from os import O_NONBLOCK
 
-import emolog
+from emolog.lib import FakeSineEmbedded, AsyncIOEventLoop, TransportStdinAndOut
 
 
 def set_nonblocking(fd):
-    orig_fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)
+    orig_fl = fcntl(fd, F_GETFL)
+    fcntl(fd, F_SETFL, orig_fl | O_NONBLOCK)
 
 def main():
-    set_nonblocking(sys.stdin)
-    loop = asyncio.get_event_loop()
+    set_nonblocking(stdin)
+    loop = get_event_loop()
     loop.set_debug(True)
-    embedded = emolog.FakeSineEmbedded(emolog.AsyncIOEventLoop(loop),
-                                       transport=emolog.TransportStdinAndOut())
+    embedded = FakeSineEmbedded(AsyncIOEventLoop(loop), transport=TransportStdinAndOut())
     loop.run_forever()
 
 if __name__ == '__main__':

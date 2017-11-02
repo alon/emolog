@@ -8,7 +8,7 @@ import sys
 from serial import Serial
 from serial.tools.list_ports import comports
 
-from emolog import encode_version, ClientParser, Version, SkipBytes, get_seq
+from emolog.lib import encode_version, ClientParser, Version, SkipBytes, get_seq
 
 
 def main():
