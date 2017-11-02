@@ -247,6 +247,23 @@ def button(parent, title, callback):
     return Button(title, parent)
 
 
+def paths_from_file_urls(urls):
+    ret = []
+    file_colon_doubleslash = 'file://'
+    for x in urls:
+        if not x.startswith(file_colon_doubleslash):
+            continue
+        x = x[len(file_colon_doubleslash):]
+        if 'win' in sys.platform:
+            # starts with an extra '/', remove it
+            x = x[1:]
+        if not os.path.exists(x):
+            print(f"no such file: {x}")
+            continue
+        ret.append(x)
+    return ret
+
+
 class GUI(QWidget):
     def __init__(self):
         super().__init__()
@@ -279,8 +296,7 @@ class GUI(QWidget):
         # TODO: hide the drag label, show a button instead to do consolidation
         # get the relative position from the mime data
         mime = e.mimeData().text()
-        file_colon_doubleslash = 'file://'
-        files = [x[len(file_colon_doubleslash):] for x in mime.split('\r\n') if x.startswith(file_colon_doubleslash)]
+        files = paths_from_file_urls([x.strip() for x in mime.split('\n')])
         if len(files) == 0:
             print("no files dragged")
             return
