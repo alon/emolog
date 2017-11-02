@@ -6,7 +6,7 @@
  * MCU pin PC4 (UART7 RX) to USB-UART adapter's TX
  * MCU pin PC5 (UART7 TX) to USB-UART adapter's RX
  * and of course Launchpad's ground to USB-UART adapter's ground.
- *  */
+ */
 
 
 // General includes
@@ -26,6 +26,9 @@
 
 #include "../examples_common/emolog_example_client.h" // include for example code that is common to all platforms
 #include "emolog_embedded.h"       // for calling emolog_init()
+#include "emolog_comm.h"
+#include "emolog_sampler.h"
+#include "emolog_protocol.h"
 
 
 #define EMOLOG_BAUD_RATE_HZ         1000000
