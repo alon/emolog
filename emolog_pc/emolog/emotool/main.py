@@ -19,6 +19,7 @@ from time import time, sleep
 from socket import socket
 from subprocess import Popen
 from configparser import ConfigParser
+from shutil import which
 
 from ..lib import Client, SamplerSample, AckTimeout
 from ..dwarf import FileParser
@@ -87,8 +88,17 @@ def dwarf_get_variables_by_name(filename, names):
 
 async def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
-    cmdline = create_python_process_cmdline_command('import emolog.emotool.embedded as emb; emb.main()')
-    create_process(cmdline + [str(ticks_per_second), str(port)])
+    # Use our executable to work with a development environment (python executable)
+    # or pyinstaller (emotool.exe)
+    if sys.argv[0].endswith('python'):
+        assert sys.argv[1] == 'emotool.py', f"unknown case: sys.argv[1] == {sys.argv[1]}"
+        cmdline = sys.argv[:2]
+    elif which(sys.argv[0]):
+        cmdline = [sys.argv[0]]
+    else:
+        cmdline = ['python', sys.argv[0]]
+    print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
+    create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
 
 
 class EmoToolClient(Client):
@@ -428,10 +438,13 @@ def parse_args():
     parser.add_argument('--no_gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
     parser.add_argument('--wait-for-gui', default=False, action='store_true', help='wait for user closing the main window before quitting')
 
-    ret = parser.parse_args()
+    # Embedded
+    parser.add_argument('--embedded', default=False, action='store_true', help='debugging: be a fake embedded target')
+
+    ret, unparsed = parser.parse_known_args()
 
     if not ret.fake:
-        if not ret.elf:
+        if not ret.elf and not ret.embedded:
             # elf required unless fake_sine in effect
             parser.print_usage()
             print(f"{sys.argv[0]}: error: the following missing argument is required: --elf")
@@ -690,6 +703,9 @@ def main(cmdline=None):
     if cmdline is not None:
         sys.argv = cmdline
     args = parse_args()
+    if args.embedded:
+        from .embedded import main as embmain
+        embmain()
     client = start_gui(args)
     do_post_process(args, client)
 
