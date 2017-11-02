@@ -4,8 +4,8 @@ import os
 import sys
 from argparse import ArgumentParser
 
-from Qt import QtGui, QtCore
-from Qt.QtWidgets import QPushButton, QWidget, QApplication, QLabel
+from PyQt5 import QtGui, QtCore
+from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel
 
 import xlsxwriter as xlwr
 import xlrd

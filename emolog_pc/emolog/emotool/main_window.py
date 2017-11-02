@@ -4,7 +4,7 @@ import time
 from bisect import bisect_left
 from collections import defaultdict
 
-from Qt import QtGui, QtCore, QtWidgets
+from PyQt5 import QtGui, QtCore, QtWidgets
 from quamash import QEventLoop
 import pyqtgraph as pg
 import pyqtgraph.console
