@@ -227,12 +227,16 @@ def summarize_files(filenames, output_filename):
     return output_filename
 
 
-def find_similar_vacancy(base):
+def allocate_unused_file_in_directory(initial):
+    """look for a file at the dirname(initial) with basename(initial)
+    file name. If one already exists, try adding _1, then _2 etc. right
+    before the extention
+    """
     i = 1
-    d = os.path.dirname(base)
-    filename_with_ext = os.path.basename(base)
+    d = os.path.dirname(initial)
+    filename_with_ext = os.path.basename(initial)
     noext, ext = filename_with_ext.rsplit('.', 1)
-    fname = base
+    fname = initial
     while os.path.exists(fname) and i < 1000:
         fname = os.path.join(d, f'{noext}_{i}.{ext}')
         i += 1
@@ -268,11 +272,15 @@ class GUI(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.files = []
+        self.files = set()
         self.output = None
 
     def summarize(self):
-        summarize_files(self.files, self.output)
+        summarize_files(list(self.files), self.output)
+        if hasattr(os, 'startfile'):
+            os.startfile(self.output)
+        else:
+            os.system(f'xdg-open {self.output}')
         raise SystemExit
 
 
@@ -283,7 +291,7 @@ class GUI(QWidget):
         self.summarize_button.move(100, 65)
         self.summarize_button.hide()
 
-        self.drag_label = QLabel('drag files over here', self)
+        self.drag_label = QLabel('drag files here', self)
         self.drag_label.move(50, 65)
 
         self.setWindowTitle('Post Process xlsx summarizer')
@@ -301,19 +309,18 @@ class GUI(QWidget):
             print("no files dragged")
             return
         directory = os.path.dirname(files[0])
-        self.output = find_similar_vacancy(os.path.join(directory, OUTPUT_FILENAME))
+        self.output = allocate_unused_file_in_directory(os.path.join(directory, OUTPUT_FILENAME))
         if os.path.exists(self.output):
-            # TODO - show error in gui
+            self.status_label.setText('too many existing summarize.xlsx files, delete them')
             print("failed to find an output filename that doesn't already exist")
             return
-        print(f"writing output to {self.output}")
-        self.summarize_button.text = f"write {os.path.basename(self.output)}"
         for file in files:
             if not os.path.exists(file):
                 print(f"no such file {file}")
             else:
-                self.files.append(file)
+                self.files.add(file)
         if len(self.files) > 0:
+            self.summarize_button.setText(f"{len(self.files)} to {os.path.basename(self.output)}")
             self.drag_label.hide()
             self.summarize_button.show()
         else:
