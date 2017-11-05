@@ -4,6 +4,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from linecache import getlines
+from configparser import ConfigParser
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel
@@ -21,9 +22,7 @@ UP_AVERAGES_TEXT = 'UP Averages'
 ALL_AVERAGES_TEXT = 'ALL Averages'
 HALF_CYCLE_SUMMARY_TEXT = 'Half-Cycle Summary'
 
-DEFAULT_USER_DEFINED_FIELDS = ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"]
-USER_DEFINED_FIELDS_FILENAME = 'summary_user_defined.txt'
-
+CONFIG_FILENAME = 'summary.ini'
 OUTPUT_FILENAME = 'summary.xlsx'
 
 
@@ -148,15 +147,13 @@ class IntAlloc():
         return self.val
 
 
-def summarize_dir(d, user_defined_fields=None):
-    if user_defined_fields == None:
-        user_defined_fields = get_user_defined_fields(d)
+def summarize_dir(d, config):
     output_filename = os.path.join(d, OUTPUT_FILENAME)
     filenames = read_xlsx(d)
-    summarize_files(filenames=filenames, output_filename=output_filename, user_defined_fields=user_defined_fields)
+    summarize_files(filenames=filenames, output_filename=output_filename, config=config)
 
 
-def summarize_files(filenames, output_filename, user_defined_fields=None):
+def summarize_files(filenames, output_filename, config):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new summary.xls file from them
@@ -166,12 +163,13 @@ def summarize_files(filenames, output_filename, user_defined_fields=None):
     readers = get_readers(filenames)
     N = len(readers)
 
-    if user_defined_fields is None:
-        user_defined_fields = list(DEFAULT_USER_DEFINED_FIELDS)
-    
     if N == 0:
         print("no files found")
         return
+
+    user_defined_fields = config.user_defined_fields
+    half_cycle_directions = config.half_cycle_directions
+    half_cycle_fields = config.half_cycle_fields
 
     print("reading parameters")
     all_parameters = [get_parameters(reader) for reader in readers]
@@ -184,12 +182,12 @@ def summarize_files(filenames, output_filename, user_defined_fields=None):
     known_summary_titles = small_int_dict(all_summary_titles)
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
-    summary_titles = list(known_summary_titles.keys())
+    summary_titles = half_cycle_fields # TODO - treat known_summary_titles somehow?
     parameter_names = list(known_parameters.keys())
     N_par = len(parameter_names)
     N_sum = len(summary_titles)
-    top_titles = Render.points_add([(N_par, 'Down'), (N_sum, 'Up'), (N_sum, 'All')])
-    titles = parameter_names + (3 * summary_titles)
+    top_titles = Render.points_add(({'down': N_par, 'up':N_sum, 'all':N_sum}[d], d) for d in half_cycle_directions)
+    titles = parameter_names + (len(half_cycle_directions) * summary_titles)
 
     # writing starts here. write titles
     writer = xlwr.Workbook(output_filename)
@@ -214,11 +212,11 @@ def summarize_files(filenames, output_filename, user_defined_fields=None):
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
         params_values = Render.subset(key_ind_dict=known_parameters, d=parameters)
-        s_up, s_down, s_all = [
-            {k: v for k, v in zip(summary['titles'], summary[key])}
-            for key in ('up', 'down', 'all')]
-        summary_rows = [Render.subset(known_summary_titles, sum_row)
-                        for sum_row in (s_up, s_down, s_all)]
+        sum_per_dir = [
+            {k: v for k, v in zip(summary['titles'], summary[key.lower()])}
+            for key in half_cycle_directions]
+        summary_rows = [Render.subset(summary_titles, sum_row)
+                        for sum_row in sum_per_dir]
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
         data = [filename] + [''] * n_user + params_values + summary_values
@@ -270,12 +268,27 @@ def paths_from_file_urls(urls):
     return ret
 
     
-def get_user_defined_fields(d):
-    filename = os.path.join(d, USER_DEFINED_FIELDS_FILENAME)
-    if not os.path.exists(filename):
-        return None
-    return [x for x in getlines(filename) if x.strip() != '' and not x.strip().startswith('#')]
+class Config:
+    def __init__(self, d):
+        ini_filename = os.path.join(d, CONFIG_FILENAME)
+        if os.path.exists(ini_filename):
+            self.config = ConfigParser()
+            self.config.read(ini_filename)
+        else:
+            self.config = None
+        self.user_defined_fields = self._get_strings('user_defined', 'fields', ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"])
+        self.half_cycle_fields = self._get_strings('half_cycle', 'fields', default=['Average Velocity [m/s]', 'Flow Rate [LPM]'])
+        self.half_cycle_directions = self._get_strings('half_cycle', 'directions', ['down', 'up', 'all'])
 
+    def _get(self, section, field, default):
+        if self.config is not None and self.config.has_option(section, field):
+            return self.config.get(section, field)
+        return default
+    
+    def _get_strings(self, section, field, default):
+        if self.config is not None and self.config.has_option(section, field):
+            return [x.strip() for x in self.config.get(section, field).split(',')]
+        return default
 
 class GUI(QWidget):
     def __init__(self):
@@ -285,8 +298,8 @@ class GUI(QWidget):
         self.output = None
 
     def summarize(self):
-        user_defined_fields = get_user_defined_fields(os.path.dirname(self.output))
-        summarize_files(list(self.files), self.output, user_defined_fields=user_defined_fields)
+        config = Config(os.path.dirname(self.output))
+        summarize_files(list(self.files), self.output, config=config)
         if hasattr(os, 'startfile'):
             os.startfile(self.output)
         else:
@@ -355,7 +368,7 @@ def main():
         return
 
     # console mode
-    output = summarize_dir(args.dir)
+    output = summarize_dir(args.dir, Config(args.dir))
     if not output:
         return
     print(f"wrote {output}")

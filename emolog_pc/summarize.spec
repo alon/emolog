@@ -2,6 +2,7 @@
 
 block_cipher = None
 
+import os
 import sys
 sys.path.insert(0, ".")
 from emolog.setup import build_artifacts
@@ -10,7 +11,7 @@ build_artifacts()
 a = Analysis(['summarize.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],
              binaries=[],
-             datas=[],
+             datas=[(os.path.join('config', 'summary.ini'), '.'],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
@@ -27,7 +28,7 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True )
+          console=False )
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
