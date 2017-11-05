@@ -10,7 +10,6 @@ import os
 import sys
 import string
 import logging
-import csv
 import struct
 import random
 import asyncio
@@ -21,10 +20,11 @@ from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
 
+from ..util import version
 from ..cython_util import decode_little_endian_float
-from ..lib import Client, SamplerSample, AckTimeout
+from ..lib import SamplerSample, AckTimeout, Client
 from ..dwarf import FileParser
-from ..util import version, coalesce_meth
+from ..cylib import CyEmoToolClient
 from .post_processor import post_process
 from .main_window import run_forever
 
@@ -106,101 +106,6 @@ async def start_fake_sine(ticks_per_second, port):
     create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
 
 
-class EmoToolClient(Client):
-    # must be singleton!
-    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
-    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
-    # until the final cleanup. This means multiple instances will fail to communicate.
-
-    instance = None
-
-    def __init__(self, verbose, dump, window):
-        if EmoToolClient.instance is not None:
-            raise Exception("EmoToolClient is a singleton, can't create another instance")
-        super(EmoToolClient, self).__init__(verbose=verbose, dump=dump)
-        self.csv = None
-        self.csv_filename = None
-        self.first_ticks = None
-        self.last_ticks = None
-        self.min_ticks = None
-        self.names = None
-        self.samples_received = 0
-        self.ticks_lost = 0
-        self.max_ticks = None
-        self._running = False
-        self.fd = None
-        self.window = window
-        EmoToolClient.instance = self  # for singleton
-
-    def reset(self, csv_filename, names, min_ticks, max_ticks):
-        self.csv = None
-        self.csv_filename = csv_filename
-        self.first_ticks = None
-        self.last_ticks = None
-        self.min_ticks = min_ticks
-        self.names = names
-        self.samples_received = 0
-        self.ticks_lost = 0
-        self.max_ticks = max_ticks
-        self._running = True
-
-    @property
-    def running(self):
-        return self._running
-
-    @property
-    def total_ticks(self):
-        if self.first_ticks is None or self.last_ticks is None:
-            return 0
-        return self.last_ticks - self.first_ticks
-
-    def initialize_file(self):
-        if self.csv:
-            return
-        self.fd = open(self.csv_filename, 'w+')
-        self.csv = csv.writer(self.fd, lineterminator='\n')
-        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
-
-    def stop(self):
-        self._running = False
-
-    def handle_sampler_samples(self, msgs):
-        """
-        Write to CSV, add points to plots
-        :param msgs: [(seq, ticks, {name: value})]
-        :return: None
-        """
-        if not self._running:
-            return
-        if not self.csv:
-            self.initialize_file()
-        # TODO - decode variables (integer/float) in emolog VariableSampler
-        now = time() * 1000
-        self.csv.writerows([[seq, ticks, now] +
-                          [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
-        self.fd.flush()
-        if self.window:
-            for msg in msgs:
-                self.plot(msg)
-        self.samples_received += len(msgs)
-        for seq, ticks, variables in msgs:
-            if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
-                print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
-                    now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
-                self.ticks_lost += ticks - self.last_ticks - self.min_ticks
-            self.last_ticks = ticks
-        if self.first_ticks is None:
-            self.first_ticks = self.last_ticks
-        if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
-            self.stop()
-
-    def plot(self, msg):
-        (_seq, ticks, variables) = msg
-        self.do_plot((ticks, list(variables.items())))
-
-    @coalesce_meth(hertz=10) # Limit refreshes, they can be costly
-    def do_plot(self, msgs):
-        self.window.log_variables(msgs=msgs)
 
 
 def iterate(prefix, initial):
@@ -324,6 +229,12 @@ def create_python_process_cmdline(script):
 
 def create_python_process_cmdline_command(command):
     return ['python', '-c', command]
+
+
+class EmoToolClient(CyEmoToolClient, Client):
+    def __init__(self, verbose, dump, window):
+        Client.__init__(self, verbose=verbose, dump=dump)
+        CyEmoToolClient.__init__(self, verbose, dump, window)
 
 
 async def start_transport(client):
@@ -585,6 +496,7 @@ async def run_client(client, variables, allow_kb_stop):
     dt = 0.1 if args.runtime is not None else 1.0
     if allow_kb_stop and try_getch_message:
         print(try_getch_message)
+    client.start_logging_time = time()
     while client.running:
         logger.info('beep')
         if allow_kb_stop and try_getch():
@@ -653,8 +565,9 @@ async def amain(window):
     await run_client(client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
+    setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
-    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time}")
+    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time:#3.6} (setup time {setup_time:#3.6})")
     return client
 
 
@@ -679,6 +592,7 @@ def start_gui_callback(loop, window):
             print("exiting on user ctrl-c")
         except Exception as e:
             logger.error("got exception {!r}".format(e))
+            raise
     client = EmoToolClient.instance
     loop.run_until_complete(cleanup(client))
     if args.wait_for_gui:

@@ -1,3 +1,5 @@
+# cython: linetrace=True
+
 """
 Emolog is a logging protocol for debugging embedded c programs.
 
@@ -28,8 +30,12 @@ from time import time
 from logging import getLogger
 from struct import pack, unpack
 from asyncio import Protocol, get_event_loop, Future, InvalidStateError, sleep
+import csv
+from functools import wraps
 
 import builtins # profile will be here when run via kernprof
+
+import cython
 
 from .setup import is_development_package, build_protocol_library, PROTOCOL_LIB, EMO_MESSAGE_TYPE_H_FILENAME
 
@@ -74,7 +80,7 @@ cdef extern from "emolog_protocol.h":
 ### Globals
 
 
-class EmoMessageTypes(object):
+class EmoMessageTypes:
     pass
 
 
@@ -94,7 +100,7 @@ def initialize_emo_message_type_to_str():
 initialize_emo_message_type_to_str()
 
 
-HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
+cdef int HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
 
 
 MAGIC = unpack(ENDIANESS + 'H', b'EM')[0]
@@ -245,7 +251,6 @@ class SamplerSample(Message):
     def handle_by(self, handler):
         if handler.sampler.running:
             self.update_with_sampler(handler.sampler)
-            handler.received_samples += 1
             handler.pending_samples.append((self.seq, self.ticks, self.variables))
             #logger.debug(f"Got Sample: {self}")
         else:
@@ -347,7 +352,11 @@ class RegisteredVariable(object):
         self._type = _type
 
 
-class VariableSampler(object):
+@cython.final
+cdef class VariableSampler:
+    cdef public list table
+    cdef public bint running
+
     def __init__(self):
         self.table = []
         self.running = False
@@ -370,9 +379,9 @@ class VariableSampler(object):
             size=size,
             _type=_type))
 
-    def variables_from_ticks_and_payload(self, ticks, payload):
+    def variables_from_ticks_and_payload(self, int ticks, payload):
         variables = {}
-        offset = 0
+        cdef int offset = 0
         for row in self.table:
             if ticks % row.period_ticks == row.phase_ticks:
                 variables[row.name] = row._type(payload[offset:offset + row.size])
@@ -396,6 +405,7 @@ cdef uint8_t *to_str(val, size):
 
 SAMPLER_SAMPLE_TICKS_FORMAT = ENDIANESS + 'L'
 
+sampler_sample = SamplerSample(0, 0)
 
 def emo_decode(buf, i_start):
     n = len(buf)
@@ -410,7 +420,8 @@ def emo_decode(buf, i_start):
         if emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
             ticks = unpack(SAMPLER_SAMPLE_TICKS_FORMAT, payload[:4])[0]
-            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
+            sampler_sample.reset(seq=seq, ticks=ticks, payload=payload[4:])
+            msg = sampler_sample
         elif emo_type == emo_message_types.version:
             (client_version, reply_to_seq, reserved) = unpack(ENDIANESS + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
@@ -455,7 +466,6 @@ class Parser(object):
         self.debug_message_decoding = debug
 
     def iter_available_messages(self, s):
-        ret = []
         assert isinstance(s, bytes)
         if len(s) == 0:
             self.empty_count += 1
@@ -483,13 +493,12 @@ class Parser(object):
                 logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
-            ret.append(msg)
+            yield msg
             i = i_next
         self.buf = self.buf[i:]
         if len(self.buf) > 1024:
             print("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
                 len(self.buf), len(self.buf) + i))
-        return ret
 
     def send_message(self, command_class, **kw):
         """
@@ -655,6 +664,8 @@ cdef class CyClientBase:
 
     ACK_TIMEOUT_SECONDS = 1.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
+    cdef int received_samples
+    cdef unsigned stopped
 
     def __init__(self, verbose=False, dump=None):
         self._futures = set()
@@ -666,7 +677,7 @@ cdef class CyClientBase:
         self.parser = None
         self.transport = None
         self.connection_made_future = self.add_future()
-        self.stopped = False
+        self.stopped = 0
         if dump:
             self.dump = open(dump, 'wb')
         else:
@@ -681,7 +692,7 @@ cdef class CyClientBase:
         #self.dump.flush()
 
     def exit_gracefully(self):
-        self.stopped = True
+        self.stopped = 1
         self.cancel_all_futures()
 
     def cancel_all_futures(self):
@@ -738,15 +749,15 @@ cdef class CyClientBase:
         self.ack = self.add_future(timeout=self.ACK_TIMEOUT_SECONDS, timeout_result=self.ACK_TIMEOUT)
 
     def data_received(self, data):
-        if self.stopped:
+        if self.stopped > 0:
             return
         if self.dump:
             self.dump_buf(data)
-        msgs = self.parser.iter_available_messages(data)
-        for msg in msgs:
+        for msg in self.parser.iter_available_messages(data):
             msg.handle_by(self)
         if len(self.pending_samples) > 0:
             self.handle_sampler_samples(self.pending_samples)
+            self.received_samples += len(self.pending_samples)
             del self.pending_samples[:]
 
     def handle_sampler_samples(self, msgs):
@@ -760,3 +771,121 @@ class ClientBase(CyClientBase, Protocol):
     def __init__(self, verbose=False, dump=None):
         CyClientBase.__init__(self, verbose=verbose, dump=dump)
         Protocol.__init__(self)
+
+
+##### EmoTool
+
+def coalesce_meth(hertz):
+    """ decorator to call real function.
+    TODO: use async loop mechanism, since otherwise this ends up possibly forgetting
+    the last point. Since we intend to work at 20000 Hz and look at seconds, this is
+     not a real problem"""
+    dt = 1.0 / hertz
+    def wrappee(f):
+        last_time = [None]
+        msgs = []
+        @wraps(f)
+        def wrapper(self, msg):
+            msgs.append(msg)
+            cur_time = time()
+            lt = last_time[0]
+            if lt is None or cur_time - lt >= dt:
+                last_time[0] = cur_time
+            else:
+                return
+            f(self, msgs)
+            msgs.clear()
+        return wrapper
+    return wrappee
+
+
+class CyEmoToolClient:
+    # must be singleton!
+    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
+    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
+    # until the final cleanup. This means multiple instances will fail to communicate.
+
+    instance = None
+
+    def __init__(self, verbose, dump, window):
+        if CyEmoToolClient.instance is not None:
+            raise Exception("EmoToolClient is a singleton, can't create another instance")
+        self.csv = None
+        self.csv_filename = None
+        self.first_ticks = None
+        self.last_ticks = None
+        self.min_ticks = None
+        self.names = None
+        self.samples_received = 0
+        self.ticks_lost = 0
+        self.max_ticks = None
+        self._running = False
+        self.fd = None
+        self.window = window
+        CyEmoToolClient.instance = self  # for singleton
+
+    def reset(self, csv_filename, names, min_ticks, max_ticks):
+        self.csv = None
+        self.csv_filename = csv_filename
+        self.first_ticks = None
+        self.last_ticks = None
+        self.min_ticks = min_ticks
+        self.names = names
+        self.samples_received = 0
+        self.ticks_lost = 0
+        self.max_ticks = max_ticks
+        self._running = True
+
+    @property
+    def running(self):
+        return self._running
+
+    @property
+    def total_ticks(self):
+        if self.first_ticks is None or self.last_ticks is None:
+            return 0
+        return self.last_ticks - self.first_ticks
+
+    def initialize_file(self):
+        if self.csv:
+            return
+        self.fd = open(self.csv_filename, 'w+')
+        self.csv = csv.writer(self.fd, lineterminator='\n')
+        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+
+    def stop(self):
+        self._running = False
+
+    def handle_sampler_samples(self, msgs):
+        """
+        Write to CSV, add points to plots
+        :param msgs: [(seq, ticks, {name: value})]
+        :return: None
+        """
+        if not self._running:
+            return
+        if not self.csv:
+            self.initialize_file()
+        # TODO - decode variables (integer/float) in emolog VariableSampler
+        now = time() * 1000
+        self.csv.writerows([[seq, ticks, now] +
+                      [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
+        self.fd.flush()
+        if self.window:
+            for (_seq, ticks, variables) in msgs:
+                self.do_plot((ticks, list(variables.items())))
+        self.samples_received += len(msgs)
+        for seq, ticks, variables in msgs:
+            if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
+                print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
+                    now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
+                self.ticks_lost += ticks - self.last_ticks - self.min_ticks
+            self.last_ticks = ticks
+        if self.first_ticks is None:
+            self.first_ticks = self.last_ticks
+        if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
+            self.stop()
+
+    @coalesce_meth(10) # Limit refreshes, they can be costly
+    def do_plot(self, msgs):
+        self.window.log_variables(msgs=msgs)
