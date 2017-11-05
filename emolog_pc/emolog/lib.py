@@ -32,11 +32,12 @@ import sys
 from time import clock
 from math import sin
 from abc import ABCMeta, abstractmethod
-import logging
+from logging import getLogger
 
 from .util import which
 
 import builtins # profile will be here when run via kernprof
+
 
 if 'profile' not in builtins.__dict__:
     def nop_decorator(f):
@@ -69,7 +70,7 @@ __all__ = [
 ENDIANESS = '<'
 
 
-logger = logging.getLogger('emolog')
+logger = getLogger('emolog')
 
 
 if 'win' in sys.platform:
@@ -842,7 +843,7 @@ class FakeSineEmbedded(asyncio.Protocol):
     def __init__(self, ticks_per_second, **kw):
         super().__init__(**kw)
         self.ticks_per_second = ticks_per_second
-        self.tick_time = 1.0 / ticks_per_second
+        self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
         self.verbose = True
         self.parser = None
         self.sines = []
@@ -912,7 +913,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         # We could use the gcd to find the minimal tick size but this is good enough
         if len(var_size_pairs) > 0:
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
-        dt = max(0.0, self.tick_time * self.ticks + self.start_time - time())
+        dt = max(0.0, self.tick_time * self.ticks + self.start_time - time()) if self.ticks_per_second > 0.0 else 0
         self.eventloop.call_later(dt, self.handle_time_event)
 
 

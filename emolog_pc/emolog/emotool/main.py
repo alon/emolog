@@ -86,6 +86,10 @@ def dwarf_get_variables_by_name(filename, names):
     return sampled_vars
 
 
+async def start_fake_bench(port):
+    return await start_fake_sine(ticks_per_second=0, port=port)
+
+
 async def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
     # Use our executable to work with a development environment (python executable)
@@ -330,6 +334,8 @@ async def start_transport(client):
     port = random.randint(10000, 50000)
     if args.fake:
         await start_fake_sine(args.ticks_per_second, port)
+    elif args.fake_bench:
+        await start_fake_bench(port)
     else:
         start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     attempt = 0
@@ -405,6 +411,8 @@ def parse_args():
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake', default=False, action='store_true',
                         help='debug only - fake a client - no serial nor elf required')
+    parser.add_argument('--fake-bench', default=False, action='store_true',
+                        help='debug only - fake a client, benchmark processing time')
     parser.add_argument('--serial', default='auto', help='serial port to use')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
@@ -443,7 +451,7 @@ def parse_args():
 
     ret, unparsed = parser.parse_known_args()
 
-    if not ret.fake:
+    if not ret.fake and not ret.fake_bench:
         if not ret.elf and not ret.embedded:
             # elf required unless fake_sine in effect
             parser.print_usage()
