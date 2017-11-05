@@ -33,6 +33,7 @@ import builtins # profile will be here when run via kernprof
 
 from .setup import is_development_package, build_protocol_library, PROTOCOL_LIB, EMO_MESSAGE_TYPE_H_FILENAME
 
+# TODO: line_profiler is not compatible with cython.
 if 'profile' not in builtins.__dict__:
     def nop_decorator(f):
         return f
@@ -509,7 +510,28 @@ class Parser(object):
 
 #### FakeEmbedded
 
-class FakeSineEmbedded(Protocol):
+
+# we ignore address, and size is used to return the same size as requested
+cdef struct Sine:
+    # Sinus parameters
+    float freq
+    float amp
+    float phase
+    # Sampling parameters
+    int period_ticks
+    int phase_ticks
+    int size
+    int address
+
+
+def make_sine():
+    return Sine(size=4, address=7,
+                           freq=50 + 50 * (5 / 10.0), amp=10 * 5, phase=0.05 * 5,
+                           phase_ticks=10,
+                           period_ticks=20)
+
+
+cdef class FakeSineEmbeddedBase:
     """
     Implement a simple embedded side. We don't care about the addresses,
     just fake a sinus on each address, starting at t=phase_ticks when requested,
@@ -526,21 +548,15 @@ class FakeSineEmbedded(Protocol):
     """
 
     VERSION = 1
+    cdef Sine sines[10]
+    cdef int sines_num;
 
-    # we ignore address, and size is used to return the same size as requested
-    Sine = namedtuple('Sine', [
-        # Sinus parameters
-        'freq', 'amp', 'phase',
-        # Sampling parameters
-        'period_ticks', 'phase_ticks', 'size', 'address'])
-
-    def __init__(self, ticks_per_second, **kw):
-        super().__init__(**kw)
+    def __init__(self, ticks_per_second):
         self.ticks_per_second = ticks_per_second
         self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
         self.verbose = True
         self.parser = None
-        self.sines = []
+        self.sines_num = 0
         self.start_time = time()
         self.running = False
         self.ticks = 0
@@ -574,7 +590,7 @@ class FakeSineEmbedded(Protocol):
             self.parser.send_message(Ack, error=0, reply_to_seq=msg.seq)
 
     def on_sampler_clear(self):
-        self.sines.clear()
+        self.sines_num = 0
 
     def on_sampler_stop(self):
         self.running = False
@@ -587,11 +603,12 @@ class FakeSineEmbedded(Protocol):
     def on_sampler_register_variable(self, msg):
         phase_ticks, period_ticks, address, size = (
             msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
-        n = len(self.sines) + 1
-        self.sines.append(self.Sine(size=size, address=address,
-                               freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
-                               phase_ticks=phase_ticks,
-                               period_ticks=period_ticks))
+        n = self.sines_num
+        self.sines_num += 1
+        self.sines[n] = Sine(size=size, address=address,
+                           freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
+                           phase_ticks=phase_ticks,
+                           period_ticks=period_ticks)
 
     def handle_time_event(self):
         # ignore time for the ticks aspect - a tick is a call of this function.
@@ -601,7 +618,8 @@ class FakeSineEmbedded(Protocol):
         self.ticks += 1
         t = self.ticks * self.tick_time
         var_size_pairs = []
-        for sine in self.sines:
+        for i in range(self.sines_num):
+            sine = self.sines[i]
             if self.ticks % sine.period_ticks == sine.phase_ticks:
                 var_size_pairs.append((float(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
         # We could use the gcd to find the minimal tick size but this is good enough
@@ -609,6 +627,12 @@ class FakeSineEmbedded(Protocol):
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
         dt = max(0.0, self.tick_time * self.ticks + self.start_time - time()) if self.ticks_per_second > 0.0 else 0
         self.eventloop.call_later(dt, self.handle_time_event)
+
+
+class FakeSineEmbedded(FakeSineEmbeddedBase, Protocol):
+    def __init__(self, ticks_per_second, **kw):
+        FakeSineEmbeddedBase.__init__(self, ticks_per_second)
+        Protocol.__init__(self, **kw)
 
 
 ##### Client
@@ -620,7 +644,7 @@ class Dumper:
 dumper = Dumper()
 
 
-class ClientBase(Protocol):
+cdef class CyClientBase:
     """
     Note: removed handling of Acks
      - TODO
@@ -731,3 +755,8 @@ class ClientBase(Protocol):
         """
         pass
 
+
+class ClientBase(CyClientBase, Protocol):
+    def __init__(self, verbose=False, dump=None):
+        CyClientBase.__init__(self, verbose=verbose, dump=dump)
+        Protocol.__init__(self)

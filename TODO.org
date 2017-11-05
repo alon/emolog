@@ -20,6 +20,11 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 
 + [ ] --log with --verbose yields an empty log file. This means we can't log stuff to file without some "noise" in the printouts to the screen
 
++ [ ] performance: currently 80% on a single core of an i7 4th gen when handling 20k samples (80% bandwidth of 8Mbps). Should be factor of 2 better at least, probably 10 (just giving random numbers - but already seen a lot of improvement with selectively converting parts to cython).
+
++ [ ] unbreak setup.py - cython now needs include path to emolog_protocol
+      python setup.py build_ext --inplace --include-dirs ../emolog_protocol/source/
+
 
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
