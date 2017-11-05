@@ -61,7 +61,7 @@ cdef extern from "emolog_protocol.h":
     void emo_encode_sampler_sample_start(uint8_t *dest);
     void emo_encode_sampler_sample_add_var(uint8_t *dest, const uint8_t *p, uint16_t size);
     uint16_t emo_encode_sampler_sample_end(uint8_t *dest, uint32_t ticks);
-    int16_t emo_decode(const uint8_t *src, uint16_t size);
+    #int16_t emo_decode(const uint8_t *src, uint16_t size);
     int16_t emo_decode_with_offset(const uint8_t *src, unsigned offset, uint16_t size);
     void crc_init();
 
