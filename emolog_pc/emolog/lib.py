@@ -19,18 +19,16 @@
 
 from asyncio import Future, Protocol, sleep, get_event_loop
 from asyncio.futures import InvalidStateError
-from collections import namedtuple
 from time import time
 from struct import pack
 import sys
-from math import sin
 from logging import getLogger
 
 import builtins # profile will be here when run via kernprof
 
 from .cylib import (
-    SamplerRegisterVariable, SamplerClear, SamplerSample, SamplerStart, SamplerStop, Ack, Version,
-    Message,
+    SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
+    FakeSineEmbedded,
     AckTimeout, VariableSampler, Parser)
 
 if 'profile' not in builtins.__dict__:
@@ -221,104 +219,3 @@ class Client(Protocol):
         """
         pass
 
-
-class FakeSineEmbedded(Protocol):
-    """
-    Implement a simple embedded side. We don't care about the addresses,
-    just fake a sinus on each address, starting at t=phase_ticks when requested,
-    having a frequency that rises. Actually I'll wing it - it's really just
-    a source of signals for debugging:
-        the protocol
-        the GUI
-
-    Also an example of how an embedded side behaves:
-        Respond with ACK to everything
-        Except to Version: respond with our Version
-
-    !important! do not write to STDOUT - used in a pipe
-    """
-
-    VERSION = 1
-
-    # we ignore address, and size is used to return the same size as requested
-    Sine = namedtuple('Sine', [
-        # Sinus parameters
-        'freq', 'amp', 'phase',
-        # Sampling parameters
-        'period_ticks', 'phase_ticks', 'size', 'address'])
-
-    def __init__(self, ticks_per_second, **kw):
-        super().__init__(**kw)
-        self.ticks_per_second = ticks_per_second
-        self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
-        self.verbose = True
-        self.parser = None
-        self.sines = []
-        self.start_time = time()
-        self.running = False
-        self.ticks = 0
-        self.eventloop = get_event_loop()
-
-    def connection_made(self, transport):
-        self.parser = Parser(transport, debug=self.verbose)
-
-    def data_received(self, data):
-        for msg in self.parser.iter_available_messages(data):
-            self.handle_message(msg)
-
-    def handle_message(self, msg):
-        if not isinstance(msg, Message):
-            return
-
-        # handle everything except Version
-        if isinstance(msg, SamplerClear):
-            self.on_sampler_clear()
-        elif isinstance(msg, SamplerStart):
-            self.on_sampler_start()
-        elif isinstance(msg, SamplerStop):
-            self.on_sampler_stop()
-        elif isinstance(msg, SamplerRegisterVariable):
-            self.on_sampler_register_variable(msg)
-
-        # reply with ACK to everything
-        if isinstance(msg, Version):
-            self.parser.send_message(Version, version=self.VERSION, reply_to_seq=msg.seq)
-        else:
-            self.parser.send_message(Ack, error=0, reply_to_seq=msg.seq)
-
-    def on_sampler_clear(self):
-        self.sines.clear()
-
-    def on_sampler_stop(self):
-        self.running = False
-
-    def on_sampler_start(self):
-        self.running = True
-        self.ticks = 0
-        self.eventloop.call_later(0.0, self.handle_time_event)
-
-    def on_sampler_register_variable(self, msg):
-        phase_ticks, period_ticks, address, size = (
-            msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
-        n = len(self.sines) + 1
-        self.sines.append(self.Sine(size=size, address=address,
-                               freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
-                               phase_ticks=phase_ticks,
-                               period_ticks=period_ticks))
-
-    def handle_time_event(self):
-        # ignore time for the ticks aspect - a tick is a call of this function.
-        # easy.
-        if not self.running:
-            return
-        self.ticks += 1
-        t = self.ticks * self.tick_time
-        var_size_pairs = []
-        for sine in self.sines:
-            if self.ticks % sine.period_ticks == sine.phase_ticks:
-                var_size_pairs.append((float(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
-        # We could use the gcd to find the minimal tick size but this is good enough
-        if len(var_size_pairs) > 0:
-            self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
-        dt = max(0.0, self.tick_time * self.ticks + self.start_time - time()) if self.ticks_per_second > 0.0 else 0
-        self.eventloop.call_later(dt, self.handle_time_event)
