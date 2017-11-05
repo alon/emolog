@@ -97,10 +97,8 @@ MAGIC = unpack(ENDIANESS + 'H', b'EM')[0]
 
 
 class Message(metaclass=ABCMeta):
-
     # Used by all encode functions - can segfault if buffer is too small
-    buf_size = 1024
-    buf = b'\x00' * buf_size #create_string_buffer(buf_size)
+    buf = b'\x00' * 1024  # create_string_buffer(buf_size)
 
     def __init__(self, seq):
         self.seq = seq
