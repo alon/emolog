@@ -206,8 +206,8 @@ def summarize_files(filenames, output_filename, config):
     row = IntAlloc()
     # create titles
     n_user = len(user_defined_fields)
-    summary_out.write_column(row=row.val + 1, col=0, data=[''] * n_user + top_titles, cell_format=title_format)
-    summary_out.write_column(row=row.val + 1, col=1, data=user_defined_fields + titles, cell_format=title_format)
+    summary_out.write_row(col=row.val + 1, row=0, data=[''] * n_user + top_titles, cell_format=title_format)
+    summary_out.write_row(col=row.val + 1, row=1, data=user_defined_fields + titles, cell_format=title_format)
 
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
@@ -220,9 +220,9 @@ def summarize_files(filenames, output_filename, config):
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
         data = [filename] + [''] * n_user + params_values + summary_values
-        summary_out.write_column(row=row.val, col=reader_i + 2, data=data, cell_format=col_format)
-    summary_out.set_column(firstcol=0, lastcol=2, width=8)
-    summary_out.set_column(firstcol=2, lastcol=N + 3, width=8)
+        summary_out.write_row(col=row.val, row=reader_i + 2, data=data, cell_format=col_format)
+    #summary_out.set_row(firstrow=0, lastrow=2, width=8)
+    #summary_out.set_row(firstrow=2, lastrow=N + 3, width=8)
     writer.close()
     return output_filename
 

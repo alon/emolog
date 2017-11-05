@@ -11,7 +11,7 @@ build_artifacts()
 a = Analysis(['summarize.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],
              binaries=[],
-             datas=[(os.path.join('config', 'summary.ini'), '.'],
+             datas=[(os.path.join('config', 'summary.ini'), '.')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
