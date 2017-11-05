@@ -21,6 +21,7 @@ from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
 
+from ..cython_util import decode_little_endian_float
 from ..lib import Client, SamplerSample, AckTimeout
 from ..dwarf import FileParser
 from ..util import version, coalesce_meth
@@ -214,10 +215,6 @@ def next_available(folder, prefix):
         candidate = os.path.join(folder, filename)
         if not os.path.exists(candidate):
             return candidate
-
-
-def decode_little_endian_float(s):
-    return struct.unpack('<f', s)[0]
 
 
 def return_enum_decoder(size):

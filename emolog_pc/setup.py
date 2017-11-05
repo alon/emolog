@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, Extension
 
 from Cython.Build import cythonize
 
@@ -6,6 +6,14 @@ from emolog.setup import build_artifacts
 
 # TODO - turn this into setup commands so it happens during setup (for instance not when run with --help)
 artifacts = build_artifacts()
+
+gdb_debug = False
+
+cylib = Extension(name="emolog.cylib", sources=["emolog/cylib.pyx", "../emolog_protocol/source/emolog_protocol.c"],
+                  include_path='../emolog_protocol/source')
+cython_util = Extension(name="emolog.cython_util", sources=["emolog/cython_util.pyx"])
+
+cython_extensions = [cylib, cython_util]
 
 setup(
     name='Emotool',
@@ -27,7 +35,7 @@ setup(
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     package_data={'emolog': artifacts},
-    ext_modules = cythonize("emolog/cython_util.pyx"),
+    ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
     data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
     entry_points={
         'console_scripts': [
