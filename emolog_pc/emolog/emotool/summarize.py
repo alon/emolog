@@ -28,7 +28,7 @@ OUTPUT_FILENAME = 'summary.xlsx'
 
 def read_xlsx(d):
     entries = [entry for entry in os.scandir(d) if entry.is_file() and entry.path.endswith('xlsx')]
-    filenames = [entry.path for entry in entries]
+    filenames = list(sorted([entry.path for entry in entries]))
     return filenames
 
 
