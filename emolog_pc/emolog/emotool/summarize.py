@@ -267,7 +267,7 @@ def paths_from_file_urls(urls):
         ret.append(x)
     return ret
 
-    
+
 class Config:
     def __init__(self, d):
         ini_filename = os.path.join(d, CONFIG_FILENAME)
@@ -283,12 +283,12 @@ class Config:
 
     def _get(self, section, field, default):
         if self.config is not None and self.config.has_option(section, field):
-            return self.config.get(section, field)
+            return self.config.get(section, field, raw=True) # avoid % interpolation, we want to have % values
         return default
-    
+
     def _get_strings(self, section, field, default):
         if self.config is not None and self.config.has_option(section, field):
-            return [x.strip() for x in self.config.get(section, field).split(',')]
+            return [x.strip() for x in self.config.get(section, field, raw=True).split(',')]
         return default
 
 class GUI(QWidget):
