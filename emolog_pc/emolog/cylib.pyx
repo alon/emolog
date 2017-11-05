@@ -437,3 +437,67 @@ class AckTimeout(Exception):
     pass
 
 
+class Parser(object):
+    def __init__(self, transport, debug=False):
+        self.transport = transport
+        self.buf = b''
+        self.send_seq = 0
+        self.empty_count = 0
+
+        # debug flags
+        self.debug_message_encoding = debug
+        self.debug_message_decoding = debug
+
+    def iter_available_messages(self, s):
+        ret = []
+        assert isinstance(s, bytes)
+        if len(s) == 0:
+            self.empty_count += 1
+            # stream closed - quit - but wait a bit to be sure
+            if self.empty_count > 2:
+                raise SystemExit()
+        self.buf = self.buf + s
+        i = 0
+        buf = self.buf
+        n = len(buf)
+        while i < n:
+            msg, i_next, error = emo_decode(buf, i_start=i)
+            if error:
+                logger.error(error)
+            if self.debug_message_decoding:
+                if error:
+                    logger.error("decoding error, buf length {}, error: {}".format(n, error))
+                elif not hasattr(msg, 'type'):
+                    logger.debug("decoded {}".format(msg))
+                else:
+                    logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
+                        emo_message_type_to_str[msg.type], i_next - i, msg.seq, n))
+            if isinstance(msg, SkipBytes):
+                parsed_buf = buf[i:i_next]
+                logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
+            elif isinstance(msg, MissingBytes):
+                break
+            ret.append(msg)
+            i = i_next
+        self.buf = self.buf[i:]
+        if len(self.buf) > 1024:
+            print("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
+                len(self.buf), len(self.buf) + i))
+        return ret
+
+    def send_message(self, command_class, **kw):
+        """
+        Sends a command to the client and waits for a reply and returns it.
+        Blocking.
+        """
+        command = command_class(seq=self.send_seq, **kw)
+        self.send_seq += 1
+        encoded = command.encode()
+        if self.debug_message_encoding:
+            logger.debug("sending: {}, encoded as {}".format(command, encoded))
+        self.transport.write(encoded)
+
+    def __str__(self):
+        return '<Parser: #{}: {!r}'.format(len(self.buf), self.buf)
+
+    __repr__ = __str__
