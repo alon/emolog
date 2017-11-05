@@ -31,7 +31,6 @@ from logging import getLogger
 import builtins # profile will be here when run via kernprof
 
 from .cylib import (
-    lib,
     SamplerRegisterVariable, SamplerClear, SamplerSample, SamplerStart, SamplerStop, Ack, Version,
     Message, MissingBytes, SkipBytes, emo_message_type_to_str,
     AckTimeout, emo_decode, VariableSampler)
@@ -47,15 +46,6 @@ logger = getLogger('emolog')
 
 
 ### Code depending on lib
-
-def dump_crctable():
-    with open('crcdump.pickle', 'wb') as fd:
-        fd.write(lib.crcTable, 256)
-
-
-def get_seq():
-    return lib.get_seq()
-
 
 class Parser(object):
     def __init__(self, transport, debug=False):
