@@ -112,7 +112,8 @@ class Message(metaclass=ABCMeta):
         return s
 
     def handle_by(self, handler):
-        logger.debug(f"ignoring a {self}")
+        #logger.debug(f"ignoring a {self}")
+        pass
 
     def __str__(self):
         return '<{}>'.format(emo_message_type_to_str[self.type])
@@ -131,7 +132,7 @@ class Version(Message):
         return emo_encode_version(self.buf, self.reply_to_seq if self.reply_to_seq is not None else self.seq)
 
     def handle_by(self, handler):
-        logger.debug(f"Got Version: {self.version}")
+        #logger.debug(f"Got Version: {self.version}")
         handler.set_future_result(handler.ack, True)
 
 
@@ -240,9 +241,10 @@ class SamplerSample(Message):
             self.update_with_sampler(handler.sampler)
             handler.received_samples += 1
             handler.pending_samples.append((self.seq, self.ticks, self.variables))
-            logger.debug(f"Got Sample: {self}")
+            #logger.debug(f"Got Sample: {self}")
         else:
-            logger.debug("ignoring sample since PC sampler is not primed")
+            #logger.debug("ignoring sample since PC sampler is not primed")
+            pass
 
     def update_with_sampler(self, sampler):
         self.variables = sampler.variables_from_ticks_and_payload(ticks=self.ticks, payload=self.payload)
