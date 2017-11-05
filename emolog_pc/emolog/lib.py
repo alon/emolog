@@ -17,14 +17,12 @@
 # build_protocol_library,
 # )
 
-import asyncio
-from asyncio import Future
+from asyncio import Future, Protocol, sleep, get_event_loop
 from asyncio.futures import InvalidStateError
 from collections import namedtuple
 from time import time
-import struct
+from struct import pack
 import sys
-from time import clock
 from math import sin
 from logging import getLogger
 
@@ -55,7 +53,7 @@ class Dumper:
 dumper = Dumper()
 
 
-class Client(asyncio.Protocol):
+class Client(Protocol):
     """
     Note: removed handling of Acks
      - TODO
@@ -85,7 +83,7 @@ class Client(asyncio.Protocol):
         self.set_future_result(self.ack, True)
 
     def dump_buf(self, buf):
-        self.dump.write(struct.pack('<fI', clock(), len(buf)) + buf)
+        self.dump.write(pack('<fI', time(), len(buf)) + buf)
         #self.dump.flush()
 
     def exit_gracefully(self):
@@ -98,16 +96,16 @@ class Client(asyncio.Protocol):
         self._futures.clear()
 
     def add_future(self, timeout=None, timeout_result=None):
-        f = asyncio.Future()
+        f = Future()
         self._futures.add(f)
         if timeout is not None:
             async def set_result_after_timeout():
-                await asyncio.sleep(timeout)
+                await sleep(timeout)
                 try:
                     self.set_future_result(f, timeout_result)
                 except:
                     pass
-            sleep_task = asyncio.get_event_loop().create_task(set_result_after_timeout())
+            sleep_task = get_event_loop().create_task(set_result_after_timeout())
             self._futures.add(sleep_task)
         return f
 
@@ -264,7 +262,7 @@ class TransportStdinAndOut(TransportPairOfFd):
                                                    fdout=sys.stdout.buffer)
 
 
-class FakeSineEmbedded(asyncio.Protocol):
+class FakeSineEmbedded(Protocol):
     """
     Implement a simple embedded side. We don't care about the addresses,
     just fake a sinus on each address, starting at t=phase_ticks when requested,
@@ -299,7 +297,7 @@ class FakeSineEmbedded(asyncio.Protocol):
         self.start_time = time()
         self.running = False
         self.ticks = 0
-        self.eventloop = asyncio.get_event_loop()
+        self.eventloop = get_event_loop()
 
     def connection_made(self, transport):
         self.parser = Parser(transport, debug=self.verbose)
