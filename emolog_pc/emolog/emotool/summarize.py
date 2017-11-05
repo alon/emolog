@@ -134,8 +134,8 @@ class Render():
         return Render.points(data)
 
     @staticmethod
-    def subset(key_ind_dict, d, default=None):
-        return [d.get(param, default) for param in key_ind_dict]
+    def subset(subset, d, default=None):
+        return [d.get(param, default) for param in subset]
 
 
 class IntAlloc():
@@ -183,7 +183,7 @@ def summarize_files(filenames, output_filename, config):
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
     summary_titles = half_cycle_fields # TODO - treat known_summary_titles somehow?
-    parameter_names = list(known_parameters.keys())
+    parameter_names = config.parameters # TODO - check against list(known_parameters.keys())
     N_par = len(parameter_names)
     N_sum = len(summary_titles)
     top_titles = Render.points_add(({'down': N_par, 'up':N_sum, 'all':N_sum}[d], d) for d in half_cycle_directions)
@@ -211,7 +211,7 @@ def summarize_files(filenames, output_filename, config):
 
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
-        params_values = Render.subset(key_ind_dict=known_parameters, d=parameters)
+        params_values = Render.subset(subset=parameter_names, d=parameters)
         sum_per_dir = [
             {k: v for k, v in zip(summary['titles'], summary[key.lower()])}
             for key in half_cycle_directions]
@@ -279,6 +279,7 @@ class Config:
         self.user_defined_fields = self._get_strings('user_defined', 'fields', ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"])
         self.half_cycle_fields = self._get_strings('half_cycle', 'fields', default=['Average Velocity [m/s]', 'Flow Rate [LPM]'])
         self.half_cycle_directions = self._get_strings('half_cycle', 'directions', ['down', 'up', 'all'])
+        self.parameters = self._get_strings('global', 'parameters', [])
 
     def _get(self, section, field, default):
         if self.config is not None and self.config.has_option(section, field):
