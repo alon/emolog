@@ -3,6 +3,7 @@
 import os
 import sys
 from argparse import ArgumentParser
+from linecache import getlines
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel
@@ -20,7 +21,8 @@ UP_AVERAGES_TEXT = 'UP Averages'
 ALL_AVERAGES_TEXT = 'ALL Averages'
 HALF_CYCLE_SUMMARY_TEXT = 'Half-Cycle Summary'
 
-USER_DEFINED_FIELDS = ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"]
+DEFAULT_USER_DEFINED_FIELDS = ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"]
+USER_DEFINED_FIELDS_FILENAME = 'summary_user_defined.txt'
 
 OUTPUT_FILENAME = 'summary.xlsx'
 
@@ -146,13 +148,15 @@ class IntAlloc():
         return self.val
 
 
-def summarize_dir(d):
+def summarize_dir(d, user_defined_fields=None):
+    if user_defined_fields == None:
+        user_defined_fields = get_user_defined_fields(d)
     output_filename = os.path.join(d, OUTPUT_FILENAME)
     filenames = read_xlsx(d)
-    summarize_files(filenames=filenames, output_filename=output_filename)
+    summarize_files(filenames=filenames, output_filename=output_filename, user_defined_fields=user_defined_fields)
 
 
-def summarize_files(filenames, output_filename):
+def summarize_files(filenames, output_filename, user_defined_fields=None):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new summary.xls file from them
@@ -162,6 +166,9 @@ def summarize_files(filenames, output_filename):
     readers = get_readers(filenames)
     N = len(readers)
 
+    if user_defined_fields is None:
+        user_defined_fields = list(DEFAULT_USER_DEFINED_FIELDS)
+    
     if N == 0:
         print("no files found")
         return
@@ -199,15 +206,10 @@ def summarize_files(filenames, output_filename):
     summary_out = writer.add_worksheet('Summary')
 
     row = IntAlloc()
-    # write user defined fields
-    for field in USER_DEFINED_FIELDS:
-        summary_out.write_row(row=row.val, col=0, data=[field], cell_format=title_format)
-        summary_out.write_row(row=row.val, col=1, data=[''], cell_format=user_format)
-        row.inc(1)
-
     # create titles
-    summary_out.write_column(row=row.val + 1, col=0, data=top_titles, cell_format=title_format)
-    summary_out.write_column(row=row.val + 1, col=1, data=titles, cell_format=title_format)
+    n_user = len(user_defined_fields)
+    summary_out.write_column(row=row.val + 1, col=0, data=[''] * n_user + top_titles, cell_format=title_format)
+    summary_out.write_column(row=row.val + 1, col=1, data=user_defined_fields + titles, cell_format=title_format)
 
     # write column for each file
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
@@ -219,7 +221,7 @@ def summarize_files(filenames, output_filename):
                         for sum_row in (s_up, s_down, s_all)]
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
-        data = [filename] + params_values + summary_values
+        data = [filename] + [''] * n_user + params_values + summary_values
         summary_out.write_column(row=row.val, col=reader_i + 2, data=data, cell_format=col_format)
     summary_out.set_column(firstcol=0, lastcol=2, width=8)
     summary_out.set_column(firstcol=2, lastcol=N + 3, width=8)
@@ -267,6 +269,13 @@ def paths_from_file_urls(urls):
         ret.append(x)
     return ret
 
+    
+def get_user_defined_fields(d):
+    filename = os.path.join(d, USER_DEFINED_FIELDS_FILENAME)
+    if not os.path.exists(filename):
+        return None
+    return [x for x in getlines(filename) if x.strip() != '' and not x.strip().startswith('#')]
+
 
 class GUI(QWidget):
     def __init__(self):
@@ -276,7 +285,8 @@ class GUI(QWidget):
         self.output = None
 
     def summarize(self):
-        summarize_files(list(self.files), self.output)
+        user_defined_fields = get_user_defined_fields(os.path.dirname(self.output))
+        summarize_files(list(self.files), self.output, user_defined_fields=user_defined_fields)
         if hasattr(os, 'startfile'):
             os.startfile(self.output)
         else:
