@@ -132,7 +132,7 @@ class Version(Message):
         self.reply_to_seq = reply_to_seq
 
     def encode_inner(self):
-        return emo_encode_version(self.buf, self.reply_to_seq)
+        return emo_encode_version(self.buf, self.reply_to_seq if self.reply_to_seq is not None else self.seq)
 
     def handle_by(self, handler):
         logger.debug(f"Got Version: {self.version}")
