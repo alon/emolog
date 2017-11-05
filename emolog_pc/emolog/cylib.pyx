@@ -20,11 +20,9 @@ Wrap emolog_protocol c library. Build it if it doesn't exist. Provides the same
 API otherwise, plus helpers.
 """
 
-import struct
 from abc import ABCMeta, abstractmethod
 from logging import getLogger
-from ctypes import create_string_buffer
-import ctypes
+from struct import pack, unpack
 
 import builtins # profile will be here when run via kernprof
 
@@ -93,7 +91,7 @@ initialize_emo_message_type_to_str()
 HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
 
 
-MAGIC = struct.unpack(ENDIANESS + 'H', b'EM')[0]
+MAGIC = unpack(ENDIANESS + 'H', b'EM')[0]
 
 ### Messages
 
@@ -236,8 +234,7 @@ class SamplerSample(Message):
     def encode_inner(self):
         emo_encode_sampler_sample_start(self.buf)
         for var, size in self.var_size_pairs:
-            p = ctypes_mem_from_size_and_val(var, size)
-            emo_encode_sampler_sample_add_var(self.buf, p, size)
+            emo_encode_sampler_sample_add_var(self.buf, to_str(var, size), size)
         return emo_encode_sampler_sample_end(self.buf, self.ticks)
 
     def handle_by(self, handler):
@@ -317,7 +314,7 @@ def decode_emo_header_unsafe(s):
     :param s: bytes of header
     :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
     """
-    _magic, _type, length, seq, payload_crc, header_crc = struct.unpack(HEADER_FORMAT, s)
+    _magic, _type, length, seq, payload_crc, header_crc = unpack(HEADER_FORMAT, s)
     return _type, length, seq
 
 
@@ -327,7 +324,7 @@ def decode_emo_header(s):
     :param s: bytes of header
     :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
     """
-    magic, _type, length, seq, payload_crc, header_crc = struct.unpack(HEADER_FORMAT, s)
+    magic, _type, length, seq, payload_crc, header_crc = unpack(HEADER_FORMAT, s)
     if magic != MAGIC:
         error = "bad magic: {} (expected {})".format(magic, MAGIC)
         return error, None, None, None
@@ -378,16 +375,16 @@ class VariableSampler(object):
 
 
 
-def ctypes_mem_from_size_and_val(val, size):
+cdef uint8_t *to_str(val, size):
     if size == 4:
         if isinstance(val, float):
-            return ctypes.c_float(val)
+            return pack('<f', val)
         else:
-            return ctypes.c_int32(val)
+            return pack('<i', val)
     elif size == 2:
-        return ctypes.c_int16(val)
+        return pack('<h', val)
     elif size == 1:
-        return ctypes.c_int8(val)
+        return pack('<b', val)
     raise Exception("unknown size {}".format(size))
 
 
@@ -406,13 +403,13 @@ def emo_decode(buf, i_start):
         payload = buf[payload_start : i_next]
         if emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
-            ticks = struct.unpack(SAMPLER_SAMPLE_TICKS_FORMAT, payload[:4])[0]
+            ticks = unpack(SAMPLER_SAMPLE_TICKS_FORMAT, payload[:4])[0]
             msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
         elif emo_type == emo_message_types.version:
-            (client_version, reply_to_seq, reserved) = struct.unpack(ENDIANESS + 'HBB', payload)
+            (client_version, reply_to_seq, reserved) = unpack(ENDIANESS + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
         elif emo_type == emo_message_types.ack:
-            (error, reply_to_seq) = struct.unpack(ENDIANESS + 'HB', payload)
+            (error, reply_to_seq) = unpack(ENDIANESS + 'HB', payload)
             msg = Ack(seq=seq, error=error, reply_to_seq=reply_to_seq)
         elif emo_type in [emo_message_types.ping, emo_message_types.sampler_clear,
                           emo_message_types.sampler_start, emo_message_types.sampler_stop]:
@@ -422,7 +419,7 @@ def emo_decode(buf, i_start):
                    emo_message_types.sampler_start: SamplerStart,
                    emo_message_types.sampler_stop: SamplerStop}[emo_type](seq=seq)
         elif emo_type == emo_message_types.sampler_register_variable:
-            phase_ticks, period_ticks, address, size, _reserved = struct.unpack(ENDIANESS + 'LLLHH', payload)
+            phase_ticks, period_ticks, address, size, _reserved = unpack(ENDIANESS + 'LLLHH', payload)
             msg = SamplerRegisterVariable(seq=seq, phase_ticks=phase_ticks, period_ticks=period_ticks,
                                           address=address, size=size)
         else:
