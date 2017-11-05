@@ -222,46 +222,6 @@ class Client(Protocol):
         pass
 
 
-class TransportFed(object):
-    def __init__(self, writefd):
-        self.data = []
-        self.writefd = writefd
-
-    def feed_me(self, s):
-        self.data.append(s)
-
-    def read(self):
-        s = b''.join(reversed(self.data))
-        self.data.clear()
-        return s
-
-    def write(self, s):
-        self.writefd.write(s)
-
-
-class TransportPairOfFd(object):
-    def __init__(self, fdin, fdout):
-        self.fdin = fdin
-        self.fdout = fdout
-
-    def write(self, s):
-        self.fdout.write(s)
-
-    def read(self):
-        data = self.fdin.read()
-        return data
-
-    def fileno(self):
-        """ used by Client to get the reader fileno """
-        return self.fdin.fileno()
-
-
-class TransportStdinAndOut(TransportPairOfFd):
-    def __init__(self):
-        super(TransportStdinAndOut, self).__init__(fdin=sys.stdin.buffer,
-                                                   fdout=sys.stdout.buffer)
-
-
 class FakeSineEmbedded(Protocol):
     """
     Implement a simple embedded side. We don't care about the addresses,
