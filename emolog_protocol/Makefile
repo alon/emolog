@@ -15,8 +15,8 @@ LIBRARY=$(LIBPREFIX)emolog_protocol$(LIBSUFFIX)
 
 all: $(LIBRARY)
 
-$(LIBRARY): source/emolog_protocol.h source/emolog_protocol.c
-	$(CC) $(CFLAGS) -shared -fPIC -o $(LIBRARY) source/emolog_protocol.c
+$(LIBRARY): source/emolog_protocol.h source/emolog_protocol.cpp
+	$(CC) $(CFLAGS) -shared -fPIC -o $(LIBRARY) source/emolog_protocol.cpp
 
 .PHONY: clean run
 

@@ -18,7 +18,7 @@ Usage for testing purposes:
     1. TODO
 
 
-Wrap emolog_protocol c library. Build it if it doesn't exist. Provides the same
+Wrap emolog_protocol.cpp library. Build it if it doesn't exist. Provides the same
 API otherwise, plus helpers.
 """
 
@@ -51,7 +51,7 @@ ENDIANESS = '<'
 logger = getLogger('emolog')
 
 
-### Wrap emolog_protocol.c
+### Wrap emolog_protocol.cpp
 
 ctypedef unsigned uint32_t
 ctypedef unsigned short uint16_t

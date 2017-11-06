@@ -35,7 +35,7 @@ def build_protocol_library():
     if not path.exists(LIB_ABS_DIR):
         return # not actually a development checkout
     chdir(LIB_ABS_DIR)
-    if not path.exists(LIB_FILENAME) or stat(LIB_FILENAME).st_mtime < stat('source/emolog_protocol.c').st_mtime:
+    if not path.exists(LIB_FILENAME) or stat(LIB_FILENAME).st_mtime < stat('source/emolog_protocol.cpp').st_mtime:
         if which(MAKE_EXEC) is None:
             print("missing make; please place a copy of {} at {}".format(LIB_FILENAME, LIB_ABS_DIR))
             raise SystemExit
