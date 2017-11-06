@@ -284,10 +284,11 @@ def summarize_files(filenames, output_path, config):
 
     param_left_col = 1 + N_user + N_par # 1 - for file name; TODO: make this declarative (place cells on board with name, than use name)
 
-    for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
+    for filename, parameters, summary in zip(filenames, all_parameters, all_summaries):
         params_values = Render.subset(subset=parameter_names, d=parameters)
         sum_per_dir = [
-            {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])}
+            {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])
+             if k in summary_titles}
             for key in half_cycle_directions]
         cell_locations = {k: xl_rowcol_to_cell(row=row.val, col=1 + i) for i, k in enumerate(HALF_CYCLE_PREDEFINED_CELL_NAMES)}
         summary_rows_with_unfilled_formula = [
@@ -298,9 +299,10 @@ def summarize_files(filenames, output_path, config):
         summary_rows = [[x(**cells) if callable(x) else x for x in values]
                         for values, cells in summary_rows_with_unfilled_formula]
         summary_values = sum(summary_rows, [])
-        filename = os.path.split(filenames[reader_i])[-1]
+        filename = os.path.split(filename)[-1]
         data = [filename] + [''] * N_user + params_values + summary_values
-        output.add_row(col=0, row=reader_i + 2, data=data, cell_format=col_format)
+        output.add_row(col=0, row=row.val, data=data, cell_format=col_format)
+        row.inc(1)
     #summary_out.set_row(firstrow=0, lastrow=2, width=8)
     #summary_out.set_row(firstrow=2, lastrow=N + 3, width=8)
     output.write()
