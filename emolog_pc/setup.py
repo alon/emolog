@@ -35,7 +35,7 @@ setup(
         'Cython(==0.27.3)',
         'pyserial(==3.2.1)',
         'pyserial-asyncio(==0.2)',
-        'cx-Freeze(==5.0.2)',
+        'PyInstaller(==3.3)',
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     package_data={'emolog': artifacts},
