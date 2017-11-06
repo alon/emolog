@@ -13,7 +13,7 @@ import glob
 import configparser
 
 from .ppxl_util import (
-    ppxl_formula_flow_rate_lpm,
+    ppxl_formula_power_out,
     ppxl_formula_efficiency,
     ppxl_formula_cruising_power_out,
     ppxl_formula_cruising_efficiency,
@@ -809,7 +809,7 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
     flow_rate_col = columns.index('Flow Rate [LPM]')
     for row in half_cycle_rows + summary_rows:
         flow_rate_cell = xl_rowcol_to_cell(row, flow_rate_col)
-        formula = ppxl_formula_flow_rate_lpm(flow_rate_cell=flow_rate_cell, pump_head_cell=pump_head_cell)
+        formula = ppxl_formula_power_out(flow_rate_cell=flow_rate_cell, pump_head_cell=pump_head_cell)
         sheet.write_formula(row, power_out_col, formula, wb_formats['frac'])
 
     # efficiency column
