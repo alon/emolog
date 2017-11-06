@@ -54,5 +54,5 @@ def build_artifacts():
     MESSAGE_TYPE_H_FILENAME = path.basename(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME)
     print(f"copying {MESSAGE_TYPE_H_FILENAME}")
     copy(DEVEL_EMO_MESSAGE_TYPE_H_FILENAME, 'emolog')
-    return [LIB_FILENAME, MESSAGE_TYPE_H_FILENAME]
+    return [MESSAGE_TYPE_H_FILENAME]
 
