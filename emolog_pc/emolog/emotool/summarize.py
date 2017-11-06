@@ -11,7 +11,16 @@ from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel
 
 import xlsxwriter as xlwr
 import xlrd
+from xlsxwriter.utility import xl_rowcol_to_cell
 
+from .ppxl_util import (
+HALF_CYCLE_CELL_TO_FORMULA,
+HALF_CYCLE_PREDEFINED_TITLES,
+HALF_CYCLE_PREDEFINED_CELL_NAMES,
+HALF_CYCLE_TITLE_TO_CELL_NAME,
+HALF_CYCLE_CELL_TO_TITLE_NAME,
+HALF_CYCLE_FORMULA_TITLES,
+)
 
 PARAMETERS_SHEET_NAME = 'Parameters'
 HALF_CYCLES_SHEET_NAME = 'Half-Cycles'
@@ -37,7 +46,7 @@ def get_readers(filenames):
     data = [(reader, filename) for reader, filename in zip(readers, filenames) if
                HALF_CYCLES_SHEET_NAME in reader.sheet_names()]
     readers, filenames = [x[0] for x in data], [x[1] for x in data]
-    return readers
+    return readers, filenames
 
 
 def verify_cell_at(sheet, row, col, contents):
@@ -139,8 +148,8 @@ class Render():
 
 
 class IntAlloc():
-    def __init__(self):
-        self.val = 0
+    def __init__(self, init=0):
+        self.val = init
 
     def inc(self, delta):
         self.val += delta
@@ -148,82 +157,153 @@ class IntAlloc():
 
 
 def summarize_dir(d, config):
-    output_filename = os.path.join(d, OUTPUT_FILENAME)
     filenames = read_xlsx(d)
-    summarize_files(filenames=filenames, output_filename=output_filename, config=config)
+    output_filename = summarize_files(filenames=filenames, output_path=d, config=config)
+    return output_filename
 
 
-def summarize_files(filenames, output_filename, config):
+def enum_cum_len(vs, initial=0):
+    if len(vs) == 0:
+        return
+    acc = initial
+    for v in vs:
+        yield acc, v
+        acc += len(v)
+
+
+class Output:
+    def __init__(self, filename):
+        self.filename = filename
+        self.cell_formats = []
+        self.data = []
+
+    def add(self, row, col, value, cell_format):
+        self.data.append((row, col, value, cell_format))
+
+    def add_row(self, row, col, data, cell_format):
+        for i, value in enumerate(data):
+            self.add(row=row, col=col + i, value=value, cell_format=cell_format)
+
+    def add_col(self, row, col, data, cell_format):
+        for i, value in enumerate(data):
+            self.add(row=row + i, col=col, value=value, cell_format=cell_format)
+
+    def add_format(self, **kw):
+        """
+        Identical to add_format(properties=kw)
+        :param kw:
+        :return:
+        """
+        self.cell_formats.append(kw)
+        return len(self.cell_formats) - 1
+
+    def write(self):
+        writer = xlwr.Workbook(self.filename)
+        formats = {i: writer.add_format(properties=properties) for i, properties in enumerate(self.cell_formats)}
+        summary_out = writer.add_worksheet('Summary')
+        for row, col, value, format in self.data:
+            summary_out.write(row, col, value, formats[format]) # cannot use named arguments due to (row, col, *args) def
+        writer.close()
+
+
+def dunion(d1, d2):
+    d = dict(d1)
+    d.update(d2)
+    return d
+
+
+def summarize_files(filenames, output_path, config):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new summary.xls file from them
     :param dir:
     :return: written xlsx filename full path
     """
-    readers = get_readers(filenames)
+    readers, filenames = get_readers(filenames) # the initial filenames contains xlsx that are not produced by the post processor
     N = len(readers)
 
     if N == 0:
         print("no files found")
         return
 
-    user_defined_fields = config.user_defined_fields
+    output_filename = allocate_unused_file_in_directory(os.path.join(output_path, OUTPUT_FILENAME))
+
+    user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
     half_cycle_directions = config.half_cycle_directions
     half_cycle_fields = config.half_cycle_fields
 
     print("reading parameters")
     all_parameters = [get_parameters(reader) for reader in readers]
-    all_parameter_names = [p.keys() for p in all_parameters]
-    known_parameters = small_int_dict(all_parameter_names)
 
     print("reading summaries")
     all_summaries = [get_summary_data(reader) for reader in readers]
-    all_summary_titles = [x['titles'] for x in all_summaries]
-    known_summary_titles = small_int_dict(all_summary_titles)
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
-    summary_titles = half_cycle_fields # TODO - treat known_summary_titles somehow?
-    parameter_names = config.parameters # TODO - check against list(known_parameters.keys())
+    summary_titles = half_cycle_fields
+    parameter_names = HALF_CYCLE_PREDEFINED_TITLES + [x for x in config.parameters]
     N_par = len(parameter_names)
     N_sum = len(summary_titles)
-    top_titles = Render.points_add(({'down': N_par, 'up':N_sum, 'all':N_sum}[d], d) for d in half_cycle_directions)
+    N_user = len(user_defined_fields)
+    top_titles = [None] * N_par + sum([[d] * N_sum for d in half_cycle_directions], [])
     titles = parameter_names + (len(half_cycle_directions) * summary_titles)
 
-    # writing starts here. write titles
-    writer = xlwr.Workbook(output_filename)
+    # aggregate all data to output: tuples of row, col, format, value
+    output = Output(output_filename)
 
     # formats for titles and cells
-    title_format = writer.add_format(
-        properties=dict(text_wrap=True, align='left', bold=True))
-    col_format = writer.add_format(
-        properties=dict(text_wrap=True, align='left', num_format='0.000'))
-    user_format = writer.add_format(
-        properties=dict(align='left', num_format='0.000'))
+    title_format = output.add_format(text_wrap=True, align='left', bold=True)
+    col_format = output.add_format(text_wrap=True, align='left', num_format='0.000')
+    user_format = output.add_format(align='left', num_format='0.000')
 
-    # create sheet
-    summary_out = writer.add_worksheet('Summary')
+    # check we have all inputs required for the formula presented
+    formulae = [HALF_CYCLE_CELL_TO_FORMULA[HALF_CYCLE_TITLE_TO_CELL_NAME[k]] for k in summary_titles
+                if k in HALF_CYCLE_FORMULA_TITLES]
+    cell_names = lambda ff: [x for x in ff.__code__.co_varnames if x.endswith('_cell')]
+    required_cell_names = set(sum([cell_names(f) for f in formulae], []))
+
+    available_cell_names = {HALF_CYCLE_TITLE_TO_CELL_NAME[x] for x in set(HALF_CYCLE_TITLE_TO_CELL_NAME.keys()) & set(titles)}
+
+    if required_cell_names - available_cell_names:
+        missing_names = list(sorted(required_cell_names - available_cell_names))
+        print(f"missing cells: {missing_names}")
+        missing_titles = [HALF_CYCLE_CELL_TO_TITLE_NAME[n] for n in missing_names]
+        print(f"equivalent titles:{missing_titles}")
+        return
 
     row = IntAlloc()
     # create titles
-    n_user = len(user_defined_fields)
-    summary_out.write_row(col=row.val + 1, row=0, data=[''] * n_user + top_titles, cell_format=title_format)
-    summary_out.write_row(col=row.val + 1, row=1, data=user_defined_fields + titles, cell_format=title_format)
+    output.add_row(col=row.val + 1, row=0, data=[''] * N_user + top_titles, cell_format=title_format)
+    output.add_row(col=row.val + 1, row=1, data=user_defined_fields + titles, cell_format=title_format)
+    row.inc(2)
 
     # write column for each file
+    def cells_from_d(keys, row, col):
+        return {HALF_CYCLE_TITLE_TO_CELL_NAME[k]:
+                                  xl_rowcol_to_cell(row=row, col=col + i) for i, k in enumerate(keys)
+                if k in HALF_CYCLE_TITLE_TO_CELL_NAME}
+
+    param_left_col = 1 + N_user + N_par # 1 - for file name; TODO: make this declarative (place cells on board with name, than use name)
+
     for reader_i, (parameters, summary) in enumerate(zip(all_parameters, all_summaries)):
         params_values = Render.subset(subset=parameter_names, d=parameters)
         sum_per_dir = [
-            {k: v for k, v in zip(summary['titles'], summary[key.lower()])}
+            {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])}
             for key in half_cycle_directions]
-        summary_rows = [Render.subset(summary_titles, sum_row)
-                        for sum_row in sum_per_dir]
+        cell_locations = {k: xl_rowcol_to_cell(row=row.val, col=1 + i) for i, k in enumerate(HALF_CYCLE_PREDEFINED_CELL_NAMES)}
+        summary_rows_with_unfilled_formula = [
+            (Render.subset(summary_titles, sum_row), dunion(cell_locations, cells_from_d(keys=summary_titles, row=row.val, col=col)))
+                        for col, sum_row in enum_cum_len(sum_per_dir, initial=param_left_col)]
+        for values, cells in summary_rows_with_unfilled_formula:
+            assert len(cells.values()) == len(set(cells.values())), "error: allocated same cell to two variables"
+        summary_rows = [[x(**cells) if callable(x) else x for x in values]
+                        for values, cells in summary_rows_with_unfilled_formula]
         summary_values = sum(summary_rows, [])
         filename = os.path.split(filenames[reader_i])[-1]
-        data = [filename] + [''] * n_user + params_values + summary_values
-        summary_out.write_row(col=row.val, row=reader_i + 2, data=data, cell_format=col_format)
+        data = [filename] + [''] * N_user + params_values + summary_values
+        output.add_row(col=0, row=reader_i + 2, data=data, cell_format=col_format)
     #summary_out.set_row(firstrow=0, lastrow=2, width=8)
     #summary_out.set_row(firstrow=2, lastrow=N + 3, width=8)
-    writer.close()
+    output.write()
     return output_filename
 
 
@@ -272,6 +352,7 @@ class Config:
     def __init__(self, d):
         ini_filename = os.path.join(d, CONFIG_FILENAME)
         if os.path.exists(ini_filename):
+            print(f"reading config from {ini_filename}")
             self.config = ConfigParser()
             self.config.read(ini_filename)
         else:
@@ -288,7 +369,7 @@ class Config:
 
     def _get_strings(self, section, field, default):
         if self.config is not None and self.config.has_option(section, field):
-            return [x.strip() for x in self.config.get(section, field, raw=True).split(',')]
+            return [x.strip() for x in [y for y in self.config.get(section, field, raw=True).split(',') if len(y) > 0]]
         return default
 
 class GUI(QWidget):
@@ -299,7 +380,7 @@ class GUI(QWidget):
         self.output = None
 
     def summarize(self):
-        config = Config(os.path.dirname(self.output))
+        config = Config(self.output)
         summarize_files(list(self.files), self.output, config=config)
         if hasattr(os, 'startfile'):
             os.startfile(self.output)
@@ -333,7 +414,7 @@ class GUI(QWidget):
             print("no files dragged")
             return
         directory = os.path.dirname(files[0])
-        self.output = allocate_unused_file_in_directory(os.path.join(directory, OUTPUT_FILENAME))
+        self.output = directory
         if os.path.exists(self.output):
             self.status_label.setText('too many existing summarize.xlsx files, delete them')
             print("failed to find an output filename that doesn't already exist")
@@ -344,7 +425,7 @@ class GUI(QWidget):
             else:
                 self.files.add(file)
         if len(self.files) > 0:
-            self.summarize_button.setText(f"{len(self.files)} to {os.path.basename(self.output)}")
+            self.summarize_button.setText(f"{len(self.files)} to {self.output}")
             self.drag_label.hide()
             self.summarize_button.show()
         else:

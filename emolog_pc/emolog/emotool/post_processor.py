@@ -12,6 +12,13 @@ from xlsxwriter.utility import xl_rowcol_to_cell
 import glob
 import configparser
 
+from .ppxl_util import (
+    ppxl_formula_flow_rate_lpm,
+    ppxl_formula_efficiency,
+    ppxl_formula_cruising_power_out,
+    ppxl_formula_cruising_efficiency,
+)
+
 
 tick_time_ms = 0.05  # 50 us = 0.05 ms
 step_size_mm = 4.0
@@ -801,29 +808,35 @@ def add_half_cycles_sheet(writer, half_cycle_stats, half_cycle_summary, wb_forma
     pump_head_cell = '$C$2'
     flow_rate_col = columns.index('Flow Rate [LPM]')
     for row in half_cycle_rows + summary_rows:
-        formula = '=' + xl_rowcol_to_cell(row, flow_rate_col) + ' / 60 * 9.80665 * ' + pump_head_cell
+        flow_rate_cell = xl_rowcol_to_cell(row, flow_rate_col)
+        formula = ppxl_formula_flow_rate_lpm(flow_rate_cell=flow_rate_cell, pump_head_cell=pump_head_cell)
         sheet.write_formula(row, power_out_col, formula, wb_formats['frac'])
 
     # efficiency column
     power_in_col = columns.index('Average Power In [W]')
     efficiency_col = columns.index(efficiency_col_name)
     for row in half_cycle_rows + summary_rows:
-        formula = '=' + xl_rowcol_to_cell(row, power_out_col) + ' / ' + xl_rowcol_to_cell(row, power_in_col)
+        power_out_cell = xl_rowcol_to_cell(row, power_out_col)
+        power_in_cell = xl_rowcol_to_cell(row, power_in_col)
+        formula = ppxl_formula_efficiency(power_out_cell=power_out_cell, power_in_cell=power_in_cell)
         sheet.write_formula(row, efficiency_col, formula, wb_formats['percent'])
 
     # Cruising Power Out column
     cruising_power_out_col = columns.index(cruising_power_out_col_name)
     cruising_flow_rate_col = columns.index('Cruising Flow Rate [LPM]')
     for row in half_cycle_rows + summary_rows:
-        formula = '=' + xl_rowcol_to_cell(row, cruising_flow_rate_col) + ' / 60 * 9.80665 * ' + pump_head_cell
+        cruising_flow_rate_cell = xl_rowcol_to_cell(row, cruising_flow_rate_col)
+        formula = ppxl_formula_cruising_power_out(cruising_flow_rate_cell=cruising_flow_rate_cell, pump_head_cell=pump_head_cell)
         sheet.write_formula(row, cruising_power_out_col, formula, wb_formats['frac'])
 
     # Cruising efficiency column
     cruising_power_in_col = columns.index('Cruising Power In [W]')
     cruising_efficiency_col = columns.index(cruising_efficiency_col_name)
     for row in half_cycle_rows + summary_rows:
-        formula = '=' + xl_rowcol_to_cell(row, cruising_power_out_col) + ' / ' + xl_rowcol_to_cell(row,
-                                                                                                   cruising_power_in_col)
+        cruising_power_out_cell = xl_rowcol_to_cell(row, cruising_power_out_col)
+        cruising_power_in_cell = xl_rowcol_to_cell(row, cruising_power_in_col)
+        formula = ppxl_formula_cruising_efficiency(cruising_power_out_cell=cruising_power_out_cell,
+                                                   cruising_power_in_cell=cruising_power_in_cell)
         sheet.write_formula(row, cruising_efficiency_col, formula, wb_formats['percent'])
 
 
