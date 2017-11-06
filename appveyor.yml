@@ -50,6 +50,11 @@ build_script:
   - "pyinstaller emotool.spec"
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\\dist"
   - 7z a emotool.zip emotool
+  - dir %APPVEYOR_BUILD_FOLDER%
+  - dir %APPVEYOR_BUILD_FOLDER\dist
 
 artifacts:
-  - path: dist\*.zip
+  - path: dist\summarize.zip
+    name: Summarize
+  - path: dist\emotool.zip
+    name: emotool
