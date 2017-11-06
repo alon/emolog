@@ -42,12 +42,13 @@ build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - "python setup.py install"
   - "pyinstaller summarize.spec"
-  - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\dist"
+  - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\\dist"
   # TODO: proper versions for both the zipped directory and the zip file
   # TODO -1: version reporting correctly for both summarize and emotool
   - 7z a summarize.zip summarize
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - "pyinstaller emotool.spec"
+  - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\\dist"
   - 7z a emotool.zip emotool
 
 artifacts:
