@@ -12,17 +12,17 @@ import string
 import logging
 import struct
 import random
-import asyncio
 from functools import reduce
 from time import time, sleep
 from socket import socket
 from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
+from asyncio import sleep, Protocol, get_event_loop, Task
 
 from ..util import version
 from ..cython_util import decode_little_endian_float
-from ..lib import SamplerSample, AckTimeout, Client
+from ..lib import SamplerSample, AckTimeout, ClientProtocolMixin
 from ..dwarf import FileParser
 from ..cylib import CyEmoToolClient
 from .post_processor import post_process
@@ -231,14 +231,24 @@ def create_python_process_cmdline_command(command):
     return ['python', '-c', command]
 
 
-class EmoToolClient(CyEmoToolClient, Client):
+class EmoToolClient(CyEmoToolClient, ClientProtocolMixin):
+    # must be singleton!
+    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
+    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
+    # until the final cleanup. This means multiple instances will fail to communicate.
+
+    instance = None
+
     def __init__(self, verbose, dump, window):
-        Client.__init__(self, verbose=verbose, dump=dump)
         CyEmoToolClient.__init__(self, verbose, dump, window)
+        ClientProtocolMixin.__init__(self)
+        if EmoToolClient.instance is not None:
+            raise Exception("EmoToolClient is a singleton, can't create another instance")
+        EmoToolClient.instance = self  # for singleton
 
 
 async def start_transport(client):
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
     port = random.randint(10000, 50000)
     if args.fake:
         await start_fake_sine(args.ticks_per_second, port)
@@ -249,7 +259,7 @@ async def start_transport(client):
     attempt = 0
     while attempt < 10:
         attempt += 1
-        sleep(0.1)
+        await sleep(0.1)
         s = socket()
         try:
             s.connect(('127.0.0.1', port))
@@ -273,7 +283,7 @@ def create_process(cmdline):
 
 
 def cancel_outstanding_tasks():
-    for task in asyncio.Task.all_tasks():
+    for task in Task.all_tasks():
         logger.warning('canceling task {}'.format(task))
         task.cancel()
 
@@ -497,11 +507,10 @@ async def run_client(client, variables, allow_kb_stop):
     if allow_kb_stop and try_getch_message:
         print(try_getch_message)
     client.start_logging_time = time()
-    while client.running:
-        logger.info('beep')
+    while client.running():
         if allow_kb_stop and try_getch():
             break
-        await asyncio.sleep(dt)
+        await sleep(dt)
     await client.send_sampler_stop()
 
 
@@ -598,7 +607,7 @@ def start_gui_callback(loop, window):
     if args.wait_for_gui:
         async def sleep_forever():
             while True:
-                await asyncio.sleep(1000)
+                await sleep(1000)
         loop.run_until_complete(sleep_forever())
     return client
 

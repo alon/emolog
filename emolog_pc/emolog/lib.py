@@ -29,8 +29,8 @@ import builtins # profile will be here when run via kernprof
 from .cylib import (
     SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
     FakeSineEmbedded,
-    AckTimeout, VariableSampler, Parser,
-    ClientBase)
+    AckTimeout, VariableSampler, Parser, CyClientBase
+    )
 
 if 'profile' not in builtins.__dict__:
     def nop_decorator(f):
@@ -41,7 +41,16 @@ if 'profile' not in builtins.__dict__:
 logger = getLogger('emolog')
 
 
-class Client(ClientBase):
+class ClientProtocolMixin(Protocol):
+    """
+    To use, inherit also from CyClientBase
+    You cannot inherit from it here to avoid two classes with predefined structure
+    inheriting and resulting in an error
+    """
+    def __init__(self, verbose=False, dump=False):
+        CyClientBase.__init__(self, verbose=verbose, dump=dump)
+        Protocol.__init__(self)
+
     async def await_ack(self):
         await self.ack
         is_timeout = self.ack.result() == self.ACK_TIMEOUT

@@ -766,12 +766,6 @@ cdef class CyClientBase:
         pass
 
 
-class ClientBase(CyClientBase, Protocol):
-    def __init__(self, verbose=False, dump=None):
-        CyClientBase.__init__(self, verbose=verbose, dump=dump)
-        Protocol.__init__(self)
-
-
 ##### EmoTool
 
 def coalesce_meth(hertz):
@@ -798,17 +792,11 @@ def coalesce_meth(hertz):
     return wrappee
 
 
-class CyEmoToolClient:
-    # must be singleton!
-    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
-    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
-    # until the final cleanup. This means multiple instances will fail to communicate.
-
-    instance = None
+cdef class CyEmoToolClient(CyClientBase):
+    cdef bint _running
 
     def __init__(self, verbose, dump, window):
-        if CyEmoToolClient.instance is not None:
-            raise Exception("EmoToolClient is a singleton, can't create another instance")
+        super().__init__(verbose=verbose, dump=dump)
         self.csv = None
         self.csv_filename = None
         self.first_ticks = None
@@ -821,7 +809,6 @@ class CyEmoToolClient:
         self._running = False
         self.fd = None
         self.window = window
-        CyEmoToolClient.instance = self  # for singleton
 
     def reset(self, csv_filename, names, min_ticks, max_ticks):
         self.csv = None
@@ -835,12 +822,10 @@ class CyEmoToolClient:
         self.max_ticks = max_ticks
         self._running = True
 
-    @property
-    def running(self):
+    cpdef bint running(self):
         return self._running
 
-    @property
-    def total_ticks(self):
+    cpdef long total_ticks(self):
         if self.first_ticks is None or self.last_ticks is None:
             return 0
         return self.last_ticks - self.first_ticks
@@ -882,7 +867,7 @@ class CyEmoToolClient:
             self.last_ticks = ticks
         if self.first_ticks is None:
             self.first_ticks = self.last_ticks
-        if self.max_ticks is not None and self.total_ticks + 1 >= self.max_ticks:
+        if self.max_ticks is not None and self.total_ticks() + 1 >= self.max_ticks:
             self.stop()
 
     @coalesce_meth(10) # Limit refreshes, they can be costly
