@@ -24,7 +24,6 @@ API otherwise, plus helpers.
 
 import sys
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
 from math import sin
 from time import time
 from logging import getLogger
@@ -37,7 +36,7 @@ import builtins # profile will be here when run via kernprof
 
 import cython
 
-from .setup import is_development_package, build_protocol_library, PROTOCOL_LIB, EMO_MESSAGE_TYPE_H_FILENAME
+from .setup import EMO_MESSAGE_TYPE_H_FILENAME
 
 # TODO: line_profiler is not compatible with cython.
 if 'profile' not in builtins.__dict__:
