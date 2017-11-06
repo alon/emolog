@@ -20,7 +20,7 @@ setup(
         'xlrd(==1.1.0)',
         'XlsxWriter(==1.0.2)',
         'pandas(==0.21.0)',
-        'Cython(==0.27.2)',
+        'Cython(==0.27.3)',
         'pyserial(==3.2.1)',
         'pyserial-asyncio(==0.2)',
         'cx-Freeze(==5.0.2)',
