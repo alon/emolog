@@ -27,6 +27,10 @@ install:
   - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
   - "pip install --disable-pip-version-check --user --upgrade pip"
 
+  # DRY violation - setup.py already states this. But since setup.py required importing cython,
+  # there is a catch 22. So until that is fixed, this remains.
+  - "pip install Cython==0.27.2"
+
   # Install the build dependencies of the project. If some dependencies contain
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
