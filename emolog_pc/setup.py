@@ -13,7 +13,8 @@ macros = [] #[('CYTHON_TRACE', 1)]
 cylib = Extension(name="emolog.cylib",
                   sources=["emolog/cylib.pyx", "../emolog_protocol/source/emolog_protocol.cpp"],
                   include_dirs=['../emolog_protocol/source'],
-                  define_macros=macros)
+                  define_macros=macros,
+                  language="c++")
 cython_util = Extension(name="emolog.cython_util", sources=["emolog/cython_util.pyx"])
 
 cython_extensions = [cylib, cython_util]
