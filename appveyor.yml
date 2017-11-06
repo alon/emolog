@@ -24,7 +24,6 @@ install:
 
   # Upgrade to the latest version of pip to avoid it displaying warnings
   # about it being out of date.
-  - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
   - "pip install --disable-pip-version-check --user --upgrade pip"
 
   # DRY violation - setup.py already states this. But since setup.py required importing cython,
@@ -35,7 +34,9 @@ install:
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
   # target Python version and architecture
-  - "pip install -e ."
+  - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
+  - python -c "import os; print(os.getcwd())"
+  - "pip install -vvv -e ."
 
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
