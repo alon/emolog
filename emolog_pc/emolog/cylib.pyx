@@ -840,7 +840,7 @@ cdef class CyEmoToolClient(CyClientBase):
     def stop(self):
         self._running = False
 
-    def handle_sampler_samples(self, msgs):
+    cdef handle_sampler_samples(self, msgs):
         """
         Write to CSV, add points to plots
         :param msgs: [(seq, ticks, {name: value})]

@@ -2,10 +2,9 @@ from setuptools import setup, Extension
 
 from Cython.Build import cythonize
 
-from emolog.setup import build_artifacts
+from emolog.setup import get_artifacts
 
-# TODO - turn this into setup commands so it happens during setup (for instance not when run with --help)
-artifacts = build_artifacts()
+artifacts = get_artifacts()
 
 gdb_debug = False
 macros = [] #[('CYTHON_TRACE', 1)]
