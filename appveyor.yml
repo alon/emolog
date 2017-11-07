@@ -38,6 +38,10 @@ install:
   - python -c "import os; print(os.getcwd())"
   - "pip install -e ."
 
+test:
+  - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
+  - pytest tests\test_library.py # only thing that passes right now
+
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - "python setup.py install"

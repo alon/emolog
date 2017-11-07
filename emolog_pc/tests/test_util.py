@@ -4,7 +4,7 @@ from time import sleep
 sys.path.append(os.path.join(os.path.dirname(sys.modules[__name__].__file__), '..'))
 
 
-from util import coalesce_meth
+from emolog.cylib import coalesce_meth
 
 
 def test_coalesce():
