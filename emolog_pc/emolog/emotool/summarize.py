@@ -350,6 +350,13 @@ def paths_from_file_urls(urls):
     return ret
 
 
+def start(filename):
+    if hasattr(os, 'startfile'):
+        os.startfile(filename)
+    else:
+        os.system(f'xdg-open {filename}')
+
+
 class Config:
     def __init__(self, d):
         ini_filename = os.path.join(d, CONFIG_FILENAME)
@@ -383,11 +390,8 @@ class GUI(QWidget):
 
     def summarize(self):
         config = Config(self.output)
-        summarize_files(list(self.files), self.output, config=config)
-        if hasattr(os, 'startfile'):
-            os.startfile(self.output)
-        else:
-            os.system(f'xdg-open {self.output}')
+        output_file = summarize_files(list(self.files), self.output, config=config)
+        open(output_file)
         raise SystemExit
 
 
@@ -456,7 +460,7 @@ def main():
     if not output:
         return
     print(f"wrote {output}")
-    os.system(f'xdg-open {output}')
+    start(output)
 
 
 if __name__ == '__main__':
