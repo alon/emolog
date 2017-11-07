@@ -47,11 +47,11 @@ test_script:
   # sanity of pyinstaller artifacts
   - mkdir "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
   - cd "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
-  - 7z x "%APPVEYOR_BUILD_FOLDER%\\dist\\summarize.zip"
+  - 7z x "%APPVEYOR_BUILD_FOLDER%\dist\summarize.zip"
   - cd summarize
   - summarize.exe --help
   - cd ..\
-  - 7z x  "%APPVEYOR_BUILD_FOLDER%\\dist\\emotool.zip"
+  - 7z x  "%APPVEYOR_BUILD_FOLDER%\dist\emotool.zip"
   - cd emotool
   - emotool.py --help
   # TODO: full run of summarize, compare to known file
