@@ -30,6 +30,9 @@ install:
   # there is a catch 22. So until that is fixed, this remains.
   - "pip install Cython"
 
+  # Should this be done here or via setup some how? it should not be part of the build/install requirements, just development
+  - "pip install pytest"
+
   # Install the build dependencies of the project. If some dependencies contain
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
