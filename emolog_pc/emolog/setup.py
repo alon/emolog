@@ -6,6 +6,7 @@ from .util import which
 
 
 git_root_candidate = path.join('..', '.git')
+GIT_ROOT = None
 if path.exists(git_root_candidate):
     GIT_ROOT = path.abspath('..')
 
@@ -22,7 +23,7 @@ for candidate in candidates:
     if path.exists(candidate):
         EMO_MESSAGE_TYPE_H_FILENAME = candidate
 
-assert EMO_MESSAGE_TYPE_H_FILENAME, f"cannot find {EMO_MESSAGE_TYPE_H_BASENAME}"
+assert EMO_MESSAGE_TYPE_H_FILENAME, f"cannot find {EMO_MESSAGE_TYPE_H_BASENAME} in any of {candidates}; also: GIT_ROOT={GIT_ROOT} and module_dir={module_dir}"
 
 
 def get_artifacts():
