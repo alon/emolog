@@ -776,12 +776,13 @@ cdef class CyClientBase:
 
 ##### EmoTool
 
-# cpdef so the python unit test can access it
-cpdef coalesce_meth(hertz):
-    """ decorator to call real function.
+def coalesce_meth(hertz):
+    """
+    decorator to call real function.
     TODO: use async loop mechanism, since otherwise this ends up possibly forgetting
     the last point. Since we intend to work at 20000 Hz and look at seconds, this is
-     not a real problem"""
+    not a real problem
+    """
     dt = 1.0 / hertz
     def wrappee(f):
         last_time = [None]
