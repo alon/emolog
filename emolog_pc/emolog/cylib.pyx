@@ -36,8 +36,6 @@ import builtins # profile will be here when run via kernprof
 
 import cython
 
-from .setup import EMO_MESSAGE_TYPE_H_FILENAME
-
 # TODO: line_profiler is not compatible with cython.
 if 'profile' not in builtins.__dict__:
     def nop_decorator(f):
