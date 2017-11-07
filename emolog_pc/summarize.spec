@@ -5,8 +5,8 @@ block_cipher = None
 import os
 import sys
 sys.path.insert(0, ".")
-from emolog.setup import build_artifacts
-build_artifacts()
+from emolog.setup import get_artifacts
+get_artifacts()
 
 a = Analysis(['summarize.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],

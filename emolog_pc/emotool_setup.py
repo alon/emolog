@@ -1,6 +1,6 @@
 from cx_Freeze import setup, Executable
 
-from emolog.setup import build_artifacts
+from emolog.setup import get_artifacts
 
 """
 Known problems:
@@ -31,7 +31,7 @@ AttributeError: 'NoneType' object has no attribute 'name'
 """
 
 # TODO - turn this into setup commands so it happens during setup (for instance not when run with --help)
-artifacts = build_artifacts()
+artifacts = get_artifacts()
 
 # Dependencies are automatically detected, but it might need
 # fine tuning.

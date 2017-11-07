@@ -6,15 +6,15 @@ import sys
 import os
 sys.path.insert(0, ".")
 # TODO - make this into a command - would make --help work correctly (not cause side effects)
-from emolog.setup import build_artifacts
-artifacts = build_artifacts()
+from emolog.setup import get_artifacts
+artifacts = get_artifacts()
 
 
 emotool_a = Analysis(['emotool.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],
              binaries=[],
              datas=[(os.path.join('emolog', art), 'emolog') for art in artifacts] + [('local_machine_config.ini.example', '.')],
-             hiddenimports=['emolog', 'emolog.emotool', 'emolog.emotool.embedded',
+             hiddenimports=['emolog', 'emolog.setup', 'emolog.emotool', 'emolog.emotool.embedded',
                             'pandas._libs.tslibs.timedeltas'],
              hookspath=[],
              runtime_hooks=[],
