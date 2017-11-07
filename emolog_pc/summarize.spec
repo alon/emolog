@@ -2,16 +2,10 @@
 
 block_cipher = None
 
-import os
-import sys
-sys.path.insert(0, ".")
-from emolog.setup import get_artifacts
-get_artifacts()
-
 a = Analysis(['summarize.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],
              binaries=[],
-             datas=[(os.path.join('config', 'summary.ini'), '.')],
+             datas=[],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

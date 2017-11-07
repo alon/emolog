@@ -58,7 +58,14 @@ typedef struct emo_header {
 
 
 typedef enum {
-#include "emo_message_t.h" // this is shared with python, must stay simple
+    EMO_MESSAGE_TYPE_VERSION = 1,
+    EMO_MESSAGE_TYPE_PING = 2,
+    EMO_MESSAGE_TYPE_ACK = 3,
+    EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE = 4,
+    EMO_MESSAGE_TYPE_SAMPLER_CLEAR = 5,
+    EMO_MESSAGE_TYPE_SAMPLER_START = 6,
+    EMO_MESSAGE_TYPE_SAMPLER_STOP = 7,
+    EMO_MESSAGE_TYPE_SAMPLER_SAMPLE = 8,
 } emo_message_t;
 
 

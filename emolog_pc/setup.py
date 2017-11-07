@@ -2,10 +2,6 @@ from setuptools import setup, Extension
 
 from Cython.Build import cythonize
 
-from emolog.setup import get_artifacts
-
-artifacts = get_artifacts()
-
 gdb_debug = False
 macros = [] #[('CYTHON_TRACE', 1)]
 
@@ -37,7 +33,6 @@ setup(
         'PyInstaller(==3.3)',
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
-    package_data={'emolog': artifacts},
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
     data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
     entry_points={

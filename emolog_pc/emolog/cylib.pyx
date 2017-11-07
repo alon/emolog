@@ -75,28 +75,37 @@ cdef extern from "emolog_protocol.h":
     void crc_init();
 
 
+cdef extern from "emolog_protocol.h":
+    cdef cppclass emo_message_t:
+        pass
+
+cdef extern from "emolog_protocol.h" namespace "emo_message_t":
+    cdef emo_message_t EMO_MESSAGE_TYPE_VERSION
+    cdef emo_message_t EMO_MESSAGE_TYPE_PING
+    cdef emo_message_t EMO_MESSAGE_TYPE_ACK
+    cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE
+    cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_CLEAR
+    cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_START
+    cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_STOP
+    cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_SAMPLE
+
+
 
 ### Globals
 
 
-class EmoMessageTypes:
-    pass
+class emo_message_types:
+    version=<int>EMO_MESSAGE_TYPE_VERSION
+    ping=<int>EMO_MESSAGE_TYPE_PING
+    ack=<int>EMO_MESSAGE_TYPE_ACK
+    sampler_register_variable=<int>EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE
+    sampler_clear=<int>EMO_MESSAGE_TYPE_SAMPLER_CLEAR
+    sampler_start=<int>EMO_MESSAGE_TYPE_SAMPLER_START
+    sampler_stop=<int>EMO_MESSAGE_TYPE_SAMPLER_STOP
+    sampler_sample=<int>EMO_MESSAGE_TYPE_SAMPLER_SAMPLE
 
 
-emo_message_types = EmoMessageTypes()
-emo_message_type_to_str = {}
-
-
-def initialize_emo_message_type_to_str():
-    with open(EMO_MESSAGE_TYPE_H_FILENAME) as fd:
-        lines = [l.split('=') for l in fd.readlines() if l.strip() != '' and not l.strip().startswith('//')]
-        lines = [(part_a.strip(), int(part_b.replace(',', '').strip())) for part_a, part_b in lines]
-        for name, value in lines:
-            assert(name.startswith('EMO_MESSAGE_TYPE_'))
-            short_name = name[len('EMO_MESSAGE_TYPE_'):].lower()
-            setattr(emo_message_types, short_name, value)
-            emo_message_type_to_str[value] = short_name
-initialize_emo_message_type_to_str()
+emo_message_type_to_str = {v: v for k, v in emo_message_types.__dict__.items() if not k.startswith('__')}
 
 
 cdef int HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
@@ -485,8 +494,9 @@ class Parser(object):
                 elif not hasattr(msg, 'type'):
                     logger.debug("decoded {}".format(msg))
                 else:
-                    logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
-                        emo_message_type_to_str[msg.type], i_next - i, msg.seq, n))
+                    pass # TODO: return this but only when run with --debug - it is slow otherwise
+                    #logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
+                    #    emo_message_type_to_str[msg.type], i_next - i, msg.seq, n))
             if isinstance(msg, SkipBytes):
                 parsed_buf = buf[i:i_next]
                 logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
@@ -768,7 +778,7 @@ cdef class CyClientBase:
 
 ##### EmoTool
 
-def coalesce_meth(hertz):
+cdef coalesce_meth(hertz):
     """ decorator to call real function.
     TODO: use async loop mechanism, since otherwise this ends up possibly forgetting
     the last point. Since we intend to work at 20000 Hz and look at seconds, this is
@@ -840,7 +850,7 @@ cdef class CyEmoToolClient(CyClientBase):
     def stop(self):
         self._running = False
 
-    cdef handle_sampler_samples(self, msgs):
+    def handle_sampler_samples(self, msgs):
         """
         Write to CSV, add points to plots
         :param msgs: [(seq, ticks, {name: value})]
