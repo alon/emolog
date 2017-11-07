@@ -13,7 +13,7 @@ module_dir = path.split(__file__)[0]
 
 EMO_MESSAGE_TYPE_H_BASENAME = 'emo_message_t.h'
 
-devel_protocol_lib_dir = path.abspath(path.join(module_dir, '..', '..', 'emolog_protocol'))
+devel_protocol_lib_dir = path.abspath(path.join(module_dir, '..', '..', 'emolog_protocol', 'source'))
 
 candidates = [path.join(d, EMO_MESSAGE_TYPE_H_BASENAME) for d in [module_dir, devel_protocol_lib_dir]]
 
