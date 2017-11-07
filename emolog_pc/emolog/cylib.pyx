@@ -776,7 +776,8 @@ cdef class CyClientBase:
 
 ##### EmoTool
 
-cdef coalesce_meth(hertz):
+# cpdef so the python unit test can access it
+cpdef coalesce_meth(hertz):
     """ decorator to call real function.
     TODO: use async loop mechanism, since otherwise this ends up possibly forgetting
     the last point. Since we intend to work at 20000 Hz and look at seconds, this is
