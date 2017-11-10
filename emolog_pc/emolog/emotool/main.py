@@ -360,8 +360,8 @@ def parse_args():
     parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
     # GUI
+    parser.add_argument('--gui', default=False, action='store_true', dest='gui', help='enable graphical user interface')
     parser.add_argument('--no-gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
-    parser.add_argument('--no_gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
     parser.add_argument('--wait-for-gui', default=False, action='store_true', help='wait for user closing the main window before quitting')
 
     # Embedded
