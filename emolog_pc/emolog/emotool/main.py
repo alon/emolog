@@ -87,11 +87,11 @@ def dwarf_get_variables_by_name(filename, names):
     return sampled_vars
 
 
-async def start_fake_bench(port):
-    return await start_fake_sine(ticks_per_second=0, port=port)
+def start_fake_bench(port):
+    return start_fake_sine(ticks_per_second=0, port=port)
 
 
-async def start_fake_sine(ticks_per_second, port):
+def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
     # Use our executable to work with a development environment (python executable)
     # or pyinstaller (emotool.exe)
@@ -103,9 +103,7 @@ async def start_fake_sine(ticks_per_second, port):
     else:
         cmdline = ['python', sys.argv[0]]
     print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
-    create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
-
-
+    return create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
 
 
 def iterate(prefix, initial):
@@ -251,9 +249,9 @@ async def start_transport(client):
     loop = get_event_loop()
     port = random.randint(10000, 50000)
     if args.fake:
-        await start_fake_sine(args.ticks_per_second, port)
+        start_fake_sine(args.ticks_per_second, port)
     elif args.fake_bench:
-        await start_fake_bench(port)
+        start_fake_bench(port)
     else:
         start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     attempt = 0
