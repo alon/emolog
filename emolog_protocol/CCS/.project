@@ -34,7 +34,7 @@
 	<variableList>
 		<variable>
 			<name>SW_ROOT</name>
-			<value>$%7BPARENT-3-PROJECT_LOC%7D/TivaWare</value>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D/tivaware</value>
 		</variable>
 	</variableList>
 </projectDescription>
