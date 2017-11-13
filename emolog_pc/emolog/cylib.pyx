@@ -819,8 +819,9 @@ cdef class CyEmoToolClient(CyClientBase):
         self._running = False
         self.fd = None
         self.window = window
+        self._do_plot = True
 
-    def reset(self, csv_filename, names, min_ticks, max_ticks):
+    def reset(self, csv_filename, names, min_ticks, max_ticks, do_plot):
         self.csv = None
         self.csv_filename = csv_filename
         self.first_ticks = None
@@ -831,6 +832,7 @@ cdef class CyEmoToolClient(CyClientBase):
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
+        self._do_plot = do_plot
 
     cpdef bint running(self):
         return self._running
@@ -865,7 +867,7 @@ cdef class CyEmoToolClient(CyClientBase):
         self.csv.writerows([[seq, ticks, now] +
                       [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
         self.fd.flush()
-        if self.window:
+        if self.window and self._do_plot:
             for (_seq, ticks, variables) in msgs:
                 self.do_plot((ticks, list(variables.items())))
         self.samples_received += len(msgs)
