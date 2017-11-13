@@ -1,2 +1,5 @@
-emolog/emo_message_t.h
-emolog/cython_util.c
+emolog/*.c
+emolog/*.cpp
+build
+dist
+Emotool.egg-info

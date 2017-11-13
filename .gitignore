@@ -3,6 +3,7 @@
 .metadata
 *.pyc
 *.sw?
+*.o
 emolog_protocol/example_user
 emolog_protocol.dll
 emolog/example_user.exe
