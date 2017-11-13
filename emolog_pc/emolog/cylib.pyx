@@ -301,6 +301,9 @@ class SkipBytes(object):
     def __str__(self):
         return "Skip Bytes {}".format(self.skip)
 
+    def handle_by(self, handler):
+        pass
+
     __repr__ = __str__
 
 
