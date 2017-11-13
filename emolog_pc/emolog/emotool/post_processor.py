@@ -433,7 +433,7 @@ def calc_half_cycle_stats(data):
         hc_stats['Average Velocity [m/s]'] = hc_stats['Travel Range [steps]'] * step_size_mm / hc_stats['Time [ms]']
 
         cruising = hc[hc['Mode'] == 'MODE_CRUISING']
-        cruising_range = cruising['Position'].max() - cruising['Position'].min()
+        cruising_range = cruising['Position'].max() - cruising['Position'].min() + 1
         if len(cruising) > 0:
             cruising_time = (cruising.last_valid_index() - cruising.first_valid_index() + 1) * tick_time_ms
         else:
