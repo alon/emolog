@@ -266,9 +266,8 @@ async def start_transport(client):
         except:
             pass
         else:
-            s.close()
             break
-    client_transport, client2 = await loop.create_connection(lambda: client, '127.0.0.1', port)
+    client_transport, client2 = await loop.create_connection(lambda: client, sock=s)
     assert client2 is client
 
 
