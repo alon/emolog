@@ -875,7 +875,7 @@ cdef class CyEmoToolClient(CyClientBase):
         self.fd.flush()
         if self.window and self._do_plot:
             for (_seq, ticks, variables) in msgs:
-                self.do_plot((ticks, list(variables.items())))
+                self.do_plot((ticks, list((k, v) for (k, v) in variables.items() if type(v) == float)))
         self.samples_received += len(msgs)
         for seq, ticks, variables in msgs:
             if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
