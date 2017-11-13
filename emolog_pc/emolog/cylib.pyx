@@ -88,6 +88,9 @@ cdef extern from "emolog_protocol.h" namespace "emo_message_t":
     cdef emo_message_t EMO_MESSAGE_TYPE_SAMPLER_SAMPLE
 
 
+### Initialize crc table for emolog
+crc_init()
+
 
 ### Globals
 
