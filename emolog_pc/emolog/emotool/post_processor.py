@@ -32,16 +32,16 @@ def post_process(input_csv_filename, truncate_data=False, verbose=False):
     start_time = time.time()
     read_config()
     data = pd.read_csv(input_csv_filename)
-    # check for required keys for post processing
-    for k in ['Power In [W]', 'Dc bus v', 'Total i']:
-        if k not in data:
-            print(f"cannot run post processing, missing key {k!r}")
-            return
     data.columns = [clean_col_name(c) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
     data = remove_invalid_temperatures(data)
+    # check for required columns (after name translation) for post processing
+    for k in ['Dc bus v', 'Total i']:
+        if k not in data:
+            print(f"cannot run post processing, missing column {k!r}")
+            return
     data['Power In [W]'] = data['Dc bus v'] * data['Total i']
     data = step_time_prediction_to_vel(data)
     data_before_cropping = data.copy()
@@ -998,7 +998,7 @@ def read_config():
         config.read(CONFIG_FILE_NAME)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
     parser.add_argument('input_csv', help='CSV file to parse. Wildcards are accepted. If the input is a folder, '
                                           'all CSV files in the folder are processed. If this parameter is not '
@@ -1059,3 +1059,7 @@ if __name__ == '__main__':
     print('Successfully processed: {}'.format(summary['processed']))
     print('Failed (may be I/V logs): {}'.format(summary['failed']))
     print('Skipped (Excel already exists): {}'.format(summary['skipped']))
+
+
+if __name__ == '__main__':
+    main()
