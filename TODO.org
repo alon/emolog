@@ -26,6 +26,14 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 
 + [ ] clean up top level directory
 
++ [ ] add all parameters from emotool.bat to the ini file and delete the batch file
+
++ [ ] ACK timeout happens during normal operation (apparently only at the end and after stop is sent).
+
++ [ ] try to find way to change emolog_protocol.cpp back to .c
+
++ [ ] document the full steps needed to install and upgrade emolog from git on a clean windows system
+
 
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
