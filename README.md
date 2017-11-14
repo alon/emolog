@@ -30,3 +30,9 @@ pip install -e .
 13. connect FTDI FT2232H device
 14. turn off "Serial Enumerator" at device-manager->com ports->com X->Properties->Advanced settings
 15. run emotool.bat
+
+Development
+===========
+
+After any change to a pyx file you need to rebuild the cython extensions:
+(venv)> python setup.py build_ext --inplace
