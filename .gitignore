@@ -2,6 +2,7 @@
 [Rr]elease*/
 .metadata
 *.pyc
+*.pyd
 *.sw?
 *.o
 emolog_protocol/example_user
