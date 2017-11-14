@@ -34,6 +34,10 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 
 + [ ] document the full steps needed to install and upgrade emolog from git on a clean windows system
 
++ [ ] implement a mechanism that compares the embedded binary the DWARF reads to the what's programmed into the hardware
+
++ [ ] improve embededd.py so that it can generate an output read from a pre-recorded CSV
+
 
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
