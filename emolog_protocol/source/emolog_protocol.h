@@ -51,7 +51,7 @@ typedef struct emo_header {
     uint8_t  seq;         // used to tell ack/nacks targets
     uint8_t  payload_crc; // CRC8 of the payload only
     uint8_t  header_crc;  // CRC8 of the header not including the header_crc byte
-}  emo_header;
+} PACKED emo_header;
 
 
 #define EMO_HEADER_NO_CRC_SIZE (sizeof(emo_header) - sizeof(((emo_header*)0)->header_crc))
@@ -73,7 +73,7 @@ typedef enum {
 typedef struct emo_ ## payload_name {    \
     emo_header h;                   \
     emo_ ## payload_name ## _payload p;             \
-}  emo_ ## payload_name;
+} PACKED emo_ ## payload_name;
 
 
 /** version */
@@ -83,7 +83,7 @@ typedef struct emo_version_payload {
     uint16_t   protocol_version;
     uint8_t    reply_to_seq; // -1 if initiating, seq of replied to message if responding
     uint8_t    reserved;
-}  emo_version_payload;
+} PACKED emo_version_payload;
 
 MAKE_STRUCT(version)
 
@@ -92,7 +92,7 @@ MAKE_STRUCT(version)
 
 
 typedef struct emo_ping_payload {
-}  emo_ping_payload;
+} PACKED emo_ping_payload;
 
 MAKE_STRUCT(ping)
 
@@ -108,7 +108,7 @@ MAKE_STRUCT(ping)
 typedef struct emo_ack_payload {
     uint16_t error;
     uint8_t  reply_to_seq;
-}  emo_ack_payload;
+} PACKED emo_ack_payload;
 
 MAKE_STRUCT(ack);
 
@@ -124,25 +124,25 @@ typedef struct emo_sampler_register_variable_payload {
     uint32_t address;
     uint16_t size;
     uint16_t reserved;
-}  emo_sampler_register_variable_payload;
+} PACKED emo_sampler_register_variable_payload;
 
 MAKE_STRUCT(sampler_register_variable)
 
 
 typedef struct emo_sampler_clear_payload {
-}  emo_sampler_clear_payload;
+} PACKED emo_sampler_clear_payload;
 
 MAKE_STRUCT(sampler_clear)
 
 
 typedef struct emo_sampler_start_payload {
-}  emo_sampler_start_payload;
+} PACKED emo_sampler_start_payload;
 
 MAKE_STRUCT(sampler_start)
 
 
 typedef struct emo_sampler_stop_payload {
-}  emo_sampler_stop_payload;
+} PACKED emo_sampler_stop_payload;
 
 MAKE_STRUCT(sampler_stop)
 
@@ -152,7 +152,7 @@ typedef struct emo_sampler_sample_payload {
     // here come the variables themselves.
     // host sees the ticks, calculates which variables are contained (see XXX)
     // and then can parse the variables (length is known from header as well as additional redundant information)
-}  emo_sampler_sample_payload;
+} PACKED emo_sampler_sample_payload;
 
 MAKE_STRUCT(sampler_sample)
 
