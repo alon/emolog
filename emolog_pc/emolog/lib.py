@@ -28,8 +28,8 @@ import builtins # profile will be here when run via kernprof
 
 from .cylib import (
     SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
-    FakeSineEmbedded,
-    AckTimeout, VariableSampler, Parser, CyClientBase
+    VariableSampler, Parser, CyClientBase,
+    Message, Ack, SamplerSample
     )
 
 if 'profile' not in builtins.__dict__:
@@ -41,21 +41,108 @@ if 'profile' not in builtins.__dict__:
 logger = getLogger('emolog')
 
 
+class Futures:
+    CHECK_DT = 0.1
+    def __init__(self):
+        self._futures = {}
+        self._new_futures = {}
+        get_event_loop().create_task(self.reaper())
+
+    async def reaper(self):
+        while True:
+            await sleep(self.CHECK_DT)
+            now = time()
+            removed = []
+            for f, (start_time, timeout, timeout_result) in self._futures.items():
+                if f.done():
+                    removed.append(f)
+                elif timeout is not None and now > start_time + timeout:
+                    self.set_future_result(f, timeout_result)
+                    removed.append(f)
+            for f in removed:
+                if f in self._futures:
+                    del self._futures[f]
+            self._futures.update(self._new_futures)
+            self._new_futures.clear()
+
+    def cancel_all(self):
+        for f, (start_time, timeout, timeout_result) in self._futures.items():
+            f.cancel()
+        self._futures.clear()
+
+    def add_future(self, timeout=None, timeout_result=None):
+        f = Future()
+        self._new_futures[f] = (time(), timeout, timeout_result)
+        return f
+
+    def set_future_result(self, future, result):
+        try:
+            future.set_result(result)
+        except InvalidStateError:
+            pass # silently swallow error, means a double set_result
+
+
+def test_futures():
+    el = get_event_loop()
+    futures = Futures()
+    f1 = futures.add_future(timeout=3.0, timeout_result='Busted')
+    f2 = futures.add_future(timeout=0.1, timeout_result='Busted')
+    async def dosleep():
+        while not f1.done() or not f2.done():
+            await sleep(0.5)
+            if not f1.done():
+                f1.set_result(None)
+    get_event_loop().run_until_complete(dosleep())
+    print(f1.result())
+    print(f2.result())
+
+
+class AckTimeout(Exception):
+    pass
+
+
 class ClientProtocolMixin(Protocol):
     """
     To use, inherit also from CyClientBase
     You cannot inherit from it here to avoid two classes with predefined structure
     inheriting and resulting in an error
     """
+    ACK_TIMEOUT_SECONDS = 40.0
+    ACK_TIMEOUT = 'ACK_TIMEOUT'
+
     def __init__(self, verbose=False, dump=False):
         CyClientBase.__init__(self, verbose=verbose, dump=dump)
         Protocol.__init__(self)
+        self.futures = Futures()
+        self.reset_ack()
+        self.connection_made_future = self.futures.add_future()
+
+    def set_future_result(self, future, result):
+        self.futures.set_future_result(future, result)
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self.parser = Parser(transport, debug=self.verbose)
+        self.set_future_result(self.connection_made_future, self)
+
+    def exit_gracefully(self):
+        self.stopped = 1
+        self.futures.cancel_all()
+
+    def send_message(self, msg_type, **kw):
+        self.parser.send_message(msg_type, **kw)
+        self.ack = self.futures.add_future(timeout=self.ACK_TIMEOUT_SECONDS, timeout_result=self.ACK_TIMEOUT)
+
+    def reset_ack(self):
+        self.ack = Future()
+        self.ack.set_result(True)
 
     async def await_ack(self):
         await self.ack
         is_timeout = self.ack.result() == self.ACK_TIMEOUT
         self.reset_ack()
         if is_timeout:
+            print(f"{self.futures._futures!r}")
             raise AckTimeout()
 
     async def send_set_variables(self, variables):

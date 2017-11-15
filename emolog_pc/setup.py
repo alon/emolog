@@ -10,9 +10,10 @@ cylib = Extension(name="emolog.cylib",
                   include_dirs=['../emolog_protocol/source'],
                   define_macros=macros,
                   language="c++")
+fakeembedded = Extension(name="emolog.fakeembedded", sources=["emolog/fakeembedded.pyx"])
 cython_util = Extension(name="emolog.cython_util", sources=["emolog/cython_util.pyx"])
 
-cython_extensions = [cylib, cython_util]
+cython_extensions = [cylib, fakeembedded, cython_util]
 
 setup(
     name='Emotool',

@@ -27,7 +27,6 @@ from math import sin
 from time import time
 from logging import getLogger
 from struct import pack, unpack
-from asyncio import Protocol, get_event_loop, Future, InvalidStateError, sleep
 import csv
 from functools import wraps
 
@@ -174,6 +173,7 @@ class Ack(Message):
         return emo_encode_ack(self.buf, self.reply_to_seq, self.error)
 
     def handle_by(self, handler):
+        #print("Ack.handle_by")
         if self.error != 0:
             logger.error(f"embedded responded to {self.reply_to_seq} with ERROR: {self.error}")
         handler.set_future_result(handler.ack, True)
@@ -466,10 +466,6 @@ def emo_decode(buf, i_start):
     return msg, i_next, error
 
 
-class AckTimeout(Exception):
-    pass
-
-
 class Parser(object):
     def __init__(self, transport, debug=False):
         self.transport = transport
@@ -534,133 +530,6 @@ class Parser(object):
 
     __repr__ = __str__
 
-#### FakeEmbedded
-
-
-# we ignore address, and size is used to return the same size as requested
-cdef struct Sine:
-    # Sinus parameters
-    float freq
-    float amp
-    float phase
-    # Sampling parameters
-    int period_ticks
-    int phase_ticks
-    int size
-    int address
-
-
-def make_sine():
-    return Sine(size=4, address=7,
-                           freq=50 + 50 * (5 / 10.0), amp=10 * 5, phase=0.05 * 5,
-                           phase_ticks=10,
-                           period_ticks=20)
-
-
-cdef class FakeSineEmbeddedBase:
-    """
-    Implement a simple embedded side. We don't care about the addresses,
-    just fake a sinus on each address, starting at t=phase_ticks when requested,
-    having a frequency that rises. Actually I'll wing it - it's really just
-    a source of signals for debugging:
-        the protocol
-        the GUI
-
-    Also an example of how an embedded side behaves:
-        Respond with ACK to everything
-        Except to Version: respond with our Version
-
-    !important! do not write to STDOUT - used in a pipe
-    """
-
-    VERSION = 1
-    cdef Sine sines[10]
-    cdef int sines_num;
-
-    def __init__(self, ticks_per_second):
-        self.ticks_per_second = ticks_per_second
-        self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
-        self.verbose = True
-        self.parser = None
-        self.sines_num = 0
-        self.start_time = time()
-        self.running = False
-        self.ticks = 0
-        self.eventloop = get_event_loop()
-
-    def connection_made(self, transport):
-        self.parser = Parser(transport, debug=self.verbose)
-
-    def data_received(self, data):
-        for msg in self.parser.iter_available_messages(data):
-            self.handle_message(msg)
-
-    def handle_message(self, msg):
-        if not isinstance(msg, Message):
-            return
-
-        # handle everything except Version
-        if isinstance(msg, SamplerClear):
-            self.on_sampler_clear()
-        elif isinstance(msg, SamplerStart):
-            self.on_sampler_start()
-        elif isinstance(msg, SamplerStop):
-            self.on_sampler_stop()
-        elif isinstance(msg, SamplerRegisterVariable):
-            self.on_sampler_register_variable(msg)
-
-        # reply with ACK to everything
-        if isinstance(msg, Version):
-            self.parser.send_message(Version, version=self.VERSION, reply_to_seq=msg.seq)
-        else:
-            self.parser.send_message(Ack, error=0, reply_to_seq=msg.seq)
-
-    def on_sampler_clear(self):
-        self.sines_num = 0
-
-    def on_sampler_stop(self):
-        self.running = False
-
-    def on_sampler_start(self):
-        self.running = True
-        self.ticks = 0
-        self.eventloop.call_later(0.0, self.handle_time_event)
-
-    def on_sampler_register_variable(self, msg):
-        phase_ticks, period_ticks, address, size = (
-            msg.phase_ticks, msg.period_ticks, msg.address, msg.size)
-        n = self.sines_num
-        self.sines_num += 1
-        self.sines[n] = Sine(size=size, address=address,
-                           freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
-                           phase_ticks=phase_ticks,
-                           period_ticks=period_ticks)
-
-    def handle_time_event(self):
-        # ignore time for the ticks aspect - a tick is a call of this function.
-        # easy.
-        if not self.running:
-            return
-        self.ticks += 1
-        t = self.ticks * self.tick_time
-        var_size_pairs = []
-        for i in range(self.sines_num):
-            sine = self.sines[i]
-            if self.ticks % sine.period_ticks == sine.phase_ticks:
-                var_size_pairs.append((float(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
-        # We could use the gcd to find the minimal tick size but this is good enough
-        if len(var_size_pairs) > 0:
-            self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
-        dt = max(0.0, self.tick_time * self.ticks + self.start_time - time()) if self.ticks_per_second > 0.0 else 0
-        self.eventloop.call_later(dt, self.handle_time_event)
-
-
-class FakeSineEmbedded(FakeSineEmbeddedBase, Protocol):
-    def __init__(self, ticks_per_second, **kw):
-        FakeSineEmbeddedBase.__init__(self, ticks_per_second)
-        Protocol.__init__(self, **kw)
-
-
 ##### Client
 
 class Dumper:
@@ -679,71 +548,30 @@ cdef class CyClientBase:
      - TODO
     """
 
-    ACK_TIMEOUT_SECONDS = 1.0
-    ACK_TIMEOUT = 'ACK_TIMEOUT'
     cdef int received_samples
     cdef unsigned stopped
 
     def __init__(self, verbose=False, dump=None):
-        self._futures = set()
         self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
         self.pending_samples = []
-        self.reset_ack()
         self.parser = None
         self.transport = None
-        self.connection_made_future = self.add_future()
         self.stopped = 0
         if dump:
             self.dump = open(dump, 'wb')
         else:
             self.dump = None #dumper
 
-    def reset_ack(self):
-        self.ack = Future()
-        self.set_future_result(self.ack, True)
-
     def dump_buf(self, buf):
         self.dump.write(pack('<fI', time(), len(buf)) + buf)
         #self.dump.flush()
-
-    def exit_gracefully(self):
-        self.stopped = 1
-        self.cancel_all_futures()
-
-    def cancel_all_futures(self):
-        for f in self._futures:
-            f.cancel()
-        self._futures.clear()
-
-    def add_future(self, timeout=None, timeout_result=None):
-        f = Future()
-        self._futures.add(f)
-        if timeout is not None:
-            async def set_result_after_timeout():
-                await sleep(timeout)
-                try:
-                    self.set_future_result(f, timeout_result)
-                except:
-                    pass
-            sleep_task = get_event_loop().create_task(set_result_after_timeout())
-            self._futures.add(sleep_task)
-        return f
-
-    def set_future_result(self, future, result):
-        try:
-            future.set_result(result)
-        except InvalidStateError:
-            pass # silently swallow error, means a double set_result
-        if future in self._futures:
-            self._futures.remove(future)
 
     def connection_lost(self, exc):
         # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
         # this wouldn't happen - we wouldn't notice at this level. So quit?
         self._debug_log("serial connection_lost")
-        # ?? asyncio.get_event_loop.stop()
 
     def pause_writing(self):
         # interesting?
@@ -755,15 +583,6 @@ cdef class CyClientBase:
 
     def _debug_log(self, s):
         logger.debug(s)
-
-    def connection_made(self, transport):
-        self.transport = transport
-        self.parser = Parser(transport, debug=self.verbose)
-        self.set_future_result(self.connection_made_future, self)
-
-    def send_message(self, msg_type, **kw):
-        self.parser.send_message(msg_type, **kw)
-        self.ack = self.add_future(timeout=self.ACK_TIMEOUT_SECONDS, timeout_result=self.ACK_TIMEOUT)
 
     def data_received(self, data):
         if self.stopped > 0:
@@ -789,7 +608,7 @@ cdef class CyClientBase:
 def coalesce_meth(hertz):
     """
     decorator to call real function.
-    TODO: use async loop mechanism, since otherwise this ends up possibly forgetting
+    TODO: use callback mechanism, since otherwise this ends up possibly forgetting
     the last point. Since we intend to work at 20000 Hz and look at seconds, this is
     not a real problem
     """
