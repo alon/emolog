@@ -95,7 +95,7 @@ class Redirector:
         """loop forever and copy socket->serial"""
         while self.alive:
             try:
-                data = self.socket.recv(1024)
+                data = self.socket.recv(1)
                 if not data:
                     break
                 self.serial.write(data)  # get a bunch of bytes and send them

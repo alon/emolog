@@ -6,7 +6,7 @@ block_cipher = None
 emotool_a = Analysis(['emotool.py'],
              pathex=['/images/cometme-wp/workspace/emolog_pc'],
              binaries=[],
-             datas=[('local_machine_config.ini.example', '.')],
+             datas=[('../local_machine_config.ini.example', '.')],
              hiddenimports=['emolog', 'emolog.setup', 'emolog.emotool', 'emolog.emotool.embedded',
                             'pandas._libs.tslibs.timedeltas'],
              hookspath=[],

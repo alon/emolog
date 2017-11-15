@@ -1,2 +1,0 @@
-#!/bin/bash
-./serial2tcp -b 8000000 -r -p /dev/ttyUSB0 -P 8080
