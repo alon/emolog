@@ -5,6 +5,7 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
+import atexit
 import argparse
 import os
 from os import path
@@ -20,6 +21,8 @@ from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
+
+from psutil import Process, NoSuchProcess, wait_procs
 
 from ..util import version
 from ..cython_util import decode_little_endian_float
@@ -304,6 +307,29 @@ else:
         return None
 
 
+def kill_proc_tree(pid, including_parent=True, timeout=5):
+    try:
+        parent = Process(pid)
+    except NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for child in children:
+        #print(f"killing {child.pid}")
+        try:
+            child.kill()
+            child.terminate()
+        except NoSuchProcess:
+            pass
+    gone, still_alive = wait_procs(children, timeout=timeout)
+    if including_parent:
+        try:
+            parent.kill()
+            parent.terminate()
+            parent.wait(timeout)
+        except NoSuchProcess:
+            pass
+
+
 async def cleanup(client):
     if not hasattr(client, 'transport') or client.transport is None:
         cancel_outstanding_tasks()
@@ -317,11 +343,17 @@ async def cleanup(client):
     client.exit_gracefully()
     if client.transport is not None:
         client.transport.close()
+    kill_all_processes()
+
+
+def kill_all_processes():
     for process in processes:
+        #print(f"killing {process.pid}")
         if hasattr(process, 'send_ctrl_c'):
             process.send_ctrl_c()
         else:
-            process.terminate()
+            kill_proc_tree(process.pid)
+    del processes[:]
 
 
 def parse_args():
@@ -628,6 +660,7 @@ def do_post_process(args, client):
 
 def main(cmdline=None):
     global args # TODO - remove this global, pass explicitly
+    atexit.register(kill_all_processes)
     if cmdline is not None:
         sys.argv = cmdline
     args = parse_args()

@@ -32,6 +32,7 @@ setup(
         'pyserial(==3.2.1)',
         'pyserial-asyncio(==0.2)',
         'PyInstaller(==3.3)',
+        'psutil(==5.4.1)',
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
