@@ -18,7 +18,14 @@ def main():
         loop.create_server(
             lambda: FakeSineEmbedded(ticks_per_second),
             host='127.0.0.1', port=port))
-    loop.run_forever()
+    while True:
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            continue
+        except:
+            raise
+
 
 if __name__ == '__main__':
     main()

@@ -307,6 +307,7 @@ else:
     def try_getch():
         return None
 
+verbose_kill = False
 
 def kill_proc_tree(pid, including_parent=True, timeout=5):
     try:
@@ -315,7 +316,8 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
         return
     children = parent.children(recursive=True)
     for child in children:
-        #print(f"killing {child.pid}")
+        if verbose_kill:
+            print(f"killing {child.pid}")
         try:
             child.kill()
             child.terminate()
@@ -324,6 +326,8 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
     gone, still_alive = wait_procs(children, timeout=timeout)
     if including_parent:
         try:
+            if verbose_kill:
+                print(f"killing {parent.pid}")
             parent.kill()
             parent.terminate()
             parent.wait(timeout)
@@ -380,6 +384,7 @@ def parse_args():
                                                            'where xxx is a sequential number starting from "001"')
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent',
                         help='turn on verbose logging; affects performance under windows')
+    parser.add_argument('--verbose-kill', default=False, action='store_true')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs to this file')
     parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
@@ -560,7 +565,7 @@ class SamplePassOn(Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.client.register_listener(self.write_messages)
-    
+
     def write_messages(self, messages):
         pickled_messages = dumps(messages)
         self.transport.write(pack('<i', len(pickled_messages)))
@@ -573,7 +578,7 @@ async def start_tcp_listener(client, port):
     print(f"waiting on {port}")
 
 
-async def amain(args):
+async def amain_startup(args):
     if not os.path.exists(CONFIG_FILE_NAME):
         print("Configuration file {} not found. "
               "This file is required for specifying local machine configuration such as the output folder.\n"
@@ -581,15 +586,20 @@ async def amain(args):
               "Exiting.".format(CONFIG_FILE_NAME, CONFIG_FILE_NAME))
         raise SystemExit
 
-    config = ConfigParser()
-    config.read(CONFIG_FILE_NAME)
-
     setup_logging(args.log, args.silent)
 
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
+    client = await init_client(args)
+    return client
+
+
+async def amain(client, args):
     names, variables = read_elf_variables(elf=args.elf, vars=args.var, varfile=args.varfile)
+
+    config = ConfigParser()
+    config.read(CONFIG_FILE_NAME)
 
     output_folder = config['folders']['output_folder']
     if args.out:
@@ -598,9 +608,6 @@ async def amain(args):
         csv_filename = os.path.join(output_folder, args.out)
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(output_folder, args.out_prefix)
-
-    client = await init_client(args)
-    logger.info('Client initialized')
 
     if args.snapshotfile:
         print("Taking snapshot of parameters")
@@ -638,10 +645,13 @@ def start_callback(args, loop):
     loop.set_debug(args.debug)
 
     try:
-        client = loop.run_until_complete(amain(args))
+        client = loop.run_until_complete(amain_startup(args))
+    except:
+        raise SystemExit
+    try:
+        client = loop.run_until_complete(amain(client=client, args=args))
     except KeyboardInterrupt:
         print("exiting on user ctrl-c")
-        raise SystemExit
     except Exception as e:
         logger.error("got exception {!r}".format(e))
         raise
@@ -668,6 +678,8 @@ def main(cmdline=None):
     if cmdline is not None:
         sys.argv = cmdline
     args = parse_args()
+    global verbose_kill
+    verbose_kill = args.verbose_kill
     if args.embedded:
         from .embedded import main as embmain
         embmain()
