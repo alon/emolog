@@ -24,7 +24,7 @@ from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
 from pickle import dumps
 
-from psutil import Process, NoSuchProcess, wait_procs
+from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 from ..util import version
 from ..cython_util import decode_little_endian_float
@@ -330,7 +330,10 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
                 print(f"killing {parent.pid}")
             parent.kill()
             parent.terminate()
-            parent.wait(timeout)
+            try:
+                parent.wait(timeout)
+            except TimeoutExpired:
+                print(f"timeout expired, process may still be around: {parent.pid}")
         except NoSuchProcess:
             pass
 
