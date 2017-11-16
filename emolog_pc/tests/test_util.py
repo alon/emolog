@@ -4,7 +4,7 @@ from time import sleep
 sys.path.append(os.path.join(os.path.dirname(sys.modules[__name__].__file__), '..'))
 
 
-from emolog.cylib import coalesce_meth
+from emolog.cython_util import coalesce_meth
 
 
 def test_coalesce():
@@ -15,13 +15,13 @@ def test_coalesce():
             self.g.extend(args)
     # TODO - make test fake time
     t = T()
-    t.f(1)
+    t.f([1])
     assert t.g == [1]
-    t.f(2)
+    t.f([2])
     assert t.g == [1]
     sleep(0.02)
     assert t.g == [1]
-    t.f(3)
+    t.f([3])
     assert t.g == [1, 2, 3]
 
 
