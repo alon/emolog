@@ -54,7 +54,7 @@ test_script:
   - 7z x  "%APPVEYOR_BUILD_FOLDER%\emolog_pc\dist\emotool.zip"
   - cd emotool
   - emotool.exe --help
-  - cd "%APPVEYOR_BUILD_FOLDER"
+  - cd "%APPVEYOR_BUILD_FOLDER%"
   # TODO: full run of summarize, compare to known file
   # TODO: full run of emotool, compare to known result (include post_processing)
   - python misc\prof.py
