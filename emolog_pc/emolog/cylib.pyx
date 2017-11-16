@@ -23,7 +23,6 @@ API otherwise, plus helpers.
 """
 
 import sys
-from abc import ABCMeta, abstractmethod
 from math import sin
 from time import time
 from logging import getLogger
@@ -118,14 +117,14 @@ MAGIC = unpack(ENDIANESS + 'H', b'EM')[0]
 ### Messages
 
 
-class Message(metaclass=ABCMeta):
+cdef class Message:
     # Used by all encode functions - can segfault if buffer is too small
     buf = b'\x00' * 1024  # create_string_buffer(buf_size)
+    cdef public unsigned seq
 
     def __init__(self, seq):
         self.seq = seq
 
-    @abstractmethod
     def encode_inner(self):
         pass
 
@@ -225,10 +224,14 @@ class SamplerStop(Message):
         return emo_encode_sampler_stop(self.buf)
 
 
-class SamplerSample(Message):
+cdef class SamplerSample(Message):
     type = emo_message_types.sampler_sample
+    cdef public unsigned ticks
+    cdef public bytes payload
+    cdef public list var_size_pairs
+    cdef public object variables
 
-    def __init__(self, seq, ticks, payload=None, var_size_pairs=None):
+    def __init__(self, unsigned seq, unsigned ticks, bytes payload=None, list var_size_pairs=None):
         """
         :param ticks:
         :param vars: dictionary from variable index to value
@@ -267,7 +270,7 @@ class SamplerSample(Message):
             #logger.debug("ignoring sample since PC sampler is not primed")
             pass
 
-    def update_with_sampler(self, sampler):
+    cdef update_with_sampler(self, VariableSampler sampler):
         self.variables = sampler.variables_from_ticks_and_payload(ticks=self.ticks, payload=self.payload)
 
     def __str__(self):
