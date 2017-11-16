@@ -30,7 +30,7 @@ from ..util import version
 from ..cython_util import decode_little_endian_float
 from ..lib import SamplerSample, AckTimeout, ClientProtocolMixin
 from ..dwarf import FileParser
-from ..cylib import CyEmoToolClient
+from ..lib import CyEmoToolClient, header_size
 from .post_processor import post_process
 
 
@@ -401,6 +401,7 @@ def parse_args():
 
     # Server - used for GUI access
     parser.add_argument('--listen', default=None, type=int, help='enable listening TCP port for samples') # later: add a command interface, making this suitable for interactive GUI
+    parser.add_argument('--gui', default=False, action='store_true', help='launch graphing gui in addition to saving')
 
     # Embedded
     parser.add_argument('--embedded', default=False, action='store_true', help='debugging: be a fake embedded target')
@@ -435,7 +436,7 @@ def bandwidth_calc(args, variables):
     :return: average baud rate (considering 8 data bits, 1 start & stop bits)
     """
     packets_per_second = args.ticks_per_second # simplification: assume a packet every tick (upper bound)
-    header_average = packets_per_second * SamplerSample.empty_size()
+    header_average = packets_per_second * header_size()
     payload_average = sum(args.ticks_per_second / v['period_ticks'] * v['size'] for v in variables)
     return (header_average + payload_average) * 10
 

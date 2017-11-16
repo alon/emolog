@@ -71,6 +71,11 @@ cdef extern from "emolog_protocol.h":
     void crc_init();
 
 
+cpdef unsigned header_size():
+    cdef bytes buf = b' ' * 100
+    return emo_encode_ping(buf)
+
+
 cdef extern from "emolog_protocol.h":
     cdef cppclass emo_message_t:
         pass
@@ -141,10 +146,12 @@ cdef class Message:
     __repr__ = __str__
 
 
-class Version(Message):
+cdef class Version(Message):
     type = emo_message_types.version
-    def __init__(self, seq, version=None, reply_to_seq=None):
-        super(Version, self).__init__(seq=seq)
+    cdef unsigned version
+    cdef unsigned reply_to_seq
+    def __init__(self, unsigned seq, unsigned version=0, unsigned reply_to_seq=0):
+        self.seq = seq
         self.version = version
         self.reply_to_seq = reply_to_seq
 
@@ -165,7 +172,7 @@ class Ping(Message):
 class Ack(Message):
     type = emo_message_types.ack
     def __init__(self, seq, error, reply_to_seq):
-        super(Ack, self).__init__(seq=seq)
+        self.seq = seq
         self.error = error
         self.reply_to_seq = reply_to_seq
 
@@ -189,7 +196,7 @@ class SamplerRegisterVariable(Message):
     type = emo_message_types.sampler_register_variable
 
     def __init__(self, seq, phase_ticks, period_ticks, address, size):
-        super(SamplerRegisterVariable, self).__init__(seq=seq)
+        self.seq = seq
         assert size is not None
         self.phase_ticks = phase_ticks
         self.period_ticks = period_ticks
@@ -224,6 +231,7 @@ class SamplerStop(Message):
         return emo_encode_sampler_stop(self.buf)
 
 
+
 cdef class SamplerSample(Message):
     type = emo_message_types.sampler_sample
     cdef public unsigned ticks
@@ -239,21 +247,11 @@ cdef class SamplerSample(Message):
         """
         if var_size_pairs is None:
             var_size_pairs = []
-        super().__init__(seq=seq)
+        self.seq = seq
         self.ticks = ticks
         self.payload = payload
         self.var_size_pairs = var_size_pairs
         self.variables = None
-
-    def reset(self, seq, ticks, payload):
-        self.seq = seq
-        self.ticks = ticks
-        self.payload = payload
-
-    @classmethod
-    def empty_size(cls):
-        sample = cls(seq=0, ticks=0)
-        return sample.encode_inner()
 
     def encode_inner(self):
         emo_encode_sampler_sample_start(self.buf)
@@ -383,10 +381,10 @@ cdef class VariableSampler:
     cdef unsigned[:] address
     cdef unsigned[:] size
     cdef list _type
-    
+
     # holding place to allow API of register_variable - we recreate the memoryviews
     cdef list variables
-    
+
     cdef public bint running
 
     def __init__(self):
@@ -411,7 +409,7 @@ cdef class VariableSampler:
             size=size,
             _type=_type))
         self._set_variables(self.variables)
-    
+
     cdef _set_variables(self, variables):
         self.variables = variables
         self.name = [x.name for x in variables]
@@ -450,11 +448,10 @@ cdef uint8_t *to_str(val, size):
 
 SAMPLER_SAMPLE_TICKS_FORMAT = ENDIANESS + 'L'
 
-sampler_sample = SamplerSample(0, 0)
 
-def emo_decode(buf, i_start):
-    n = len(buf)
-    needed = emo_decode_with_offset(buf, i_start, min(n - i_start, 0xffff))
+cdef emo_decode(bytes buf, unsigned i_start):
+    cdef unsigned n = len(buf)
+    cdef int needed = emo_decode_with_offset(buf, i_start, min(n - i_start, 0xffff))
     error = None
     if needed == 0:
         payload_start = i_start + HEADER_SIZE
@@ -465,8 +462,7 @@ def emo_decode(buf, i_start):
         if emo_type == emo_message_types.sampler_sample:
             # TODO: this requires having a variable map so we can compute the variables from ticks
             ticks = unpack(SAMPLER_SAMPLE_TICKS_FORMAT, payload[:4])[0]
-            sampler_sample.reset(seq=seq, ticks=ticks, payload=payload[4:])
-            msg = sampler_sample
+            msg = SamplerSample(seq=seq, ticks=ticks, payload=payload[4:])
         elif emo_type == emo_message_types.version:
             (client_version, reply_to_seq, reserved) = unpack(ENDIANESS + 'HBB', payload)
             msg = Version(seq=seq, version=client_version, reply_to_seq=reply_to_seq)
@@ -495,8 +491,15 @@ def emo_decode(buf, i_start):
     return msg, i_next, error
 
 
-class Parser(object):
-    def __init__(self, transport, debug=False):
+cdef class Parser:
+    cdef unsigned send_seq
+    cdef unsigned empty_count
+    cdef bytes buf
+    cdef public object transport
+    cdef bint debug_message_encoding
+    cdef bint debug_message_decoding
+
+    def __init__(self, transport, bint debug=False):
         self.transport = transport
         self.buf = b''
         self.send_seq = 0
@@ -506,17 +509,18 @@ class Parser(object):
         self.debug_message_encoding = debug
         self.debug_message_decoding = debug
 
-    def iter_available_messages(self, s):
-        assert isinstance(s, bytes)
+    cpdef consume_and_return_messages(self, bytes s):
         if len(s) == 0:
             self.empty_count += 1
             # stream closed - quit - but wait a bit to be sure
             if self.empty_count > 2:
+                print("DEBUG - SHOULD WE SYSTEM EXIT HERE?")
                 raise SystemExit()
         self.buf = self.buf + s
-        i = 0
-        buf = self.buf
-        n = len(buf)
+        cdef unsigned i = 0
+        cdef bytes buf = self.buf
+        cdef unsigned n = len(buf)
+        cdef list ret = []
         while i < n:
             msg, i_next, error = emo_decode(buf, i_start=i)
             if error:
@@ -535,12 +539,13 @@ class Parser(object):
                 logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
             elif isinstance(msg, MissingBytes):
                 break
-            yield msg
+            ret.append(msg)
             i = i_next
         self.buf = self.buf[i:]
         if len(self.buf) > 1024:
             print("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
                 len(self.buf), len(self.buf) + i))
+        return ret
 
     def send_message(self, command_class, **kw):
         """
@@ -579,22 +584,26 @@ cdef class CyClientBase:
 
     cdef int received_samples
     cdef bint stopped
+    cdef bint dump
+    cdef object dump_out
+    cdef public list pending_samples
+    cdef public Parser parser
 
     def __init__(self, verbose=False, dump=None):
         self.verbose = verbose
         self.sampler = VariableSampler()
         self.received_samples = 0
         self.pending_samples = []
-        self.parser = None
-        self.transport = None
+        self.parser = Parser(None, debug=self.verbose)
         self.stopped = False
         if dump:
-            self.dump = open(dump, 'wb')
+            self.dump_out = open(dump, 'wb')
+            self.dump = True
         else:
-            self.dump = None #dumper
+            self.dump = False
 
     def dump_buf(self, buf):
-        self.dump.write(pack('<fI', time(), len(buf)) + buf)
+        self.dump_out.write(pack('<fI', time(), len(buf)) + buf)
         #self.dump.flush()
 
     def connection_lost(self, exc):
@@ -602,23 +611,15 @@ cdef class CyClientBase:
         # this wouldn't happen - we wouldn't notice at this level. So quit?
         self._debug_log("serial connection_lost")
 
-    def pause_writing(self):
-        # interesting?
-        print("PAUSE WRITING {}".format(self.transport.get_write_buffer_size()))
-
-    def resume_writing(self):
-        # interesting?
-        print("RESUME WRITING {}".format(self.transport.get_write_buffer_size()))
-
     def _debug_log(self, s):
         logger.debug(s)
 
-    def data_received(self, data):
+    def data_received(self, bytes data):
         if self.stopped:
             return
         if self.dump:
             self.dump_buf(data)
-        for msg in self.parser.iter_available_messages(data):
+        for msg in self.parser.consume_and_return_messages(data):
             msg.handle_by(self)
         if len(self.pending_samples) > 0:
             self.handle_sampler_samples(self.pending_samples)

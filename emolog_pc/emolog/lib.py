@@ -28,8 +28,9 @@ import builtins # profile will be here when run via kernprof
 
 from .cylib import (
     SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
-    VariableSampler, Parser, CyClientBase,
-    Message, Ack, SamplerSample
+    VariableSampler, Parser, CyClientBase, CyEmoToolClient,
+    Message, Ack, SamplerSample,
+    header_size
     )
 
 if 'profile' not in builtins.__dict__:
@@ -122,7 +123,7 @@ class ClientProtocolMixin(Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.parser = Parser(transport, debug=self.verbose)
+        self.parser.transport = transport
         self.set_future_result(self.connection_made_future, self)
 
     def exit_gracefully(self):

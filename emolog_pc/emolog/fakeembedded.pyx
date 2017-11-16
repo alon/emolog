@@ -61,7 +61,7 @@ cdef class FakeSineEmbeddedBase:
         self.parser = Parser(transport, debug=self.verbose)
 
     def data_received(self, data):
-        for msg in self.parser.iter_available_messages(data):
+        for msg in self.parser.consume_and_return_messages(data):
             self.handle_message(msg)
 
     def handle_message(self, msg):
