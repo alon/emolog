@@ -55,6 +55,7 @@ test_script:
   - cd emotool
   - emotool.exe --help
   - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
+  - copy config\local_machine_config.init .
   # TODO: full run of summarize, compare to known file
   # TODO: full run of emotool, compare to known result (include post_processing)
   - python misc\prof.py
