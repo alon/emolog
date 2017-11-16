@@ -35,7 +35,7 @@ setup(
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
-    data_files=[('etc/emolog', ['local_machine_config.ini.example'])],
+    data_files=[('etc/emolog', ['config/local_machine_config.ini.example'])],
     entry_points={
         'console_scripts': [
             'emotool = emolog.emotool.main:main',
