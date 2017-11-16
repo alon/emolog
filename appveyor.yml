@@ -56,9 +56,7 @@ test_script:
   - emotool.exe --help
   # TODO: full run of summarize, compare to known file
   # TODO: full run of emotool, compare to known result (include post_processing)
-  - pip install line_profiler
-  - kernprof -o prof.py.prof misc\prof.py --fake --runtime 10.0
-  - python -c "from pstats import Stats; s=Stats('prof.py.prof'). s.sort_stats('cumtime'); s.print_stats(100)"
+  - python misc\prof.py
 
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
