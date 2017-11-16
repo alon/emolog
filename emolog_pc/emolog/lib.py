@@ -126,7 +126,7 @@ class ClientProtocolMixin(Protocol):
         self.set_future_result(self.connection_made_future, self)
 
     def exit_gracefully(self):
-        self.stopped = 1
+        self.stopped = True
         self.futures.cancel_all()
 
     def send_message(self, msg_type, **kw):

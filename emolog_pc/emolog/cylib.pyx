@@ -578,7 +578,7 @@ cdef class CyClientBase:
     """
 
     cdef int received_samples
-    cdef unsigned stopped
+    cdef bint stopped
 
     def __init__(self, verbose=False, dump=None):
         self.verbose = verbose
@@ -587,7 +587,7 @@ cdef class CyClientBase:
         self.pending_samples = []
         self.parser = None
         self.transport = None
-        self.stopped = 0
+        self.stopped = False
         if dump:
             self.dump = open(dump, 'wb')
         else:
@@ -614,7 +614,7 @@ cdef class CyClientBase:
         logger.debug(s)
 
     def data_received(self, data):
-        if self.stopped > 0:
+        if self.stopped:
             return
         if self.dump:
             self.dump_buf(data)
