@@ -22,6 +22,7 @@ Wrap emolog_protocol.cpp library. Build it if it doesn't exist. Provides the sam
 API otherwise, plus helpers.
 """
 
+from array import array
 import sys
 from math import sin
 from time import time
@@ -358,7 +359,13 @@ def decode_emo_header(s):
     return None, _type, length, seq
 
 
-class RegisteredVariable(object):
+cdef class RegisteredVariable:
+    cdef public str name
+    cdef public int phase_ticks
+    cdef public int period_ticks
+    cdef public unsigned address
+    cdef public unsigned size
+    cdef public object _type
     def __init__(self, name, phase_ticks, period_ticks, address, size, _type):
         self.name = name
         self.phase_ticks = phase_ticks
@@ -370,15 +377,25 @@ class RegisteredVariable(object):
 
 @cython.final
 cdef class VariableSampler:
-    cdef public list table
+    # variables
+    cdef list name
+    cdef int[:] phase_ticks
+    cdef int[:] period_ticks
+    cdef unsigned[:] address
+    cdef unsigned[:] size
+    cdef list _type
+    
+    # holding place to allow API of register_variable - we recreate the memoryviews
+    cdef list variables
+    
     cdef public bint running
 
     def __init__(self):
-        self.table = []
+        self._set_variables([])
         self.running = False
 
     def clear(self):
-        self.table.clear()
+        self._set_variables([])
 
     def on_started(self):
         self.running = True
@@ -387,21 +404,34 @@ cdef class VariableSampler:
         self.running = False
 
     def register_variable(self, name, phase_ticks, period_ticks, address, size, _type):
-        self.table.append(RegisteredVariable(
+        self.variables.append(RegisteredVariable(
             name=name,
             phase_ticks=phase_ticks,
             period_ticks=period_ticks,
             address=address,
             size=size,
             _type=_type))
+        self._set_variables(self.variables)
+    
+    cdef _set_variables(self, variables):
+        self.variables = variables
+        self.name = [x.name for x in variables]
+        self.phase_ticks = array('i', [x.phase_ticks for x in variables])
+        self.period_ticks = array('i', [x.period_ticks for x in variables])
+        self.address = array('I', [x.address for x in variables])
+        self.size = array('I', [x.size for x in variables])
+        self._type = [x._type for x in variables]
 
-    def variables_from_ticks_and_payload(self, int ticks, payload):
+    cdef variables_from_ticks_and_payload(self, int ticks, payload):
         variables = {}
-        cdef int offset = 0
-        for row in self.table:
-            if ticks % row.period_ticks == row.phase_ticks:
-                variables[row.name] = row._type(payload[offset:offset + row.size])
-                offset += row.size
+        cdef unsigned offset = 0
+        cdef unsigned size
+        cdef unsigned i
+        for i in range(self.phase_ticks.size):
+            if ticks % self.period_ticks[i] == self.phase_ticks[i]:
+                size = self.size[i]
+                variables[self.name[i]] = self._type[i](payload[offset:offset + size])
+                offset += size
         return variables
 
 
