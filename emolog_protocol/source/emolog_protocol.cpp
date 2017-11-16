@@ -154,7 +154,7 @@ uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_tick
 uint16_t emo_encode_ ## suffix(uint8_t *dest)                \
 {                                                                    \
     write_message(dest, msg_type, 0, NULL);                            \
-    return sizeof(emo_ ## suffix);                                    \
+    return sizeof(emo_header);                                    \
 }
 
 
