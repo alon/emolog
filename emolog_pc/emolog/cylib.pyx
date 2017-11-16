@@ -29,7 +29,6 @@ from time import time
 from logging import getLogger
 from struct import pack, unpack
 import csv
-from functools import wraps
 
 import builtins # profile will be here when run via kernprof
 
@@ -635,36 +634,10 @@ cdef class CyClientBase:
 
 ##### EmoTool
 
-def coalesce_meth(hertz):
-    """
-    decorator to call real function.
-    TODO: use callback mechanism, since otherwise this ends up possibly forgetting
-    the last point. Since we intend to work at 20000 Hz and look at seconds, this is
-    not a real problem
-    """
-    dt = 1.0 / hertz
-    def wrappee(f):
-        last_time = [None]
-        msgs = []
-        @wraps(f)
-        def wrapper(self, msg):
-            msgs.append(msg)
-            cur_time = time()
-            lt = last_time[0]
-            if lt is None or cur_time - lt >= dt:
-                last_time[0] = cur_time
-            else:
-                return
-            f(self, msgs)
-            msgs.clear()
-        return wrapper
-    return wrappee
-
-
 cdef class CyEmoToolClient(CyClientBase):
     cdef bint _running
 
-    def __init__(self, verbose, dump, window):
+    def __init__(self, verbose, dump):
         super().__init__(verbose=verbose, dump=dump)
         self.csv = None
         self.csv_filename = None
@@ -677,7 +650,7 @@ cdef class CyEmoToolClient(CyClientBase):
         self.max_ticks = None
         self._running = False
         self.fd = None
-        self.window = window
+        self.sample_listeners = []
         self._do_plot = True
 
     def reset(self, csv_filename, names, min_ticks, max_ticks, do_plot):
@@ -692,6 +665,9 @@ cdef class CyEmoToolClient(CyClientBase):
         self.max_ticks = max_ticks
         self._running = True
         self._do_plot = do_plot
+
+    def register_listener(self, callback):
+        self.sample_listeners.append(callback)
 
     cpdef bint running(self):
         return self._running
@@ -726,9 +702,11 @@ cdef class CyEmoToolClient(CyClientBase):
         self.csv.writerows([[seq, ticks, now] +
                       [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
         self.fd.flush()
-        if self.window and self._do_plot:
-            for (_seq, ticks, variables) in msgs:
-                self.do_plot((ticks, list((k, v) for (k, v) in variables.items() if type(v) == float)))
+        if len(self.sample_listeners) > 0:
+            new_samples = [(ticks, list((k, v) for (k, v) in variables.items() if type(v) == float))
+                for (_seq, ticks, variables) in msgs]
+            for listener in self.sample_listeners:
+                listener(new_samples)
         self.samples_received += len(msgs)
         for seq, ticks, variables in msgs:
             if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
@@ -740,7 +718,3 @@ cdef class CyEmoToolClient(CyClientBase):
             self.first_ticks = self.last_ticks
         if self.max_ticks is not None and self.total_ticks() + 1 >= self.max_ticks:
             self.stop()
-
-    @coalesce_meth(10) # Limit refreshes, they can be costly
-    def do_plot(self, msgs):
-        self.window.log_variables(msgs=msgs)

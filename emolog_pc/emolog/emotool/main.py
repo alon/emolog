@@ -13,6 +13,7 @@ import sys
 import string
 import logging
 import struct
+from struct import pack
 import random
 from functools import reduce
 from time import time, sleep
@@ -21,6 +22,7 @@ from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
+from pickle import dumps
 
 from psutil import Process, NoSuchProcess, wait_procs
 
@@ -30,7 +32,6 @@ from ..lib import SamplerSample, AckTimeout, ClientProtocolMixin
 from ..dwarf import FileParser
 from ..cylib import CyEmoToolClient
 from .post_processor import post_process
-from .main_window import run_forever
 
 
 logger = logging.getLogger()
@@ -243,15 +244,15 @@ class EmoToolClient(CyEmoToolClient, ClientProtocolMixin):
 
     instance = None
 
-    def __init__(self, verbose, dump, window):
-        CyEmoToolClient.__init__(self, verbose, dump, window)
+    def __init__(self, verbose, dump):
+        CyEmoToolClient.__init__(self, verbose, dump)
         ClientProtocolMixin.__init__(self)
         if EmoToolClient.instance is not None:
             raise Exception("EmoToolClient is a singleton, can't create another instance")
         EmoToolClient.instance = self  # for singleton
 
 
-async def start_transport(client):
+async def start_transport(client, args):
     loop = get_event_loop()
     port = random.randint(10000, 50000)
     if args.fake:
@@ -330,7 +331,7 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
             pass
 
 
-async def cleanup(client):
+async def cleanup(args, client):
     if not hasattr(client, 'transport') or client.transport is None:
         cancel_outstanding_tasks()
         return
@@ -386,15 +387,12 @@ def parse_args():
     parser.add_argument('--ticks-per-second', default=1000000 / 50, type=float,
                         help='number of ticks per second. used in conjunction with runtime')
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
-    parser.add_argument('--profile', default=False, action='store_true', help='produce profiling output in profile.txt via cProfile')
     parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
     parser.add_argument('--no-processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
     parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
-    # GUI
-    parser.add_argument('--gui', default=False, action='store_true', dest='gui', help='enable graphical user interface')
-    parser.add_argument('--no-gui', default=True, action='store_false', dest='gui', help='disable graphical user interface')
-    parser.add_argument('--wait-for-gui', default=False, action='store_true', help='wait for user closing the main window before quitting')
+    # Server - used for GUI access
+    parser.add_argument('--listen', default=None, type=int, help='enable listening TCP port for samples') # later: add a command interface, making this suitable for interactive GUI
 
     # Embedded
     parser.add_argument('--embedded', default=False, action='store_true', help='debugging: be a fake embedded target')
@@ -423,7 +421,7 @@ def parse_args():
     return ret
 
 
-def bandwidth_calc(variables):
+def bandwidth_calc(args, variables):
     """
     :param variables: list of dictionaries
     :return: average baud rate (considering 8 data bits, 1 start & stop bits)
@@ -463,22 +461,22 @@ def fake_dwarf(names):
     return {name: fake_variable(name) for name in names}
 
 
-def read_elf_variables(vars, varfile):
+def read_elf_variables(elf, vars, varfile):
     if varfile is not None:
         with open(varfile) as fd:
             vars = vars + fd.readlines()
     split_vars = [[x.strip() for x in v.split(',')] for v in vars]
-    for v, orig in zip(split_vars, args.var):  # TODO: bug - args.var isn't usually relevant
+    for v, orig in zip(split_vars, vars):
         if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
-            logger.error("problem with '--var' argument {!r}".format(orig))
+            logger.error(f"problem with variable definition {orig!r}")
             logger.error("--var parameter must be a 3 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
-    if args.elf is None:
+    if elf is None:
         dwarf_variables = fake_dwarf(names)
     else:
-        dwarf_variables = dwarf_get_variables_by_name(args.elf, names)  # TODO does this really have to access args?
+        dwarf_variables = dwarf_get_variables_by_name(elf, names)  # TODO does this really have to access args?
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
@@ -522,13 +520,13 @@ def banner(s):
     print("=" * len(s))
 
 
-async def init_client(verbose, dump, window):
-    client = EmoToolClient(verbose=verbose, dump=dump, window=window)
-    await start_transport(client=client)
+async def init_client(args):
+    client = EmoToolClient(verbose=not args.silent, dump=args.dump)
+    await start_transport(client=client, args=args)
     return client
 
 
-async def run_client(client, variables, allow_kb_stop):
+async def run_client(args, client, variables, allow_kb_stop):
     if not await initialize_board(client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
         raise SystemExit
@@ -546,15 +544,36 @@ async def run_client(client, variables, allow_kb_stop):
     await client.send_sampler_stop()
 
 
-async def record_snapshot(client, csvfile, varsfile):
+async def record_snapshot(args, client, csvfile, varsfile):
     names, variables = read_elf_variables(vars=[], varfile=varsfile)
     client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0, do_plot=False)
-    await run_client(client, variables, allow_kb_stop=False)
+    await run_client(args, client, variables, allow_kb_stop=False)
 
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
 
-async def amain(window):
+
+class SamplePassOn(Protocol):
+    def __init__(self, client):
+        self.client = client
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self.client.register_listener(self.write_messages)
+    
+    def write_messages(self, messages):
+        pickled_messages = dumps(messages)
+        self.transport.write(pack('<i', len(pickled_messages)))
+        self.transport.write(pickled_messages)
+
+
+async def start_tcp_listener(client, port):
+    loop = get_event_loop()
+    await loop.create_server(lambda: SamplePassOn(client), host='localhost', port=port)
+    print(f"waiting on {port}")
+
+
+async def amain(args):
     if not os.path.exists(CONFIG_FILE_NAME):
         print("Configuration file {} not found. "
               "This file is required for specifying local machine configuration such as the output folder.\n"
@@ -570,7 +589,7 @@ async def amain(window):
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
-    names, variables = read_elf_variables(vars=args.var, varfile=args.varfile)
+    names, variables = read_elf_variables(elf=args.elf, vars=args.var, varfile=args.varfile)
 
     output_folder = config['folders']['output_folder']
     if args.out:
@@ -580,18 +599,18 @@ async def amain(window):
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(output_folder, args.out_prefix)
 
-    client = await init_client(verbose=not args.silent, dump=args.dump, window=window)
+    client = await init_client(args)
     logger.info('Client initialized')
 
     if args.snapshotfile:
         print("Taking snapshot of parameters")
         snapshot_output_filename = csv_filename[:-4] + '_params.csv'
-        await record_snapshot(client=client, csvfile=snapshot_output_filename, varsfile=args.snapshotfile)
+        await record_snapshot(args=args, client=client, csvfile=snapshot_output_filename, varsfile=args.snapshotfile)
         print("parameters saved to: {}".format(snapshot_output_filename))
 
     print("")
     print("output file: {}".format(csv_filename))
-    bandwidth_bps = bandwidth_calc(variables)
+    bandwidth_bps = bandwidth_calc(args=args, variables=variables)
     print("upper bound on bandwidth: {} Mbps out of {} ({:.3f}%)".format(
         bandwidth_bps / 1e6,
         args.baud / 1e6,
@@ -602,8 +621,11 @@ async def amain(window):
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks, do_plot=True)
+    if args.listen:
+        await start_tcp_listener(client,args.listen)
+
     start_time = time()
-    await run_client(client=client, variables=variables, allow_kb_stop=True)
+    await run_client(args=args, client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
     setup_time = client.start_logging_time - start_time
@@ -612,35 +634,18 @@ async def amain(window):
     return client
 
 
-def start_gui(args):
-    return run_forever(start_gui_callback, create_main_window=args.gui)
-
-
-def start_gui_callback(loop, window):
-    global args
+def start_callback(args, loop):
     loop.set_debug(args.debug)
 
-    def call_main():
-        loop.run_until_complete(amain(window))
-
-    if args.profile:
-        import cProfile as profile
-        profile.runctx("call_main()", globals(), locals(), "profile.txt")
-    else:
-        try:
-            call_main()
-        except KeyboardInterrupt:
-            print("exiting on user ctrl-c")
-        except Exception as e:
-            logger.error("got exception {!r}".format(e))
-            raise
-    client = EmoToolClient.instance
-    loop.run_until_complete(cleanup(client))
-    if args.wait_for_gui:
-        async def sleep_forever():
-            while True:
-                await sleep(1000)
-        loop.run_until_complete(sleep_forever())
+    try:
+        client = loop.run_until_complete(amain(args))
+    except KeyboardInterrupt:
+        print("exiting on user ctrl-c")
+        raise SystemExit
+    except Exception as e:
+        logger.error("got exception {!r}".format(e))
+        raise
+    loop.run_until_complete(cleanup(args=args, client=client))
     return client
 
 
@@ -659,7 +664,6 @@ def do_post_process(args, client):
 
 
 def main(cmdline=None):
-    global args # TODO - remove this global, pass explicitly
     atexit.register(kill_all_processes)
     if cmdline is not None:
         sys.argv = cmdline
@@ -667,8 +671,9 @@ def main(cmdline=None):
     if args.embedded:
         from .embedded import main as embmain
         embmain()
-    client = start_gui(args)
-    do_post_process(args, client)
+    else:
+        client = start_callback(args, get_event_loop())
+        do_post_process(args, client)
 
 
 if __name__ == '__main__':

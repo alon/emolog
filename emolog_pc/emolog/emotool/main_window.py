@@ -1,11 +1,14 @@
 import sys
-import asyncio
 import time
 from bisect import bisect_left
 from collections import defaultdict
+from argparse import ArgumentParser
+from struct import unpack
+from pickle import loads
 
 from PyQt5 import QtGui, QtCore, QtWidgets
-from quamash import QEventLoop
+from PyQt5.QtNetwork import QTcpSocket
+from PyQt5.QtCore import QDataStream
 import pyqtgraph as pg
 import pyqtgraph.console
 
@@ -13,7 +16,7 @@ from numpy import zeros, nan
 
 from ..util import version
 
-from ..cython_util import to_dicts
+from ..cython_util import to_dicts, coalesce_meth
 
 # for kernprof
 import builtins
@@ -21,9 +24,15 @@ if 'profile' not in builtins.__dict__:
     builtins.__dict__['profile'] = lambda x: x
 
 
+SIZEOF_UINT32 = 4
+
+
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
+        self.socket = QTcpSocket()
+        self.socket.connectToHost('localhost', args.port)
+        self.socket.readyRead.connect(self.readFromEmotool)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setWindowTitle(f"EmoTool - {version()}")
         self.main_widget = QtWidgets.QTabWidget(self)
@@ -44,8 +53,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ticks = defaultdict(list)
         self.vals = defaultdict(list)
         self.data_items = defaultdict(pg.PlotDataItem)
+        
+        self.incoming = b''
+        self.next_message_size = None
 
-    @profile
+    @coalesce_meth(10) # Limit refreshes, they can be costly
     def log_variables(self, msgs):
         """
         Show points on log window. both @ticks and @vars are arrays
@@ -74,6 +86,40 @@ class MainWindow(QtWidgets.QMainWindow):
         first_tick = min([ticks[0] for ticks in self.ticks.values()])
         self.plot_widget.setXRange(first_tick, last_tick)
 
+    def readFromEmotool(self):
+        """
+        This is a temporary measure - instead of the better solution:
+         serial2tcp process <-> app
+        We have
+         serial2tcp process <-> emotool <-> app
+        Just to avoid rewriting the emotool parts to drop asyncio support so they can be reused for app and emotool.
+        
+        Quick transport costs calculation (copy cost):
+        20000 msg/second
+        msg size < 100 bytes
+        < 2 MB /second
+        """
+        self.incoming += self.socket.readAll()
+        N = len(self.incoming)
+        i = 0
+        messages = []
+        while i < N:
+            if self.next_message_size is None:
+                if N - i < SIZEOF_UINT32:
+                    break
+                self.next_message_size, = unpack('<i', self.incoming[i : i + SIZEOF_UINT32])
+                i += SIZEOF_UINT32
+            if self.next_message_size > N - i:
+                break
+            data = self.incoming[i : i + self.next_message_size]
+            i += self.next_message_size
+            messages.extend(loads(data))
+            self.next_message_size = None
+        self.incoming = self.incoming[i:]
+        if len(messages) > 0:
+            self.log_variables(messages)
+
+
     def fileQuit(self):
         self.close()
 
@@ -81,15 +127,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fileQuit()
 
 
-def run_forever(main, create_main_window):
+def main():
     """helper to start qt event loop and use it as the main event loop
     """
     app = QtWidgets.QApplication(sys.argv)
-    loop = QEventLoop(app)
-    asyncio.set_event_loop(loop)
-    if create_main_window:
-        window = MainWindow()
-        window.show()
-    else:
-        window = None
-    return main(loop, window)
+    parser = ArgumentParser()
+    parser.add_argument('--port', type=int, default=10000, help='port emotool is listening on, right now samples only')
+    args = parser.parse_args()
+    window = MainWindow(args)
+    window.show()
+    app.exec_()
+
+
+if __name__ == '__main__':
+    main()

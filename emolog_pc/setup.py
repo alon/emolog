@@ -23,7 +23,6 @@ setup(
         'pyelftools(==0.24)',
         'pyqtgraph(==0.10.0)',
         'Qt.py(==1.0.0)',
-        'Quamash(==0.5.5)',
         'PyQt5(==5.9)',
         'xlrd(==1.1.0)',
         'XlsxWriter(==1.0.2)',
@@ -40,6 +39,7 @@ setup(
     entry_points={
         'console_scripts': [
             'emotool = emolog.emotool.main:main',
+            'emogui = emolog.emotool.main_window:main',
             'summarize = emolog.emotool.summarize:main'
         ]
     }
