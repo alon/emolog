@@ -71,11 +71,6 @@ cdef extern from "emolog_protocol.h":
     void crc_init();
 
 
-cpdef unsigned header_size():
-    cdef bytes buf = b' ' * 100
-    return emo_encode_ping(buf)
-
-
 cdef extern from "emolog_protocol.h":
     cdef cppclass emo_message_t:
         pass
@@ -112,8 +107,14 @@ class emo_message_types:
 
 emo_message_type_to_str = {v: v for k, v in emo_message_types.__dict__.items() if not k.startswith('__')}
 
+cdef unsigned calc_header_size():
+    cdef bytes buf = b' ' * 100
+    return emo_encode_ping(buf)
 
-cdef int HEADER_SIZE = 8  # TODO - check this for consistency with library (add a test)
+cdef unsigned HEADER_SIZE = calc_header_size()
+
+def header_size():
+    return HEADER_SIZE
 
 
 MAGIC = unpack(ENDIANESS + 'H', b'EM')[0]
