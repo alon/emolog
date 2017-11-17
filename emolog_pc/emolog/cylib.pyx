@@ -584,7 +584,6 @@ cdef class CSVHandler:
     cdef bint _running
     cdef bint verbose
     cdef bint dump
-    cdef bint _do_plot
     cdef int first_ticks
     cdef int last_ticks
     cdef int min_ticks
@@ -613,9 +612,8 @@ cdef class CSVHandler:
         self._running = False
         self.fd = None
         self.sample_listeners = set()
-        self._do_plot = True
 
-    def reset(self, csv_filename, names, min_ticks, max_ticks, do_plot):
+    def reset(self, csv_filename, names, min_ticks, max_ticks):
         self.csv = None
         self.csv_filename = csv_filename
         self.first_ticks = -1
@@ -626,7 +624,6 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
-        self._do_plot = do_plot
 
     def register_listener(self, callback):
         self.sample_listeners.add(callback)

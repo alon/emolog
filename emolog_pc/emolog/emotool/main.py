@@ -584,7 +584,7 @@ async def run_client(args, client, variables, allow_kb_stop):
 
 async def record_snapshot(args, client, csvfile, varsfile):
     names, variables = read_elf_variables(vars=[], varfile=varsfile)
-    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0, do_plot=False)
+    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0)
     await run_client(args, client, variables, allow_kb_stop=False)
 
 
@@ -660,7 +660,7 @@ async def amain(client, args):
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 
-    client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks, do_plot=True)
+    client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
     if args.listen:
         await start_tcp_listener(client,args.listen)
 
