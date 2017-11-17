@@ -161,7 +161,7 @@ cdef class Version(Message):
 
     def handle_by(self, handler):
         #logger.debug(f"Got Version: {self.version}")
-        handler.set_future_result(handler.ack, True)
+        handler.ack_received()
 
 
 class Ping(Message):
@@ -184,7 +184,7 @@ class Ack(Message):
         #print("Ack.handle_by")
         if self.error != 0:
             logger.error(f"embedded responded to {self.reply_to_seq} with ERROR: {self.error}")
-        handler.set_future_result(handler.ack, True)
+        handler.ack_received()
 
     def __str__(self):
         # TODO - string for error
@@ -193,10 +193,14 @@ class Ack(Message):
     __repr__ = __str__
 
 
-class SamplerRegisterVariable(Message):
+cdef class SamplerRegisterVariable(Message):
     type = emo_message_types.sampler_register_variable
+    cdef public unsigned phase_ticks
+    cdef public unsigned period_ticks
+    cdef public unsigned address
+    cdef public unsigned size
 
-    def __init__(self, seq, phase_ticks, period_ticks, address, size):
+    def __init__(self, unsigned seq, unsigned phase_ticks, unsigned period_ticks, unsigned address, unsigned size):
         self.seq = seq
         assert size is not None
         self.phase_ticks = phase_ticks
@@ -211,21 +215,21 @@ class SamplerRegisterVariable(Message):
                                                     self.address,
                                                     self.size)
 
-class SamplerClear(Message):
+cdef class SamplerClear(Message):
     type = emo_message_types.sampler_clear
 
     def encode_inner(self):
         return emo_encode_sampler_clear(self.buf)
 
 
-class SamplerStart(Message):
+cdef class SamplerStart(Message):
     type = emo_message_types.sampler_start
 
     def encode_inner(self):
         return emo_encode_sampler_start(self.buf)
 
 
-class SamplerStop(Message):
+cdef class SamplerStop(Message):
     type = emo_message_types.sampler_stop
 
     def encode_inner(self):
@@ -286,7 +290,7 @@ cdef class SamplerSample(Message):
     __repr__ = __str__
 
 
-class MissingBytes(object):
+class MissingBytes:
     def __init__(self, message, header, needed):
         self.message = message
         self.needed = needed
@@ -300,7 +304,7 @@ class MissingBytes(object):
     __repr__ = __str__
 
 
-class SkipBytes(object):
+class SkipBytes:
     def __init__(self, skip):
         self.skip = skip
 
@@ -313,7 +317,7 @@ class SkipBytes(object):
     __repr__ = __str__
 
 
-class UnknownMessage(object):
+class UnknownMessage:
     def __init__(self, type, buf):
         self.type = type
         self.buf = buf
@@ -574,92 +578,48 @@ class Dumper:
 dumper = Dumper()
 
 
-cdef class CyClientBase:
-    """
-    Note: removed handling of Acks
-     - TODO
+##### CSVHandler
 
-    Removed ignored message handling
-     - TODO
-    """
-
-    cdef int received_samples
-    cdef bint stopped
-    cdef bint dump
-    cdef object dump_out
-    cdef public list pending_samples
-    cdef public Parser parser
-
-    def __init__(self, verbose=False, dump=None):
-        self.verbose = verbose
-        self.sampler = VariableSampler()
-        self.received_samples = 0
-        self.pending_samples = []
-        self.parser = Parser(None, debug=self.verbose)
-        self.stopped = False
-        if dump:
-            self.dump_out = open(dump, 'wb')
-            self.dump = True
-        else:
-            self.dump = False
-
-    def dump_buf(self, buf):
-        self.dump_out.write(pack('<fI', time(), len(buf)) + buf)
-        #self.dump.flush()
-
-    def connection_lost(self, exc):
-        # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
-        # this wouldn't happen - we wouldn't notice at this level. So quit?
-        self._debug_log("serial connection_lost")
-
-    def _debug_log(self, s):
-        logger.debug(s)
-
-    def data_received(self, bytes data):
-        if self.stopped:
-            return
-        if self.dump:
-            self.dump_buf(data)
-        for msg in self.parser.consume_and_return_messages(data):
-            msg.handle_by(self)
-        if len(self.pending_samples) > 0:
-            self.handle_sampler_samples(self.pending_samples)
-            self.received_samples += len(self.pending_samples)
-            del self.pending_samples[:]
-
-    def handle_sampler_samples(self, msgs):
-        """
-        Override me
-        """
-        pass
-
-
-##### EmoTool
-
-cdef class CyEmoToolClient(CyClientBase):
+cdef class CSVHandler:
     cdef bint _running
+    cdef bint verbose
+    cdef bint dump
+    cdef bint _do_plot
+    cdef int first_ticks
+    cdef int last_ticks
+    cdef int min_ticks
+    cdef list names
+    cdef set sample_listeners
+    cdef object csv
+    cdef object fd
+
+    cdef public str csv_filename
+    cdef public int max_ticks
+    cdef public int ticks_lost
+    cdef public int samples_received
 
     def __init__(self, verbose, dump):
-        super().__init__(verbose=verbose, dump=dump)
+        self.verbose = verbose
+        self.dump = dump
         self.csv = None
         self.csv_filename = None
-        self.first_ticks = None
-        self.last_ticks = None
-        self.min_ticks = None
-        self.names = None
+        self.first_ticks = -1
+        self.last_ticks = -1
+        self.min_ticks = 0
+        self.names = []
         self.samples_received = 0
         self.ticks_lost = 0
-        self.max_ticks = None
+        self.max_ticks = 0
         self._running = False
         self.fd = None
-        self.sample_listeners = []
+        self.sample_listeners = set()
         self._do_plot = True
 
     def reset(self, csv_filename, names, min_ticks, max_ticks, do_plot):
         self.csv = None
         self.csv_filename = csv_filename
-        self.first_ticks = None
-        self.last_ticks = None
+        self.first_ticks = -1
+        self.last_ticks = -1
         self.min_ticks = min_ticks
         self.names = names
         self.samples_received = 0
@@ -669,13 +629,13 @@ cdef class CyEmoToolClient(CyClientBase):
         self._do_plot = do_plot
 
     def register_listener(self, callback):
-        self.sample_listeners.append(callback)
+        self.sample_listeners.add(callback)
 
     cpdef bint running(self):
         return self._running
 
     cpdef long total_ticks(self):
-        if self.first_ticks is None or self.last_ticks is None:
+        if self.first_ticks == -1 or self.last_ticks == -1:
             return 0
         return self.last_ticks - self.first_ticks
 
@@ -689,7 +649,7 @@ cdef class CyEmoToolClient(CyClientBase):
     def stop(self):
         self._running = False
 
-    def handle_sampler_samples(self, msgs):
+    cdef handle_sampler_samples(self, msgs):
         """
         Write to CSV, add points to plots
         :param msgs: [(seq, ticks, {name: value})]
@@ -711,12 +671,63 @@ cdef class CyEmoToolClient(CyClientBase):
                 listener(new_samples)
         self.samples_received += len(msgs)
         for seq, ticks, variables in msgs:
-            if self.last_ticks is not None and ticks - self.last_ticks != self.min_ticks:
+            if self.first_ticks == -1:
+                self.first_ticks = ticks
+            if self.last_ticks != -1 and ticks - self.last_ticks != self.min_ticks:
                 print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
                     now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
                 self.ticks_lost += ticks - self.last_ticks - self.min_ticks
             self.last_ticks = ticks
-        if self.first_ticks is None:
-            self.first_ticks = self.last_ticks
-        if self.max_ticks is not None and self.total_ticks() + 1 >= self.max_ticks:
+        if self.max_ticks != 0 and self.total_ticks() + 1 >= self.max_ticks:
             self.stop()
+
+#####
+
+cdef class EmotoolCylib:
+    """
+    """
+
+    cdef bint dump
+    cdef bint verbose
+    cdef int received_samples
+    cdef object dump_out
+    cdef object parent
+    cdef public VariableSampler sampler
+    cdef public list pending_samples
+    cdef public Parser parser
+    cdef public CSVHandler csv_handler
+
+    def __init__(self, parent, verbose=False, dump=None):
+        self.parent = parent
+        self.verbose = verbose
+        self.dump = dump is not None
+        if dump:
+            self.dump_out = open(dump, 'wb')
+        self.sampler = VariableSampler()
+        self.received_samples = 0
+        self.pending_samples = []
+        self.parser = Parser(None, debug=self.verbose)
+        self.csv_handler = CSVHandler(verbose=verbose, dump=dump)
+
+    def dump_buf(self, buf):
+        self.dump_out.write(pack('<fI', time(), len(buf)) + buf)
+        #self.dump.flush()
+
+    def _debug_log(self, s):
+        logger.debug(s)
+
+    def data_received(self, bytes data):
+        if self.dump:
+            self.dump_buf(data)
+        for msg in self.parser.consume_and_return_messages(data):
+            msg.handle_by(self)
+        if len(self.pending_samples) > 0:
+            self.csv_handler.handle_sampler_samples(self.pending_samples)
+            self.received_samples += len(self.pending_samples)
+            del self.pending_samples[:]
+
+    def ack_received(self):
+        self.parent.set_future_result(self.parent.ack, True)
+
+    def running(self):
+        return self.csv_handler.running()

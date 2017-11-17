@@ -44,7 +44,13 @@ cdef class FakeSineEmbeddedBase:
 
     VERSION = 1
     cdef Sine sines[10]
-    cdef int sines_num;
+    cdef int sines_num
+    cdef int start_time
+    cdef bint running
+    cdef int ticks
+    cdef object eventloop
+    cdef bint verbose
+    cdef object parser # TODO - how to specify this is Parser extension type - resides in cylib.pyx
 
     def __init__(self, ticks_per_second):
         self.ticks_per_second = ticks_per_second

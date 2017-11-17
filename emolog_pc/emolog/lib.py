@@ -28,7 +28,7 @@ import builtins # profile will be here when run via kernprof
 
 from .cylib import (
     SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
-    VariableSampler, Parser, CyClientBase, CyEmoToolClient,
+    VariableSampler, Parser, EmotoolCylib,
     Message, Ack, SamplerSample,
     header_size
     )
@@ -112,7 +112,6 @@ class ClientProtocolMixin(Protocol):
     ACK_TIMEOUT = 'ACK_TIMEOUT'
 
     def __init__(self, verbose=False, dump=False):
-        CyClientBase.__init__(self, verbose=verbose, dump=dump)
         Protocol.__init__(self)
         self.futures = Futures()
         self.reset_ack()
@@ -123,15 +122,20 @@ class ClientProtocolMixin(Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.parser.transport = transport
+        self.cylib.parser.transport = transport
         self.set_future_result(self.connection_made_future, self)
 
+    def connection_lost(self, exc):
+        # generally, what do we want to do at this point? it could mean USB was unplugged, actually has to be? if client stops
+        # this wouldn't happen - we wouldn't notice at this level. So quit?
+        #self._debug_log("serial connection_lost")
+        pass
+
     def exit_gracefully(self):
-        self.stopped = True
         self.futures.cancel_all()
 
     def send_message(self, msg_type, **kw):
-        self.parser.send_message(msg_type, **kw)
+        self.cylib.parser.send_message(msg_type, **kw)
         self.ack = self.futures.add_future(timeout=self.ACK_TIMEOUT_SECONDS, timeout_result=self.ACK_TIMEOUT)
 
     def reset_ack(self):
@@ -148,9 +152,9 @@ class ClientProtocolMixin(Protocol):
 
     async def send_set_variables(self, variables):
         await self.send_sampler_clear()
-        self.sampler.clear()
+        self.cylib.sampler.clear()
         for d in variables:
-            self.sampler.register_variable(**d)
+            self.cylib.sampler.register_variable(**d)
             await self.send_sampler_register_variable(
                 phase_ticks=d['phase_ticks'],
                 period_ticks=d['period_ticks'],
@@ -170,11 +174,11 @@ class ClientProtocolMixin(Protocol):
 
     async def send_sampler_start(self):
         await self.send_and_ack(SamplerStart)
-        self.sampler.on_started()
+        self.cylib.sampler.on_started()
 
     async def send_sampler_stop(self):
         await self.send_and_ack(SamplerStop)
-        self.sampler.on_stopped()
+        self.cylib.sampler.on_stopped()
 
     async def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care

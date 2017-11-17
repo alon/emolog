@@ -28,9 +28,9 @@ from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 from ..util import version
 from ..cython_util import decode_little_endian_float
-from ..lib import SamplerSample, AckTimeout, ClientProtocolMixin
+from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib
 from ..dwarf import FileParser
-from ..lib import CyEmoToolClient, header_size
+from ..lib import header_size
 from .post_processor import post_process
 
 
@@ -236,7 +236,7 @@ def create_python_process_cmdline_command(command):
     return ['python', '-c', command]
 
 
-class EmoToolClient(CyEmoToolClient, ClientProtocolMixin):
+class EmoToolClient(ClientProtocolMixin):
     # must be singleton!
     # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
     # currently the serial subprocess only accepts a connection once, and the transport is never properly released
@@ -245,11 +245,40 @@ class EmoToolClient(CyEmoToolClient, ClientProtocolMixin):
     instance = None
 
     def __init__(self, verbose, dump):
-        CyEmoToolClient.__init__(self, verbose, dump)
-        ClientProtocolMixin.__init__(self)
         if EmoToolClient.instance is not None:
             raise Exception("EmoToolClient is a singleton, can't create another instance")
+        ClientProtocolMixin.__init__(self)
+        self.cylib = EmotoolCylib(parent=self, verbose=verbose, dump=dump)
         EmoToolClient.instance = self  # for singleton
+
+    @property
+    def running(self):
+        return self.cylib.running()
+
+    @property
+    def total_ticks(self):
+        return self.cylib.csv_handler.total_ticks
+
+    @property
+    def ticks_lost(self):
+        return self.cylib.csv_handler.ticks_lost
+
+    @property
+    def samples_received(self):
+        return self.cylib.csv_handler.samples_received
+
+    @property
+    def csv_filename(self):
+        return self.cylib.csv_handler.csv_filename
+
+    def reset(self, *args, **kw):
+        self.cylib.csv_handler.reset(*args, **kw)
+
+    def register_listener(self, *args, **kw):
+        self.cylib.csv_handler.register_listener(*args, **kw)
+
+    def data_received(self, data):
+        self.cylib.data_received(data)
 
 
 async def start_transport(client, args):
@@ -546,7 +575,7 @@ async def run_client(args, client, variables, allow_kb_stop):
     if allow_kb_stop and try_getch_message:
         print(try_getch_message)
     client.start_logging_time = time()
-    while client.running():
+    while client.running:
         if allow_kb_stop and try_getch():
             break
         await sleep(dt)
