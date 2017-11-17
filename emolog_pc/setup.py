@@ -1,5 +1,6 @@
 from setuptools import setup, Extension
 
+import numpy
 from Cython.Build import cythonize
 
 gdb_debug = False
