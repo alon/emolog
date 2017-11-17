@@ -659,6 +659,11 @@ cdef class CSVHandler:
             return
         if not self.csv:
             self.initialize_file()
+        # prune messages if we got too many
+        cdef int missing = self.max_ticks - self.samples_received
+        if len(msgs) > missing:
+            print(f"dropping {missing}..{len(msgs)}")
+            del msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
         now = time() * 1000
         self.csv.writerows([[seq, ticks, now] +
