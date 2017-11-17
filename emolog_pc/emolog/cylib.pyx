@@ -584,23 +584,21 @@ cdef class CSVHandler:
     cdef bint _running
     cdef bint verbose
     cdef bint dump
-    cdef int first_ticks
-    cdef int last_ticks
-    cdef int min_ticks
+    cdef long first_ticks
+    cdef long last_ticks
+    cdef long min_ticks
     cdef list names
     cdef set sample_listeners
-    cdef object csv
-    cdef object fd
+    cdef list data # to be made into an array
 
     cdef public str csv_filename
-    cdef public int max_ticks
-    cdef public int ticks_lost
-    cdef public int samples_received
+    cdef public long max_ticks
+    cdef public long ticks_lost
+    cdef public long samples_received
 
     def __init__(self, verbose, dump):
         self.verbose = verbose
         self.dump = dump
-        self.csv = None
         self.csv_filename = None
         self.first_ticks = -1
         self.last_ticks = -1
@@ -610,11 +608,9 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = 0
         self._running = False
-        self.fd = None
         self.sample_listeners = set()
 
-    def reset(self, csv_filename, names, min_ticks, max_ticks):
-        self.csv = None
+    def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
         self.csv_filename = csv_filename
         self.first_ticks = -1
         self.last_ticks = -1
@@ -624,6 +620,7 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
+        self.data = [None] * max_ticks
 
     def register_listener(self, callback):
         self.sample_listeners.add(callback)
@@ -636,15 +633,16 @@ cdef class CSVHandler:
             return 0
         return self.last_ticks - self.first_ticks
 
-    def initialize_file(self):
-        if self.csv:
-            return
-        self.fd = open(self.csv_filename, 'w+')
-        self.csv = csv.writer(self.fd, lineterminator='\n')
-        self.csv.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
-
     def stop(self):
         self._running = False
+        fd = open(self.csv_filename, 'w+')
+        writer = csv.writer(fd, lineterminator='\n')
+        writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+        for i, row in enumerate(self.data):
+            if row is None:
+                print(f"skipping row {i}")
+                continue
+            writer.writerow(row)
 
     # python version for profiling
     cpdef handle_sampler_samples(self, msgs):
@@ -655,17 +653,17 @@ cdef class CSVHandler:
         """
         if not self._running:
             return
-        if not self.csv:
-            self.initialize_file()
         # prune messages if we got too many
         cdef int missing = self.max_ticks - self.samples_received
         if len(msgs) > missing:
             del msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
         cdef float now = time() * 1000
-        self.csv.writerows([[seq, ticks, now] +
-                      [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
-        self.fd.flush()
+        for seq, ticks, variables in msgs:
+            if 0 < ticks < len(self.data) + 1:
+                self.data[ticks - 1] = [seq, ticks, now] + [variables.get(name, '') for name in self.names]
+            else:
+                print(f"error {ticks} > {len(self.data)} or {ticks} < 1")
         if len(self.sample_listeners) > 0:
             new_samples = [(ticks, [(k, v) for (k, v) in variables.items() if type(v) == float])
                 for (_seq, ticks, variables) in msgs]
