@@ -649,7 +649,8 @@ cdef class CSVHandler:
     def stop(self):
         self._running = False
 
-    cdef handle_sampler_samples(self, msgs):
+    # python version for profiling
+    cpdef handle_sampler_samples(self, msgs):
         """
         Write to CSV, add points to plots
         :param msgs: [(seq, ticks, {name: value})]
@@ -669,7 +670,7 @@ cdef class CSVHandler:
                       [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
         self.fd.flush()
         if len(self.sample_listeners) > 0:
-            new_samples = [(ticks, list((k, v) for (k, v) in variables.items() if type(v) == float))
+            new_samples = [(ticks, [(k, v) for (k, v) in variables.items() if type(v) == float])
                 for (_seq, ticks, variables) in msgs]
             for listener in self.sample_listeners:
                 listener(new_samples)
