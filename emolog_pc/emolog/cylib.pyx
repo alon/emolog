@@ -665,7 +665,7 @@ cdef class CSVHandler:
             print(f"dropping {missing}..{len(msgs)}")
             del msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
-        now = time() * 1000
+        cdef long now = time() * 1000
         self.csv.writerows([[seq, ticks, now] +
                       [variables.get(name, '') for name in self.names] for seq, ticks, variables in msgs])
         self.fd.flush()
