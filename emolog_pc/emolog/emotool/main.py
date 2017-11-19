@@ -16,7 +16,7 @@ import struct
 from struct import pack
 import random
 from functools import reduce
-from time import time, sleep
+from time import time, sleep, clock
 from socket import socket
 from subprocess import Popen
 from configparser import ConfigParser
@@ -665,12 +665,14 @@ async def amain(client, args):
         await start_tcp_listener(client,args.listen)
 
     start_time = time()
+    start_clock = clock()
     await run_client(args=args, client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
     setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
-    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time:#3.6} (setup time {setup_time:#3.6})")
+    total_clock = clock() - start_clock
+    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time:#3.6} cpu %{int(total_clock * 100 /total_time)} (setup time {setup_time:#3.6})")
     return client
 
 
