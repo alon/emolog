@@ -206,6 +206,7 @@ def output_name_to_std_name(output_name):
 def clean_col_name(name):
     name = remove_prefix(name, 'controller.state.')
     name = remove_prefix(name, 'controller.params.')
+    name = remove_prefix(name, 'analog_sensors.')
     name = remove_prefix(name, 'duty_cycle.')
     name = name.replace("_", " ")
     name = name[0].upper() + name[1:]
