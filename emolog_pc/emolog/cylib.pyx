@@ -589,7 +589,7 @@ cdef class CSVHandler:
     cdef long min_ticks
     cdef list names
     cdef set sample_listeners
-    cdef list data # to be made into an array
+    cdef object writer
 
     cdef public str csv_filename
     cdef public long max_ticks
@@ -609,6 +609,14 @@ cdef class CSVHandler:
         self.max_ticks = 0
         self._running = False
         self.sample_listeners = set()
+        self._init_writer()
+
+    def _init_writer(self):
+        if self.csv_filename is None:
+            return
+        fd = open(self.csv_filename, 'w+')
+        self.writer = csv.writer(fd, lineterminator='\n')
+        self.writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
 
     def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
         self.csv_filename = csv_filename
@@ -620,7 +628,7 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
-        self.data = [None] * max_ticks
+        self._init_writer()
 
     def register_listener(self, callback):
         self.sample_listeners.add(callback)
@@ -634,15 +642,9 @@ cdef class CSVHandler:
         return self.last_ticks - self.first_ticks
 
     def stop(self):
+        if not self._running:
+            return
         self._running = False
-        fd = open(self.csv_filename, 'w+')
-        writer = csv.writer(fd, lineterminator='\n')
-        writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
-        for i, row in enumerate(self.data):
-            if row is None:
-                print(f"skipping row {i}")
-                continue
-            writer.writerow(row)
 
     # python version for profiling
     cpdef handle_sampler_samples(self, msgs):
@@ -660,10 +662,8 @@ cdef class CSVHandler:
         # TODO - decode variables (integer/float) in emolog VariableSampler
         cdef float now = time() * 1000
         for seq, ticks, variables in msgs:
-            if 0 < ticks < len(self.data) + 1:
-                self.data[ticks - 1] = [seq, ticks, now] + [variables.get(name, '') for name in self.names]
-            else:
-                print(f"error {ticks} > {len(self.data)} or {ticks} < 1")
+            values = [seq, ticks, now] + [variables.get(name, '') for name in self.names]
+            self.writer.writerow(values)
         if len(self.sample_listeners) > 0:
             new_samples = [(ticks, [(k, v) for (k, v) in variables.items() if type(v) == float])
                 for (_seq, ticks, variables) in msgs]

@@ -583,8 +583,8 @@ async def run_client(args, client, variables, allow_kb_stop):
 
 
 async def record_snapshot(args, client, csvfile, varsfile):
-    names, variables = read_elf_variables(vars=[], varfile=varsfile)
-    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=0)
+    names, variables = read_elf_variables(elf=args.elf, vars=[], varfile=varsfile)
+    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=1)
     await run_client(args, client, variables, allow_kb_stop=False)
 
 
