@@ -1,7 +1,5 @@
 controller.params.bottom_travel_limit,20000,1
-controller.params.bottom_coasting_start,20000,1
 controller.params.ref_sensor_pos,20000,1
-controller.params.top_coasting_start,20000,1
 controller.params.top_travel_limit,20000,1
 controller.params.dir_change_behavior,20000,1
 controller.params.dir_change_duration,20000,1
