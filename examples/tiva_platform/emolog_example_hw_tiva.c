@@ -119,7 +119,6 @@ void hw_init(void)
 int main(void)
 {
     hw_init();     // platform specific HW initialization.
-    emolog_init(); // this must be called before using Emolog;
     emolog_example_main_loop(); // this never returns
 }
 
