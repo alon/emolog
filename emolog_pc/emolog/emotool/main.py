@@ -37,6 +37,11 @@ from .post_processor import post_process
 logger = logging.getLogger()
 
 
+module_dir = os.path.dirname(os.path.realpath(__file__))
+pc_dir = os.path.join(module_dir, '..', '..', '..', 'examples', 'pc_platform')
+pc_executable = os.path.join(pc_dir, 'pc')
+
+
 def with_errors(s):
     # TODO - find a library for this? using error distance
     #  deleted element
@@ -116,6 +121,15 @@ def start_fake_sine(ticks_per_second, port):
         cmdline = ['python'] + cmdline
     #print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
     return create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
+
+
+def start_pc(port, exe, debug):
+    cmdline = [exe, str(port)]
+    os.environ['EMOLOG_PC_PORT'] = str(port)
+    if debug:
+        input(f"press enter once you ran pc with: {cmdline}")
+        return
+    return create_process(cmdline)
 
 
 def iterate(prefix, initial):
@@ -232,8 +246,7 @@ def start_serial_process(serial, baudrate, hw_flow_control, port):
 
 
 def create_python_process_cmdline(script):
-    emolog_pc_path = os.path.dirname(os.path.realpath(__file__))
-    script_path = os.path.join(emolog_pc_path, script)
+    script_path = os.path.join(module_dir, script)
     return ['python', script_path]
 
 
@@ -289,10 +302,17 @@ class EmoToolClient(ClientProtocolMixin):
 async def start_transport(client, args):
     loop = get_event_loop()
     port = random.randint(10000, 50000)
-    if args.fake:
-        start_fake_sine(args.ticks_per_second, port)
-    elif args.fake_bench:
-        start_fake_bench(port)
+    if args.fake is not None:
+        if args.fake == 'gen':
+            start_fake_sine(args.ticks_per_second, port)
+        elif args.fake == 'bench':
+            start_fake_bench(port)
+        elif args.fake == 'pc' or os.path.exists(args.fake):
+            exe = pc_executable if args.fake == 'pc' else args.fake
+            start_pc(port=port, exe=exe, debug=args.debug)
+        else:
+            print(f"error: unfinished support for fake {args.fake}")
+            raise SystemExit
     else:
         start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     attempt = 0
@@ -401,10 +421,8 @@ def kill_all_processes():
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
-    parser.add_argument('--fake', default=False, action='store_true',
-                        help='debug only - fake a client - no serial nor elf required')
-    parser.add_argument('--fake-bench', default=False, action='store_true',
-                        help='debug only - fake a client, benchmark processing time')
+    parser.add_argument('--fake', # TODO: can I have a hook for choices? i.e. choices=ChoicesOrExecutable['gen', 'pc', 'bench'],
+                        help='debug only - fake a client - either generated or pc controller')
     parser.add_argument('--serial', default='auto', help='serial port to use')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
@@ -442,25 +460,33 @@ def parse_args():
 
     ret, unparsed = parser.parse_known_args()
 
-    if not ret.fake and not ret.fake_bench:
+    if ret.fake is None:
         if not ret.elf and not ret.embedded:
             # elf required unless fake_sine in effect
             parser.print_usage()
             print(f"{sys.argv[0]}: error: the following missing argument is required: --elf")
             raise SystemExit
     else:
-        # fill in fake vars
-        ret.var = [
-            # name, ticks, phase
-            'a,1,0',
-            'b,1,0',
-            'c,1,0',
-            'd,1,0',
-            'e,1,0',
-            'f,1,0',
-            'g,1,0',
-            'h,1,0',
-        ]
+        if ret.fake == 'gen':
+            # fill in fake vars
+            ret.var = [
+                # name, ticks, phase
+                'a,1,0',
+                'b,1,0',
+                'c,1,0',
+                'd,1,0',
+                'e,1,0',
+                'f,1,0',
+                'g,1,0',
+                'h,1,0',
+            ]
+        else:
+            if not os.path.exists(pc_executable):
+                print(f"missing pc ELF file: {pc_executable}")
+                raise SystemExit
+            ret.elf = pc_executable
+            ret.varfile = os.path.join(module_dir, '..', '..', 'vars.csv')
+            ret.snapshotfile = os.path.join(module_dir, '..', '..', 'snapshot_vars.csv')
     return ret
 
 
