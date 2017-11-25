@@ -1,4 +1,5 @@
-# cython: linetrace=True
+# cython: profile=False
+# cython: linetrace=False
 
 """
 Emolog is a logging protocol for debugging embedded c programs.
