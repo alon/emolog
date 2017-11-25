@@ -4,17 +4,24 @@ import numpy
 from Cython.Build import cythonize
 
 gdb_debug = False
-macros = [] #[('CYTHON_TRACE', 1)]
+#macros = [('CYTHON_TRACE', 1)]
+macros = []
+
+# TODO - line tracing. compiler_directives no longer used
+#                   compiler_directives={'linetrace': True, 'binding': True},
+# gives
+# extension.py:131: UserWarning: Unknown Extension options: 'compiler_directives'
 
 cylib = Extension(name="emolog.cylib",
                   sources=["emolog/cylib.pyx", "../emolog_protocol/source/emolog_protocol.cpp"],
-                  include_dirs=['../emolog_protocol/source'],
+                  include_dirs=['../emolog_protocol/source'] + [numpy.get_include()],
                   define_macros=macros,
                   language="c++")
 fakeembedded = Extension(name="emolog.fakeembedded", sources=["emolog/fakeembedded.pyx"])
 cython_util = Extension(name="emolog.cython_util", sources=["emolog/cython_util.pyx"])
+decoders = Extension(name="emolog.decoders", sources=["emolog/decoders.pyx"])
 
-cython_extensions = [cylib, fakeembedded, cython_util]
+cython_extensions = [cylib, fakeembedded, cython_util, decoders]
 
 setup(
     name='Emotool',
