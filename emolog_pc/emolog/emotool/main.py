@@ -265,9 +265,12 @@ class EmoToolClient(ClientProtocolMixin):
 
     instance = None
 
-    def __init__(self, verbose, dump):
+    def __init__(self, verbose, dump, debug):
         if EmoToolClient.instance is not None:
             raise Exception("EmoToolClient is a singleton, can't create another instance")
+        if debug:
+            print("timeout set to one hour for debugging (gdb)")
+            ClientProtocolMixin.ACK_TIMEOUT_SECONDS = 3600.0
         ClientProtocolMixin.__init__(self)
         self.cylib = EmotoolCylib(parent=self, verbose=verbose, dump=dump)
         EmoToolClient.instance = self  # for singleton
@@ -592,12 +595,6 @@ def banner(s):
     print("=" * len(s))
 
 
-async def init_client(args):
-    client = EmoToolClient(verbose=not args.silent, dump=args.dump)
-    await start_transport(client=client, args=args)
-    return client
-
-
 async def run_client(args, client, variables, allow_kb_stop):
     if not await initialize_board(client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
@@ -658,7 +655,8 @@ async def amain_startup(args):
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
-    client = await init_client(args)
+    client = EmoToolClient(verbose=not args.silent, dump=args.dump, debug=args.debug)
+    await start_transport(client=client, args=args)
     return client
 
 
