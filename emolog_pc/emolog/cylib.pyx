@@ -339,12 +339,17 @@ class UnknownMessage:
 HEADER_FORMAT = ENDIANESS + 'HBHBBB'
 
 
-def decode_emo_header_unsafe(s):
+cdef (unsigned, unsigned, unsigned) decode_emo_header_unsafe(s):
     """
     Decode emolog header assuming the MAGIC is correct
     :param s: bytes of header
     :return: success (None if yes, string of error otherwise), message type (byte), payload length (uint16), message sequence (byte)
     """
+    cdef unsigned _magic
+    cdef unsigned _type
+    cdef unsigned length
+    cdef unsigned payload_crc
+    cdef unsigned header_crc
     _magic, _type, length, seq, payload_crc, header_crc = unpack(HEADER_FORMAT, s)
     return _type, length, seq
 
@@ -387,9 +392,9 @@ cdef class VariableSampler:
     cdef unsigned[:] address
     cdef unsigned[:] size
     cdef list _type
-
-    # holding place to allow API of register_variable - we recreate the memoryviews
-    cdef list variables
+    cdef bint _use_unpack
+    cdef bint _single_sample
+    cdef bytes _single_sample_unpack_str
 
     cdef public bint running
 
