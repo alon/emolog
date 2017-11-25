@@ -243,7 +243,6 @@ cdef class SamplerSample(Message):
     cdef public unsigned ticks
     cdef public bytes payload
     cdef public list var_size_pairs
-    cdef public object variables
 
     def __init__(self, unsigned seq, unsigned ticks, bytes payload=None, list var_size_pairs=None):
         """
@@ -257,7 +256,6 @@ cdef class SamplerSample(Message):
         self.ticks = ticks
         self.payload = payload
         self.var_size_pairs = var_size_pairs
-        self.variables = None
 
     def encode_inner(self):
         emo_encode_sampler_sample_start(self.buf)
@@ -267,8 +265,7 @@ cdef class SamplerSample(Message):
 
     def handle_by(self, handler):
         if handler.sampler.running:
-            self.update_with_sampler(handler.sampler)
-            handler.pending_samples.append((self.seq, self.ticks, self.variables))
+            handler.pending_samples.append((self.seq, self.ticks, self.payload))
             #logger.debug(f"Got Sample: {self}")
         else:
             #logger.debug("ignoring sample since PC sampler is not primed")
@@ -283,9 +280,7 @@ cdef class SamplerSample(Message):
         return sample.encode_inner()
 
     def __str__(self):
-        if self.variables:
-            return '<sample {} variables {}>'.format(self.ticks, repr(self.variables))
-        elif self.var_size_pairs is not None:
+        if self.var_size_pairs is not None:
             assert self.payload is None
             return '<sample {} var_size_pairs {}>'.format(self.ticks, self.var_size_pairs)
         elif self.payload is not None:
@@ -416,37 +411,75 @@ cdef class VariableSampler:
     def on_stopped(self):
         self.running = False
 
-    def register_variable(self, name, phase_ticks, period_ticks, address, size, _type):
-        self.variables.append(RegisteredVariable(
-            name=name,
-            phase_ticks=phase_ticks,
-            period_ticks=period_ticks,
-            address=address,
-            size=size,
-            _type=_type))
-        self._set_variables(self.variables)
+    def register_variables(self, variables):
+        out = []
+        for d in variables:
+            name, phase_ticks, period_ticks, address, size, _type = (
+                d['name'], d['phase_ticks'], d['period_ticks'], d['address'], d['size'], d['_type']
+            )
+            out.append(RegisteredVariable(
+                name=name,
+                phase_ticks=phase_ticks,
+                period_ticks=period_ticks,
+                address=address,
+                size=size,
+                _type=_type))
+        self._set_variables(out)
 
     cdef _set_variables(self, variables):
-        self.variables = variables
         self.name = [x.name for x in variables]
         self.phase_ticks = array('i', [x.phase_ticks for x in variables])
         self.period_ticks = array('i', [x.period_ticks for x in variables])
         self.address = array('I', [x.address for x in variables])
         self.size = array('I', [x.size for x in variables])
         self._type = [x._type for x in variables]
+        # special case really fast - all variables has zero phase and same period
+        self._use_unpack = not any(hasattr(t, 'decode') for t in self._type) # conservative
+        if len(variables) == 0:
+            self._use_unpack = self._single_sample = False
+            return
+        if not self._use_unpack:
+            print(f"sample decoding mode: mixed unpack and decoder")
+            self._single_sample = False
+        else:
+            self._single_sample = all(x == 0 for x in self.phase_ticks) and all (x == 1 for x in self.period_ticks)
+            if len(variables) > 0 and self._single_sample:
+                print("sample decoding mode: single unpack")
+                self._single_sample_unpack_str = b'<' + b''.join(t.unpack_str for t in self._type)
+            else:
+                print("sample decoding mode: multiple unpack")
 
-    cdef variables_from_ticks_and_payload(self, int ticks, payload):
-        variables = {}
+    cdef list_from_ticks_and_payload(self, dict name_to_index, int ticks, bytes payload):
         cdef unsigned offset = 0
         cdef unsigned size
         cdef unsigned i
-        for i in range(self.phase_ticks.size):
-            if ticks % self.period_ticks[i] == self.phase_ticks[i]:
-                size = self.size[i]
-                variables[self.name[i]] = self._type[i](payload[offset:offset + size])
-                offset += size
-        return variables
-
+        if self._single_sample:
+            ret = list(unpack(self._single_sample_unpack_str, payload))
+        else:
+            types = [(self._type[i], i) for i in range(self.phase_ticks.size)
+                        if ticks % self.period_ticks[i] == self.phase_ticks[i]]
+            if self._use_unpack:
+                ret = list(unpack(b'<' + b''.join(t.unpack_str for t, i in types), payload))
+            else:
+                ret = [None] * len(self.name)
+                for t, i in types:
+                    size = self.size[i]
+                    encoded = payload[offset:offset + size]
+                    if hasattr(t, 'decode'):
+                        val = t.decode(encoded)
+                    else:
+                        val, = unpack(b'<' + t.unpack_str, encoded)
+                    try:
+                        ret[name_to_index[self.name[i]]] = val
+                    except:
+                        try:
+                            print(f'{i}')
+                            print(f'{self.name[i]}')
+                            print(f'{name_to_index[self.name[i]]}')
+                        finally:
+                            raise SystemExit
+                    offset += size
+        return ret
 
 
 cdef uint8_t *to_str(val, size):
@@ -465,10 +498,17 @@ cdef uint8_t *to_str(val, size):
 SAMPLER_SAMPLE_TICKS_FORMAT = ENDIANESS + 'L'
 
 
-cdef emo_decode(bytes buf, unsigned i_start):
+cpdef emo_decode(bytes buf, unsigned i_start):
     cdef unsigned n = len(buf)
+    cdef object error = None
+    cdef unsigned payload_start
+    cdef bytes header # make not a copy
+    cdef bytes payload # make not a copy
+    cdef unsigned emo_type
+    cdef unsigned emo_len
+    cdef unsigned seq
     cdef int needed = emo_decode_with_offset(buf, i_start, min(n - i_start, 0xffff))
-    error = None
+
     if needed == 0:
         payload_start = i_start + HEADER_SIZE
         header = buf[i_start : payload_start]
@@ -501,9 +541,11 @@ cdef emo_decode(bytes buf, unsigned i_start):
     elif needed > 0:
         msg = MissingBytes(message=buf, header=buf[i_start : i_start + HEADER_SIZE], needed=needed)
         i_next = i_start + needed
+        error = 'missing bytes'
     else:
         msg = SkipBytes(-needed)
         i_next = i_start - needed
+        error = 'skip bytes'
     return msg, i_next, error
 
 
@@ -534,13 +576,20 @@ cdef class Parser:
                 raise SystemExit()
         self.buf = self.buf + s
         cdef unsigned i = 0
+        cdef unsigned i_next
         cdef bytes buf = self.buf
         cdef unsigned n = len(buf)
         cdef list ret = []
         while i < n:
             msg, i_next, error = emo_decode(buf, i_start=i)
             if error:
-                logger.error(error)
+                if isinstance(msg, SkipBytes):
+                    parsed_buf = buf[i:i_next]
+                    logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
+                elif isinstance(msg, MissingBytes):
+                    break
+                else:
+                    logger.error(error)
             if self.debug_message_decoding:
                 if error:
                     logger.error("decoding error, buf length {}, error: {}".format(n, error))
@@ -550,11 +599,6 @@ cdef class Parser:
                     pass # TODO: return this but only when run with --debug - it is slow otherwise
                     #logger.debug("decoded header: type {}, len {}, seq {} (buf #{})".format(
                     #    emo_message_type_to_str[msg.type], i_next - i, msg.seq, n))
-            if isinstance(msg, SkipBytes):
-                parsed_buf = buf[i:i_next]
-                logger.debug("communication error - skipped {} bytes: {}".format(msg.skip, parsed_buf))
-            elif isinstance(msg, MissingBytes):
-                break
             ret.append(msg)
             i = i_next
         self.buf = self.buf[i:]
@@ -591,6 +635,14 @@ dumper = Dumper()
 
 ##### CSVHandler
 
+# TODO, with np.ndarray[DTYPE_t, ndim=2]
+#ctypedef np.bytes_t DTYPE_t
+
+cdef object encode_if_bytes(object b):
+    if isinstance(b, bytes):
+        return b.encode('utf-8')
+    return b
+
 cdef class CSVHandler:
     cdef bint _running
     cdef bint verbose
@@ -600,6 +652,10 @@ cdef class CSVHandler:
     cdef long min_ticks
     cdef list names
     cdef set sample_listeners
+    cdef list data # (np.ndarray not good enough for array types ; can specialize (fast use case doesn't have arrays)) to be made into an array
+    cdef dict name_to_index
+    cdef VariableSampler sampler
+    cdef bint write_immediately # for testing - should commit
     cdef object writer
 
     cdef public str csv_filename
@@ -607,7 +663,8 @@ cdef class CSVHandler:
     cdef public long ticks_lost
     cdef public long samples_received
 
-    def __init__(self, verbose, dump):
+    def __init__(self, sampler, verbose, dump):
+        self.sampler = sampler
         self.verbose = verbose
         self.dump = dump
         self.csv_filename = None
@@ -620,26 +677,29 @@ cdef class CSVHandler:
         self.max_ticks = 0
         self._running = False
         self.sample_listeners = set()
-        self._init_writer()
-
-    def _init_writer(self):
-        if self.csv_filename is None:
-            return
-        fd = open(self.csv_filename, 'w+')
-        self.writer = csv.writer(fd, lineterminator='\n')
-        self.writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+        self.write_immediately = True
 
     def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
+        assert max_ticks > 0, "max_ticks must be none zero, used as stopping condition for saving CSV"
+        if self._running:
+            self._save_csv()
         self.csv_filename = csv_filename
         self.first_ticks = -1
         self.last_ticks = -1
         self.min_ticks = min_ticks
         self.names = names
+        self.name_to_index = {name: i for i, name in enumerate(names)}
         self.samples_received = 0
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
-        self._init_writer()
+        if not self.write_immediately:
+            N_cols = 3 + len(self.names)
+            data = [[None] * N_cols for i in range(max_ticks)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
+            #self.data = np.array(data, dtype='string_').reshape(max_ticks, N_cols)
+            self.data = data
+        else:
+            self.writer = self._init_csv()
 
     def register_listener(self, callback):
         self.sample_listeners.add(callback)
@@ -656,6 +716,23 @@ cdef class CSVHandler:
         if not self._running:
             return
         self._running = False
+        self._save_csv()
+
+    def _save_csv(self):
+        if self.write_immediately:
+            return
+        writer = self._init_csv()
+        cdef list types = self.sampler._type
+        for i, row in enumerate(self.data):
+            writer.writerow(row[:3] + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(types, row[3:])])
+
+    cdef _init_csv(self):
+        if self.csv_filename is None:
+            return
+        fd = open(self.csv_filename, 'w+')
+        writer = csv.writer(fd, lineterminator='\n')
+        writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+        return writer
 
     # python version for profiling
     cpdef handle_sampler_samples(self, msgs):
@@ -664,24 +741,36 @@ cdef class CSVHandler:
         :param msgs: [(seq, ticks, {name: value})]
         :return: None
         """
+        cdef list data
+        cdef list new_float_only_msgs
+        cdef int missing
+        cdef float now
+        cdef bint have_listeners
+
         if not self._running:
             return
+        # cdef np.ndarray[np.double_t, ndim = 2]
+        data = self.data
         # prune messages if we got too many
-        cdef int missing = self.max_ticks - self.samples_received
+        missing = self.max_ticks - self.samples_received
         if len(msgs) > missing:
             del msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
-        cdef float now = time() * 1000
-        for seq, ticks, variables in msgs:
-            values = [seq, ticks, now] + [variables.get(name, '') for name in self.names]
-            self.writer.writerow(values)
-        if len(self.sample_listeners) > 0:
-            new_samples = [(ticks, [(k, v) for (k, v) in variables.items() if type(v) == float])
-                for (_seq, ticks, variables) in msgs]
-            for listener in self.sample_listeners:
-                listener(new_samples)
-        self.samples_received += len(msgs)
-        for seq, ticks, variables in msgs:
+        now = time() * 1000
+        have_listeners = len(self.sample_listeners) > 0
+        if have_listeners:
+            new_float_only_msgs = []
+        for seq, ticks, payload in msgs:
+            values = self.sampler.list_from_ticks_and_payload(name_to_index=self.name_to_index, ticks=ticks, payload=payload)
+            row = [seq, ticks, now] + values
+            if self.write_immediately:
+                self.writer.writerow(row)
+            elif 0 <= ticks < len(self.data):
+                data[ticks] = row
+                if have_listeners:
+                    new_float_only_msgs.append((ticks, [(self.names[i], v) for i, v in enumerate(values) if type(v) == float]))
+            else:
+                print(f"error {ticks} > {len(self.data)} or {ticks} < 1")
             if self.first_ticks == -1:
                 self.first_ticks = ticks
             if self.last_ticks != -1 and ticks - self.last_ticks != self.min_ticks:
@@ -689,6 +778,10 @@ cdef class CSVHandler:
                     now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
                 self.ticks_lost += ticks - self.last_ticks - self.min_ticks
             self.last_ticks = ticks
+        if have_listeners:
+            for listener in self.sample_listeners:
+                listener(new_float_only_msgs)
+        self.samples_received += len(msgs)
         if self.max_ticks != 0 and self.total_ticks() + 1 >= self.max_ticks:
             self.stop()
 
@@ -718,7 +811,7 @@ cdef class EmotoolCylib:
         self.received_samples = 0
         self.pending_samples = []
         self.parser = Parser(None, debug=self.verbose)
-        self.csv_handler = CSVHandler(verbose=verbose, dump=dump)
+        self.csv_handler = CSVHandler(sampler=self.sampler, verbose=verbose, dump=dump)
 
     def dump_buf(self, buf):
         self.dump_out.write(pack('<fI', time(), len(buf)) + buf)

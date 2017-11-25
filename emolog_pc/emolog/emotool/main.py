@@ -12,10 +12,8 @@ from os import path
 import sys
 import string
 import logging
-import struct
-from struct import pack
+from struct import pack, unpack
 import random
-from functools import reduce
 from time import time, sleep, clock
 from socket import socket
 from subprocess import Popen
@@ -27,7 +25,7 @@ from pickle import dumps
 from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 from ..util import version
-from ..cython_util import decode_little_endian_float
+from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib, SamplerSample
 
 
@@ -147,66 +145,53 @@ def next_available(folder, prefix):
             return candidate
 
 
-def return_enum_decoder(size):
-    if size == 4:
-        return lambda q: struct.unpack('<l', q)[0]
-    elif size == 2:
-        return lambda q: struct.unpack('<h', q)[0]
-    return ord
+class VariableNotSupported(Exception):
+    def __init__(self, v, size):
+        super().__init__(f'{v}: {size}')
 
 
-def array_decoder(array, elem_decoder, length, elem_size):
-    res = '{ '
-    for i in range(length):
-        elem = elem_decoder(array[i * elem_size: (i + 1) * elem_size])
-        if isinstance(elem, float):
-            elem_str = "{:.3f}".format(elem)
-        else:
-            elem_str = "{}".format(elem)
-        res += elem_str
-        res += ', '
-    res = res[:-2]  # throw away last comma
-    res += ' }'
-    return res
+unpack_str_from_type_name = dict(
+    float=b'f',
+    int=b'i',
+    unsigned=b'I',
+    short=b'h',
+)
 
 
 def variable_to_decoder(v, type_name, size):
     # NOTE: function accepts type_name and size as parameters instead of directly getting those from v so that
     # it would be able to call itself recursively with the element of an array
+    name_bytes = v.name.encode('utf-8')
     if type_name.startswith('enum '):
         name_to_val = v.get_enum_dict()
         max_unsigned_val = 1 << (size * 8)
-        val_to_name = {v % max_unsigned_val: k for k, v in name_to_val.items()}
-        enum_decoder = return_enum_decoder(size)
-        return lambda q: val_to_name[enum_decoder(q)]
+        val_to_name = {v: k for k, v in name_to_val.items()}
+        return NamedDecoder(name=name_bytes, max_unsigned_val=max_unsigned_val, unpack_str=unpack_str_from_size(size), val_to_name=val_to_name)
 
-    elif type_name.startswith('array of '):
+    elif v.is_array():
         # this currently flattens multi-dimensional arrays to a long one dimensional array
-        elem_type = type_name[9:]
-        bounds = v.get_array_sizes()
-        array_len = reduce(lambda x, y: x * y, bounds)
+        elem_type = type_name.rsplit(' ', 1)[1]
+        elem_unpack_str = unpack_str_from_type_name[elem_type]
+        assert len(elem_unpack_str) == 1
+        array_len = v.get_array_flat_length()
+        if size is None:
+            raise VariableNotSupported(v, size)
         elem_size = int(size / array_len)
-        assert(elem_size * array_len == size)
-        elem_decoder = variable_to_decoder(v=v, type_name=elem_type, size=elem_size)
-        return lambda q: array_decoder(array=q, elem_decoder=elem_decoder, length=array_len, elem_size=elem_size)
+        assert (elem_size * array_len == size)
+        return ArrayDecoder(name=name_bytes, elem_unpack_str=elem_unpack_str, length=array_len)
 
     elif type_name.endswith('float'):
         if size == 4:
-            return decode_little_endian_float
+            return Decoder(name=name_bytes, unpack_str=b'f')
 
     elif type_name.endswith('bool'):
-        return lambda q: 'True' if ord(q) else 'False'
+        return NamedDecoder(name=name_bytes, max_unsigned_val=2, unpack_str=b'b', val_to_name={1: 'True', 0: 'False'})
 
     else:  # TODO this should be "if it's an int". also should handle signed/unsigned correctly
-        if size == 4:
-            return lambda q: struct.unpack('<l', q)[0]
-        elif size == 2:
-            return lambda q: struct.unpack('<h', q)[0]
-        elif size == 1:
-            return ord
+        unpack_str = unpack_str_from_size(size)
+        return Decoder(name=name_bytes, unpack_str=unpack_str)
 
-    logger.error("type names supported: int, float. looked for: '{}', size = {}".format(type_name, size))
-    raise SystemExit
+    raise VariableNotSupported(v, size)
 
 
 def setup_logging(filename, silent):
@@ -527,6 +512,9 @@ class DwarfFakeVariable:
     def get_type_str(self):
         return self.type_str
 
+    def is_array(self):
+        return False
+
 
 def fake_dwarf(names):
     def fake_variable(name):
@@ -534,7 +522,40 @@ def fake_dwarf(names):
     return {name: fake_variable(name) for name in names}
 
 
-def read_elf_variables(elf, vars, varfile):
+def read_all_elf_variables(elf):
+    dwarf_variables = dwarf_get_variables_by_name(elf, None)
+    names = list(sorted(dwarf_variables.keys()))
+    name_to_ticks_and_phase = {k: (1, 0) for k in names}
+    return names, variables_from_dwarf_variables(
+        names, name_to_ticks_and_phase, dwarf_variables, skip_not_supported=True)
+
+
+def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variables, skip_not_supported):
+    variables = []
+    for name in names:
+        v = dwarf_variables[name]
+        period_ticks, phase_ticks = name_to_ticks_and_phase[name]
+        try:
+            decoder = variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)
+        except VariableNotSupported:
+            if skip_not_supported:
+                print(f"debug: unsupported by our DWARF DIE parser (dwarf package): {name}")
+                continue
+            raise
+        variables.append(dict(
+            name=name,
+            phase_ticks=phase_ticks,
+            period_ticks=period_ticks,
+            address=v.address,
+            size=v.size,
+            v=v,
+            _type=decoder))
+    return variables
+
+
+def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
+    if vars is None: # debug - will take all vars in ELF - usually not what you want
+        return read_all_elf_variables(elf)
     if varfile is not None:
         with open(varfile) as fd:
             vars = vars + fd.readlines()
@@ -545,26 +566,19 @@ def read_elf_variables(elf, vars, varfile):
             logger.error("--var parameter must be a 3 element comma separated list of: <name>,<period:int>,<phase:int>")
             raise SystemExit
     names = [name for name, ticks, phase in split_vars]
-    name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
     if elf is None:
         dwarf_variables = fake_dwarf(names)
     else:
-        dwarf_variables = dwarf_get_variables_by_name(elf, names)  # TODO does this really have to access args?
+        dwarf_variables = dwarf_get_variables_by_name(elf, names)
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
-    variables = []
-    for name in names:
-        v = dwarf_variables[name]
-        period_ticks, phase_ticks = name_to_ticks_and_phase[name]
-        variables.append(dict(
-            name=name,
-            phase_ticks=phase_ticks,
-            period_ticks=period_ticks,
-            address=v.address,
-            size=v.size,
-            _type=variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)))
-    return names, variables
+    name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
+    return names, variables_from_dwarf_variables(
+        names=names,
+        name_to_ticks_and_phase=name_to_ticks_and_phase,
+        dwarf_variables=dwarf_variables,
+        skip_not_supported=skip_not_supported)
 
 
 async def initialize_board(client, variables):
