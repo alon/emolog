@@ -25,6 +25,11 @@ def make_sine():
                            phase_ticks=10,
                            period_ticks=20)
 
+cdef minmax(t):
+    if t > 0:
+        return 1.0
+    return -1.0
+
 
 cdef class FakeSineEmbeddedBase:
     """
@@ -107,7 +112,7 @@ cdef class FakeSineEmbeddedBase:
         n = self.sines_num
         self.sines_num += 1
         self.sines[n] = Sine(size=size, address=address,
-                           freq=50 + 50 * (n / 10.0), amp=10 * n, phase=0.05 * n,
+                           freq=50 + 50 * (n / 10.0), amp=10 * (n + 1), phase=0.05 * n,
                            phase_ticks=phase_ticks,
                            period_ticks=period_ticks)
 
