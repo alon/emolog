@@ -76,7 +76,7 @@ cdef extern from "emolog_protocol.h":
         pass
 
 
-cdef extern from "emolog_protocol.h" namespace "emo_message_t":
+cdef extern from "emolog_protocol.h":
     cdef emo_message_t EMO_MESSAGE_TYPE_VERSION
     cdef emo_message_t EMO_MESSAGE_TYPE_PING
     cdef emo_message_t EMO_MESSAGE_TYPE_ACK
