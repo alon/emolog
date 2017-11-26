@@ -10,6 +10,7 @@
 
 
 // General includes
+#include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -27,14 +28,14 @@
 extern "C"
 void delay_us(uint32_t us)
 {
-    // TODO
+    usleep(us);
 }
 
 
 extern "C"
 void delay_ms(uint32_t ms)
 {
-    // TODO
+    usleep(ms * 1000);
 }
 
 /** Communication */
