@@ -124,10 +124,13 @@ def start_fake_sine(ticks_per_second, port):
 
 
 def start_pc(port, exe, debug):
+    exe = os.path.realpath(exe)
     cmdline = [exe, str(port)]
+    cmdline_str = ' '.join(cmdline)
+    debug_cmdline = f'EMOLOG_PC_PORT={port} cgdb --args {cmdline_str}'
     os.environ['EMOLOG_PC_PORT'] = str(port)
     if debug:
-        input(f"press enter once you ran pc with: {cmdline}")
+        input(f"press enter once you ran pc with: {debug_cmdline}")
         return
     return create_process(cmdline)
 
