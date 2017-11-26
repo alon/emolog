@@ -55,6 +55,11 @@ def with_errors(s):
 
 
 def dwarf_get_variables_by_name(filename, names):
+    regular_mode = names is not None and len(names) > 0
+    if names is None:
+        names = []
+    name_filter = (lambda v_name: v_name in names) if regular_mode else (lambda v_name: True)
+    missing_check = (lambda found, given: given != found) if regular_mode else (lambda found, given: False)
     file_parser = FileParser(filename=filename)
     sampled_vars = {}
     found = set()
@@ -66,14 +71,14 @@ def dwarf_get_variables_by_name(filename, names):
     for v in elf_vars:
         v_name = v.get_full_name()
         logger.debug("candidate var: {}".format(v_name))
-        if v_name in names:
+        if name_filter(v_name):
             if v.address == v.ADDRESS_TYPE_UNSUPPORTED:
                 logger.error("Address type not supported for requested variable '{}'".format(v_name))
                 raise SystemExit
             sampled_vars[v_name] = v
             found.add(v_name)
     given = set(names)
-    if given != found:
+    if missing_check(found, given):
         logger.error("the following variables were not found in the ELF:\n{}".format(", ".join(list(given - found))))
         elf_name_to_options = {name: set(with_errors(name)) for name in elf_var_names_set_lower}
         missing_lower = [name.lower() for name in given - found]
