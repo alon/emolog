@@ -1,58 +1,60 @@
 
-+ [ ] the name csvfile and the like is too ambigious, there are lots of csv files (vars, output, snapshot vars, snapshot output)... rename variables to be more explicit
++ the name csvfile and the like is too ambigious, there are lots of csv files (vars, output, snapshot vars, snapshot output)... rename variables to be more explicit
 
 Emotool / Emolog Logic:
 
-+ [ ] emotool & emolog: there's both received_samples and samples_received (one in emotool and one in emolog). is this intentional? if yes, rename to reflect different usages. if not, merge them.
++ emotool & emolog: there's both received_samples and samples_received (one in emotool and one in emolog). is this intentional? if yes, rename to reflect different usages. if not, merge them.
 
-+ [ ] emotool & emolog: emolog has 'stopped' variable, emotool has '_running'. why two of them?
++ emotool & emolog: emolog has 'stopped' variable, emotool has '_running'. why two of them?
 
-+ [ ] not sure if cleanup() is really sending sampler_stop. note that transmission stopping can also be because CTS goes inactive when closing the port. need to check for actual receive of stop (log from embedded?). Also, it seems it doesn't receive an ack (or pops an exception for some other reason), run with --verbose to see log message about it.
++ not sure if cleanup() is really sending sampler_stop. note that transmission stopping can also be because CTS goes inactive when closing the port. need to check for actual receive of stop (log from embedded?). Also, it seems it doesn't receive an ack (or pops an exception for some other reason), run with --verbose to see log message about it.
 NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is received by serial2tp and pushed to socket but ignored by emotool.py ; investigate"
 
-+ [ ] also added a sampler_stop at the end of each run_client(), and it seems to be doing something (check with very short times for snapshot var freq, we get tick jumps if this isn't added) however it causes a "got exception AckTimeout()" at the end of the *2nd* run. try to figure why.
++ also added a sampler_stop at the end of each run_client(), and it seems to be doing something (check with very short times for snapshot var freq, we get tick jumps if this isn't added) however it causes a "got exception AckTimeout()" at the end of the *2nd* run. try to figure why.
 
-+ [ ] are we waiting for the 2nd sample in the snapshot run? play with snapshot var file to check. fix if true (should finish after first sample is received)
++ are we waiting for the 2nd sample in the snapshot run? play with snapshot var file to check. fix if true (should finish after first sample is received)
 
-+ [ ] consider refactoring out init_client(). the call to start_transport can either be part of the constructor (in which case, it would be a member funciton) or explicit in amain(). in both cases, this function can be gone.
++ consider refactoring out init_client(). the call to start_transport can either be part of the constructor (in which case, it would be a member funciton) or explicit in amain(). in both cases, this function can be gone.
 
-+ [ ] run_client() makes sense to be a member function of client. this implies initialize_board() is a member as well. maybe also start_transport(), start_serial_process() ?
++ run_client() makes sense to be a member function of client. this implies initialize_board() is a member as well. maybe also start_transport(), start_serial_process() ?
 
-+ [ ] --log with --verbose yields an empty log file. This means we can't log stuff to file without some "noise" in the printouts to the screen
++ --log with --verbose yields an empty log file. This means we can't log stuff to file without some "noise" in the printouts to the screen
 
-+ [ ] move postprocessor and summarize to a different repo (Comet-ME specific)
++ move postprocessor and summarize to a different repo (Comet-ME specific)
 
-+ [ ] make emolog a git submodule of its users: pump_driver and others
++ make emolog a git submodule of its users: pump_driver and others
 
-+ [ ] clean up top level directory
++ clean up top level directory
 
-+ [ ] add all parameters from emotool.bat to the ini file and delete the batch file
++ add all parameters from emotool.bat to the ini file and delete the batch file
 
-+ [ ] ACK timeout happens during normal operation (apparently only at the end and after stop is sent).
++ ACK timeout happens during normal operation (apparently only at the end and after stop is sent).
 
-+ [ ] try to find way to change emolog_protocol.cpp back to .c
++ try to find way to change emolog_protocol.cpp back to .c
 
-+ [ ] document the full steps needed to install and upgrade emolog from git on a clean windows system
++ document the full steps needed to install and upgrade emolog from git on a clean windows system
 
-+ [ ] implement a mechanism that compares the embedded binary the DWARF reads to the what's programmed into the hardware
++ implement a mechanism that compares the embedded binary the DWARF reads to the what's programmed into the hardware
 
-+ [ ] improve embededd.py so that it can generate an output read from a pre-recorded CSV
++ improve embededd.py so that it can generate an output read from a pre-recorded CSV
 
++ test for bandwidth: to catch regressions. i.e. given ELF and vars.csv what is the bandwidth?
+  magic number right now (this commit) is 7402000.0
 
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
 
 + postprocessing:
-  [ ] steps table like the old logger? 
+  steps table like the old logger? 
 
 * LATER
-  [ ] in the main process, determinisitically (without sleep) wait for subprocess to be ready to accept socket connection
-  [ ] reduce cpu usage when transmitting samples. main hog - sampler_sample
-  [ ] signed vs. unsigned int parsing
-  [ ] graceful exit: refactor to something cleaner?
-  [ ] DMA to serial
-  [ ] use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
-  [ ] GUI
+  in the main process, determinisitically (without sleep) wait for subprocess to be ready to accept socket connection
+  reduce cpu usage when transmitting samples. main hog - sampler_sample
+  signed vs. unsigned int parsing
+  graceful exit: refactor to something cleaner?
+  DMA to serial
+  use CRC hardware (twice, header and payload). make sure results are compatible. test performance difference. 
+  GUI
 
 
 - [x] bandwidth print. e.g. "using 3.4 Mbps out of 8Mbps (xx%)"
@@ -60,15 +62,15 @@ this is older stuff --> Updated it on 1/7/2017.
     - header
     - ticks counter
     - average, rather than peak, packet size
-- [ ] every xx seconds (maybe 0.25s or so?) print how many packets were processed and how many were expected
+- every xx seconds (maybe 0.25s or so?) print how many packets were processed and how many were expected
       (or maybe it's easier to look at their diff, because a steady increase in the diff is what tells us if processing is slower than realtime)
 
 - [x] maybe some preliminary profiling of the processing? are there any obvious optimizations to be done?
 
-- [ ] NOT SURE IF STILL RELEVANT, check with scope on CTS on Guy's machine:
+- NOT SURE IF STILL RELEVANT, check with scope on CTS on Guy's machine:
 when you get the scope, it would be interesting to see if in your system it starts throttling as well (CTS going low/high and transmission starts/stops accordingly), how soon (for me after approximately 1 sec of transmitting), and with what size payload (for me only above some threshold, don't remember what it was at the moment)
-  - [ ] add timing for reader process writes to TCP socket. Write to error log if larger than something, and when. Correlate with missing data.
-  - [ ] check size of TCP socket OS buffer, can we make it larger
-  - [ ] optionally add a buffer in reader process between reading and writing (so read everything to it, write when possible)
+  - add timing for reader process writes to TCP socket. Write to error log if larger than something, and when. Correlate with missing data.
+  - check size of TCP socket OS buffer, can we make it larger
+  - optionally add a buffer in reader process between reading and writing (so read everything to it, write when possible)
 
-- [ ] code review post_processor.py
+- code review post_processor.py
