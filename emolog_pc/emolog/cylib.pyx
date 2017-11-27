@@ -277,6 +277,11 @@ cdef class SamplerSample(Message):
     cdef update_with_sampler(self, VariableSampler sampler):
         self.variables = sampler.variables_from_ticks_and_payload(ticks=self.ticks, payload=self.payload)
 
+    @classmethod
+    def empty_size(cls):
+        sample = cls(seq=0, ticks=0)
+        return sample.encode_inner()
+
     def __str__(self):
         if self.variables:
             return '<sample {} variables {}>'.format(self.ticks, repr(self.variables))

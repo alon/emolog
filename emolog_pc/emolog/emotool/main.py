@@ -28,8 +28,7 @@ from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 from ..util import version
 from ..cython_util import decode_little_endian_float
-from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib
-from ..lib import header_size
+from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib, SamplerSample
 
 
 logger = logging.getLogger()
@@ -501,7 +500,7 @@ def bandwidth_calc(args, variables):
     :return: average baud rate (considering 8 data bits, 1 start & stop bits)
     """
     packets_per_second = args.ticks_per_second # simplification: assume a packet every tick (upper bound)
-    header_average = packets_per_second * header_size()
+    header_average = packets_per_second * SamplerSample.empty_size()
     payload_average = sum(args.ticks_per_second / v['period_ticks'] * v['size'] for v in variables)
     return (header_average + payload_average) * 10
 
