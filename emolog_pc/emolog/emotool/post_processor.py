@@ -1005,7 +1005,7 @@ def main():
                                           'all CSV files in the folder are processed. If this parameter is not '
                                           'supplied, all CSV files in the default outputs folder are processed.', nargs='?')
     parser.add_argument('--overwrite', action="store_true", help='If a matching .xlsx file exists, overwrite it.')
-    parser.add_argument('--verbose', action="store_true", help='prints all processing messages for every file')
+    parser.add_argument('--verbose', default=False, action="store_true", help='prints all processing messages for every file')
     args = parser.parse_args()
     read_config()
 
@@ -1028,6 +1028,7 @@ def main():
     else:
         print('Found {} CSV files:'.format(len(files)))
 
+    verbose = True if len(files) == 1 else args.verbose
     truncate = config.getboolean('post_processor', 'truncate_data', fallback=False)
     summary = {'processed': 0, 'failed': 0, 'skipped': 0}
     for filename in files:
@@ -1038,7 +1039,7 @@ def main():
                 summary['skipped'] += 1
             else:
                 try:
-                    post_process(filename, truncate_data=truncate, verbose=args.verbose)
+                    post_process(filename, truncate_data=truncate, verbose=verbose)
                     print('Overwritten existing Excel file.')
                     summary['processed'] += 1
                 except:
@@ -1046,7 +1047,7 @@ def main():
                     summary['failed'] += 1
         else:
             try:
-                post_process(filename, truncate_data=truncate, verbose=args.verbose)
+                post_process(filename, truncate_data=truncate, verbose=verbose)
                 print('Finished post-processing.')
                 summary['processed'] += 1
             except:
