@@ -1042,16 +1042,20 @@ def main():
                     post_process(filename, truncate_data=truncate, verbose=verbose)
                     print('Overwritten existing Excel file.')
                     summary['processed'] += 1
-                except:
+                except Exception as ex:
                     print('Post-processing failed.')
+                    if verbose:
+                        raise ex
                     summary['failed'] += 1
         else:
             try:
                 post_process(filename, truncate_data=truncate, verbose=verbose)
                 print('Finished post-processing.')
                 summary['processed'] += 1
-            except:
+            except Exception as ex:
                 print('Post-processing failed.')
+                if verbose:
+                    raise ex
                 summary['failed'] += 1
 
     print()
