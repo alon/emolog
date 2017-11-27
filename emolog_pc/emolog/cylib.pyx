@@ -722,9 +722,8 @@ cdef class CSVHandler:
         if self.write_immediately:
             return
         writer = self._init_csv()
-        cdef list types = self.sampler._type
         for i, row in enumerate(self.data):
-            writer.writerow(row[:3] + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(types, row[3:])])
+            writer.writerow(row[:3] + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(self.sampler._type, row[3:])])
 
     cdef _init_csv(self):
         if self.csv_filename is None:
@@ -762,11 +761,11 @@ cdef class CSVHandler:
             new_float_only_msgs = []
         for seq, ticks, payload in msgs:
             values = self.sampler.list_from_ticks_and_payload(name_to_index=self.name_to_index, ticks=ticks, payload=payload)
-            row = [seq, ticks, now] + values
+            row_start = [seq, ticks, now]
             if self.write_immediately:
-                self.writer.writerow(row)
+                self.writer.writerow(row_start + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(self.sampler._type, values)])
             elif 0 <= ticks < len(self.data):
-                data[ticks] = row
+                data[ticks] = row_start + values
                 if have_listeners:
                     new_float_only_msgs.append((ticks, [(self.names[i], v) for i, v in enumerate(values) if type(v) == float]))
             else:
