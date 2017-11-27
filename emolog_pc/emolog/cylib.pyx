@@ -643,6 +643,7 @@ cdef object encode_if_bytes(object b):
         return b.encode('utf-8')
     return b
 
+
 cdef class CSVHandler:
     cdef bint _running
     cdef bint verbose
