@@ -29,9 +29,7 @@ from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 from ..util import version
 from ..cython_util import decode_little_endian_float
 from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib
-from ..dwarf import FileParser
 from ..lib import header_size
-from .post_processor import post_process
 
 
 logger = logging.getLogger()
@@ -60,6 +58,7 @@ def with_errors(s):
 
 
 def dwarf_get_variables_by_name(filename, names):
+    from ..dwarf import FileParser
     regular_mode = names is not None and len(names) > 0
     if names is None:
         names = []
@@ -727,6 +726,7 @@ def start_callback(args, loop):
 
 
 def do_post_process(args, client):
+    from .post_processor import post_process
     if client.csv_filename is None or not os.path.exists(client.csv_filename):
         print("no csv file created, exiting before post processing")
         return
