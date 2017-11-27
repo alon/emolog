@@ -454,15 +454,20 @@ cdef class VariableSampler:
         cdef unsigned size
         cdef unsigned i
         if self._single_sample:
-            ret = list(unpack(self._single_sample_unpack_str, payload))
+            values = list(unpack(self._single_sample_unpack_str, payload))
+            types = self._type
         else:
-            types = [(self._type[i], i) for i in range(self.phase_ticks.size)
+            types_enum = [(self._type[i], i) for i in range(self.phase_ticks.size)
                         if ticks % self.period_ticks[i] == self.phase_ticks[i]]
+            values = [None] * len(self.name)
+            types = [None] * len(self.name)
             if self._use_unpack:
-                ret = list(unpack(b'<' + b''.join(t.unpack_str for t, i in types), payload))
+                unpacked = list(unpack(b'<' + b''.join(t.unpack_str for t, i in types_enum), payload))
+                for (t, i), v in zip(types_enum, unpacked):
+                    values[i] = v
+                    types[i] = t
             else:
-                ret = [None] * len(self.name)
-                for t, i in types:
+                for t, i in types_enum:
                     size = self.size[i]
                     encoded = payload[offset:offset + size]
                     if hasattr(t, 'decode'):
@@ -470,7 +475,9 @@ cdef class VariableSampler:
                     else:
                         val, = unpack(b'<' + t.unpack_str, encoded)
                     try:
-                        ret[name_to_index[self.name[i]]] = val
+                        ind = name_to_index[self.name[i]]
+                        values[ind] = val
+                        types[ind] = t
                     except:
                         try:
                             print(f'{i}')
@@ -479,7 +486,9 @@ cdef class VariableSampler:
                         finally:
                             raise SystemExit
                     offset += size
-        return ret
+                if offset != len(payload):
+                    print(f"payload {len(payload)} but only unpacked {offset}")
+        return types, values
 
 
 cdef uint8_t *to_str(val, size):
@@ -760,15 +769,16 @@ cdef class CSVHandler:
         have_listeners = len(self.sample_listeners) > 0
         if have_listeners:
             new_float_only_msgs = []
+        name_to_index = self.name_to_index
         for seq, ticks, payload in msgs:
-            values = self.sampler.list_from_ticks_and_payload(name_to_index=self.name_to_index, ticks=ticks, payload=payload)
+            types, values = self.sampler.list_from_ticks_and_payload(name_to_index=name_to_index, ticks=ticks, payload=payload)
             row_start = [seq, ticks, now]
             if self.write_immediately:
-                self.writer.writerow(row_start + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(self.sampler._type, values)])
+                self.writer.writerow(row_start + [(encode_if_bytes(t.to_csv_val(v)) if v is not None else None) for t, v in zip(types, values)])
             elif 0 <= ticks < len(self.data):
                 data[ticks] = row_start + values
                 if have_listeners:
-                    new_float_only_msgs.append((ticks, [(self.names[i], v) for i, v in enumerate(values) if type(v) == float]))
+                    new_float_only_msgs.append((ticks, [(self.names[i], v) for i, v in enumerate(values) if v is not None and type(v) == float]))
             else:
                 print(f"error {ticks} > {len(self.data)} or {ticks} < 1")
             if self.first_ticks == -1:
