@@ -62,6 +62,7 @@ def post_process(input_csv_filename, truncate_data=False, verbose=False):
     position_stats = calc_position_stats(data)
     commutation_stats = calc_commutation_stats(data)
     summary_stats = calc_summary_stats(data, half_cycle_stats, data_before_cropping)
+    ref_sensor_stats = calc_ref_sensor_stats(data)
     end_time = time.time()
     if verbose:
         print("Statistics generation time: {:.2f} seconds".format(end_time - start_time))
@@ -69,7 +70,7 @@ def post_process(input_csv_filename, truncate_data=False, verbose=False):
     start_time = time.time()
     output_filename = input_csv_filename[:-4] + '.xlsx'
     save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  commutation_stats, output_filename, truncate_data)
+                  commutation_stats, ref_sensor_stats, output_filename, truncate_data)
     end_time = time.time()
     if verbose:
         print("save to excel time: {:.2f} seconds".format(end_time - start_time))
@@ -572,8 +573,21 @@ def calc_comm_advances(data):
     return ret
 
 
+def calc_ref_sensor_stats(data):
+    if 'Ref sensor' not in data:
+        return None
+    ref_numeric = data['Ref sensor'].replace([False, True], [0, 1])
+    ref_numeric_diff = ref_numeric.diff()
+    ref_lh_pos = data.loc[data[ref_numeric_diff == 1].index - 1]['Position']
+    ref_hl_pos = data.loc[data[ref_numeric_diff == -1].index - 1]['Position']
+    res = OrderedDict()
+    res['ref_lh_pos'] = ref_lh_pos
+    res['ref_hl_pos'] = ref_hl_pos
+    return res
+
+
 def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summary, motor_state_stats, position_stats,
-                  commutation_stats, output_filename, truncate_data=False):
+                  commutation_stats, ref_sensor_stats, output_filename, truncate_data=False):
     if truncate_data:  # for faster saving of data
         data = data[0:10000]
     writer = pd.ExcelWriter(output_filename, engine='xlsxwriter')
@@ -589,6 +603,8 @@ def save_to_excel(data, params, summary_stats, half_cycle_stats, half_cycle_summ
     add_motor_state_sheet(writer, motor_state_stats, wb_formats)
     add_positions_sheet(writer, position_stats, wb_formats)
     add_commutation_sheet(writer, commutation_stats, wb_formats)
+    if ref_sensor_stats is not None:
+        add_ref_sensor_sheet(writer, ref_sensor_stats, wb_formats)
     writer.save()
 
 
@@ -983,6 +999,40 @@ def add_commutation_sheet(writer, commutation_stats, wb_formats):
     sheet.set_row(row=cur_row, height=45, cell_format=wb_formats['header'])
     for (col_num, col_name) in enumerate(headers):
         sheet.write(cur_row, col_num, col_name)
+
+
+def add_ref_sensor_sheet(writer, ref_sensor_stats, wb_formats):
+    # write H-->L and L-->H transitions data
+    hl_data_start_row = 4
+    lh_data_start_row = hl_data_start_row + len(ref_sensor_stats['ref_hl_pos']) + 4
+    ref_sensor_stats['ref_hl_pos'].to_excel(excel_writer=writer,
+                                            sheet_name='REF Sensor',
+                                            header=False,
+                                            index=True,
+                                            startrow=hl_data_start_row)
+    ref_sensor_stats['ref_lh_pos'].to_excel(excel_writer=writer,
+                                            sheet_name='REF Sensor',
+                                            header=False,
+                                            index=True,
+                                            startrow=lh_data_start_row)
+    sheet = writer.sheets['REF Sensor']
+
+    # write and format title rows
+    sheet.write(hl_data_start_row - 3, 0, "REF Sensor H-->L Transitions", wb_formats['title'])
+    sheet.write(hl_data_start_row - 2, 0, "H-->L transitions are used as the reference position", wb_formats['general'])
+
+    sheet.write(lh_data_start_row - 3, 0, "REF Sensor L-->H Transitions", wb_formats['title'])
+    sheet.write(lh_data_start_row - 2, 0, "These are NOT used as the reference position and are only shown for completeness", wb_formats['general'])
+
+    # write and format header rows
+    header_hl_row = hl_data_start_row - 1
+    header_lh_row = lh_data_start_row - 1
+    headers = ['Tick', 'Position']
+    sheet.set_row(row=header_hl_row, cell_format=wb_formats['header'])
+    sheet.set_row(row=header_lh_row, cell_format=wb_formats['header'])
+    for (col_num, col_name) in enumerate(headers):
+        sheet.write(header_hl_row, col_num, col_name)
+        sheet.write(header_lh_row, col_num, col_name)
 
 
 config = None
