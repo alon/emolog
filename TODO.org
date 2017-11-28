@@ -41,6 +41,8 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 + test for bandwidth: to catch regressions. i.e. given ELF and vars.csv what is the bandwidth?
   magic number right now (this commit) is 7402000.0
 
++ post processor: partition_to_half_cycles doesn't work well in some corner cases (e.g. 3 half-cycles) and crashes. see TODO comment in the function.
+
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
 

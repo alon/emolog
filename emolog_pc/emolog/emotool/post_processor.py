@@ -226,6 +226,11 @@ def remove_unneeded_columns(data):
 
 
 def partition_to_half_cycles(data):
+    # TODO logic needs to be improved here for corner cases:
+    # when len(cycle_start_indexes) <= 4, special handling is required
+    # corner case logic was not correctly updated when this function was modified to crop
+    # to FULL cycles rather than half-cycles.
+
     dir_numeric = data['Required dir'].replace(['UP', 'DOWN'], [1, -1])
     cycle_start_indexes = data[dir_numeric.diff() != 0].index
 
