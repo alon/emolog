@@ -763,7 +763,11 @@ def main(cmdline=None):
         from .embedded import main as embmain
         embmain()
     else:
-        client = start_callback(args, get_event_loop())
+        loop = get_event_loop()
+        def exception_handler(loop, context):
+            print(f"Exception caught: {context}")
+        loop.set_exception_handler(exception_handler)
+        client = start_callback(args, loop)
         do_post_process(args, client)
 
 
