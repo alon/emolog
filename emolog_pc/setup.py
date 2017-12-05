@@ -44,9 +44,6 @@ setup(
     ],
     install_requires=[
         'pyelftools(==0.24)',
-        'pyqtgraph(==0.10.0)',
-        'Qt.py(==1.0.0)',
-        'PyQt5(==5.9)',
         'xlrd(==1.1.0)',
         'XlsxWriter(==1.0.2)',
         'pandas(==0.21.0)',
@@ -55,6 +52,11 @@ setup(
         'pyserial-asyncio(==0.2)',
         'PyInstaller(==3.3)',
         'psutil(==5.4.1)',
+    ],
+    extra_requires=[
+        'pyqtgraph(==0.10.0)',
+        'Qt.py(==1.0.0)',
+        'PyQt5(==5.9)',
     ],
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
