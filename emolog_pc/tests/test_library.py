@@ -6,6 +6,7 @@ import struct
 import pytest
 
 import emolog.lib as emolog
+from emolog.emotool.main import EmoToolClient
 from emolog.fakeembedded import FakeSineEmbedded
 
 
@@ -53,7 +54,14 @@ async def _client_test_helper(client, loop):
     await client.send_version()
     await client.send_sampler_stop()
     await client.send_sampler_clear()
-    await client.send_set_variables([dict(phase_ticks=0, period_ticks=2, address=123, size=4, _type=lambda s: struct.unpack('<l', s)[0])])
+    await client.send_set_variables([
+        dict(
+            name="foo",
+            phase_ticks=0,
+            period_ticks=2,
+            address=123,
+            size=4,
+            _type=lambda s: struct.unpack('<l', s)[0])])
     await client.send_sampler_start()
     # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
     # worthy of checking. How will it affect serial?
@@ -61,7 +69,8 @@ async def _client_test_helper(client, loop):
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
-    client_transport, client = await loop.create_connection(emolog.ClientProtocolMixin, sock=client_end)
+    client_orig = EmoToolClient.instance if EmoToolClient.instance is not None else EmoToolClient(dump=False, verbose=True, debug=False)
+    client_transport, client = await loop.create_connection(lambda: client_orig, sock=client_end)
     if embedded_end is not None:
         embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000), sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
@@ -77,6 +86,10 @@ async def _test_client_and_sine_socket_pair(loop):
 
 def test_client_and_fake_thingy():
     loop = asyncio.get_event_loop()
+    def exception_handler(loop, context):
+        print(f"caught exception in test: {context}")
+        raise Exception(str(context))
+    loop.set_exception_handler(exception_handler)
     client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
     loop.run_until_complete(main(loop))
     assert client.cylib.received_samples > 0
@@ -120,3 +133,6 @@ def failed_blasted_data_not_reaching_subprocess_test_client_and_fake_thingy_qt_p
     with eventloop:
         eventloop.run_until_complete(main())
 
+
+if __name__ == '__main__':
+    test_client_and_fake_thingy()
