@@ -121,7 +121,6 @@ cdef class FakeSineEmbeddedBase:
         # easy.
         if not self.running:
             return
-        self.ticks += 1
         t = self.ticks * self.tick_time
         var_size_pairs = []
         for i in range(self.sines_num):
@@ -133,6 +132,7 @@ cdef class FakeSineEmbeddedBase:
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
         dt = max(0.0, self.tick_time * self.ticks + self.start_time - time()) if self.ticks_per_second > 0.0 else 0
         self.eventloop.call_later(dt, self.handle_time_event)
+        self.ticks += 1
 
 
 class FakeSineEmbedded(FakeSineEmbeddedBase, Protocol):
