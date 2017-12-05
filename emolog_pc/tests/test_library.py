@@ -106,6 +106,7 @@ def qt_event_loop():
 
 try:
     import PyQt5
+    import quamash
 except:
     pass
 else:
