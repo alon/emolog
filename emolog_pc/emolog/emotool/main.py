@@ -254,8 +254,7 @@ class EmoToolClient(ClientProtocolMixin):
         if debug:
             print("timeout set to one hour for debugging (gdb)")
             ClientProtocolMixin.ACK_TIMEOUT_SECONDS = 3600.0
-        ClientProtocolMixin.__init__(self)
-        self.cylib = EmotoolCylib(parent=self, verbose=verbose, dump=dump)
+        super().__init__(verbose=verbose, dump=dump)
         EmoToolClient.instance = self  # for singleton
 
     @property

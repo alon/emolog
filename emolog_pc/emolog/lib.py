@@ -27,10 +27,11 @@ from logging import getLogger
 import builtins # profile will be here when run via kernprof
 
 from .cylib import (
-    SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop, Version,
+    SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop,
     VariableSampler, Parser, EmotoolCylib,
+    Version, Ping,
     Message, Ack, SamplerSample,
-    header_size
+    header_size, emo_decode
     )
 
 if 'profile' not in builtins.__dict__:
@@ -111,8 +112,9 @@ class ClientProtocolMixin(Protocol):
     ACK_TIMEOUT_SECONDS = 40.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
 
-    def __init__(self, verbose=False, dump=False):
+    def __init__(self, verbose, dump):
         Protocol.__init__(self)
+        self.cylib = EmotoolCylib(parent=self, verbose=verbose, dump=dump)
         self.futures = Futures()
         self.reset_ack()
         self.connection_made_future = self.futures.add_future()

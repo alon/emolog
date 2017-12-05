@@ -803,7 +803,7 @@ cdef class EmotoolCylib:
 
     cdef bint dump
     cdef bint verbose
-    cdef int received_samples
+    cdef int _received_samples
     cdef object dump_out
     cdef object parent
     cdef public VariableSampler sampler
@@ -818,10 +818,14 @@ cdef class EmotoolCylib:
         if dump:
             self.dump_out = open(dump, 'wb')
         self.sampler = VariableSampler()
-        self.received_samples = 0
+        self._received_samples = 0
         self.pending_samples = []
         self.parser = Parser(None, debug=self.verbose)
         self.csv_handler = CSVHandler(sampler=self.sampler, verbose=verbose, dump=dump)
+
+    @property
+    def received_samples(self):
+        return self._received_samples
 
     def dump_buf(self, buf):
         self.dump_out.write(pack('<fI', time(), len(buf)) + buf)
@@ -837,7 +841,7 @@ cdef class EmotoolCylib:
             msg.handle_by(self)
         if len(self.pending_samples) > 0:
             self.csv_handler.handle_sampler_samples(self.pending_samples)
-            self.received_samples += len(self.pending_samples)
+            self._received_samples += len(self.pending_samples)
             del self.pending_samples[:]
 
     def ack_received(self):

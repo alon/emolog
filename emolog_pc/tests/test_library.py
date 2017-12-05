@@ -5,7 +5,8 @@ import struct
 
 import pytest
 
-import emolog
+import emolog.lib as emolog
+from emolog.fakeembedded import FakeSineEmbedded
 
 
 test_decode_sanity_data = [
@@ -33,9 +34,9 @@ test_decode_sanity_data = [
 @pytest.mark.parametrize("name,reply_class,params", test_decode_sanity_data)
 def test_decode_sane(name, reply_class, params):
     encoded = reply_class(seq=0, **params).encode()
-    msg, remaining_buf, error = emolog.emo_decode(encoded)
+    msg, i_next, error = emolog.emo_decode(encoded, 0)
     assert isinstance(msg, reply_class), "expected {}, got {}".format(reply_class, str(msg))
-    assert len(remaining_buf) == 0
+    assert i_next == len(encoded)
 
 
 def test_client_parser():
@@ -60,9 +61,9 @@ async def _client_test_helper(client, loop):
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
-    client_transport, client = await loop.create_connection(emolog.Client, sock=client_end)
+    client_transport, client = await loop.create_connection(emolog.ClientProtocolMixin, sock=client_end)
     if embedded_end is not None:
-        embedded_transport, embedded = await loop.create_connection(emolog.FakeSineEmbedded, sock=embedded_end)
+        embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000), sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
 
@@ -78,7 +79,7 @@ def test_client_and_fake_thingy():
     loop = asyncio.get_event_loop()
     client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
     loop.run_until_complete(main(loop))
-    assert client.received_samples > 0
+    assert client.cylib.received_samples > 0
 
 
 def qt_event_loop():
@@ -101,7 +102,7 @@ else:
         client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
         with loop:
             loop.run_until_complete(main(loop))
-        assert client.received_samples > 0
+        assert client.cylib.received_samples > 0
 
 
 def failed_blasted_data_not_reaching_subprocess_test_client_and_fake_thingy_qt_pipe():
