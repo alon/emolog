@@ -705,7 +705,7 @@ async def amain(client, args):
 
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
     if args.listen:
-        await start_tcp_listener(client,args.listen)
+        await start_tcp_listener(client, args.listen)
 
     start_time = time()
     start_clock = clock()
