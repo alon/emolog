@@ -814,7 +814,7 @@ cdef class EmotoolCylib:
     def __init__(self, parent, verbose=False, dump=None):
         self.parent = parent
         self.verbose = verbose
-        self.dump = dump is not None
+        self.dump = dump is not None and dump is not False
         if dump:
             self.dump_out = open(dump, 'wb')
         self.sampler = VariableSampler()
