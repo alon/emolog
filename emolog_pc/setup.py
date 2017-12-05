@@ -1,7 +1,17 @@
 from setuptools import setup, Extension
 
-import numpy
-from Cython.Build import cythonize
+try:
+    import numpy
+except:
+    class numpy:
+        @staticmethod
+        def get_include():
+            return ''
+try:
+    from Cython.Build import cythonize
+except:
+    def cythonize(*args, **kw):
+        return None
 
 gdb_debug = False
 #macros = [('CYTHON_TRACE', 1)]
@@ -27,6 +37,11 @@ setup(
     name='Emotool',
     description='Command & Control side for emolog protocol',
     version="0.1",
+    setup_requires=[
+        'setuptools>=18.0', # cython extensions
+        'cython>=0.27.3',
+        'numpy'
+    ],
     install_requires=[
         'pyelftools(==0.24)',
         'pyqtgraph(==0.10.0)',
