@@ -43,7 +43,7 @@ install:
 
 test_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
-  - pytest --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml tests\test_util.py tests\test_emotool.py # TODO - uncomment the rest
+  - pytest --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml tests
   # sanity of pyinstaller artifacts
   - mkdir "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
   - cd "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
