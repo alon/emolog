@@ -26,10 +26,6 @@ install:
   # about it being out of date.
   - "pip install --disable-pip-version-check --user --upgrade pip"
 
-  # DRY violation - setup.py already states this. But since setup.py required importing cython & numpy,
-  # there is a catch 22. So until that is fixed, this remains.
-  - "pip install Cython numpy"
-
   # Should this be done here or via setup some how? it should not be part of the build/install requirements, just development
   - "pip install pytest"
 
