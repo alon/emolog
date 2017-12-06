@@ -52,6 +52,7 @@ setup(
         'pyserial-asyncio(==0.2)',
         'PyInstaller(==3.3)',
         'psutil(==5.4.1)',
+        'colorama>=0.3.7',
     ],
     extras_require={
         'summarize': [
