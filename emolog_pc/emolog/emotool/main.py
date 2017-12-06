@@ -434,7 +434,7 @@ def parse_args(args=None):
                         help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--verbose-kill', default=False, action='store_true')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs to this file')
-    parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds')
+    parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds. use 0 for endless run.')
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
     parser.add_argument('--ticks-per-second', default=1000000 / 50, type=float,
@@ -713,8 +713,8 @@ async def amain(client, args):
         bandwidth_bps / 1e6,
         args.baud / 1e6,
         100 * bandwidth_bps / args.baud))
-    max_ticks = args.ticks_per_second * args.runtime if args.runtime else None
-    if max_ticks is not None:
+    max_ticks = args.ticks_per_second * args.runtime if args.runtime else 0
+    if max_ticks > 0:
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
     min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
 

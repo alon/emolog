@@ -774,9 +774,10 @@ cdef class CSVHandler:
         # cdef np.ndarray[np.double_t, ndim = 2]
         data = self.data
         # prune messages if we got too many
-        missing = self.max_ticks - self.samples_received
-        if len(msgs) > missing:
-            del msgs[missing:]
+        if self.max_ticks > 0:
+            missing = self.max_ticks - self.samples_received
+            if len(msgs) > missing:
+                del msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
         now = time() * 1000
         have_listeners = len(self.sample_listeners) > 0
