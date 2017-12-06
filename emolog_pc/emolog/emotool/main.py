@@ -25,7 +25,7 @@ from pickle import dumps
 
 from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
-from ..util import version
+from ..util import version, resolve
 from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 
@@ -420,12 +420,16 @@ def parse_args():
                         help='add a single var, example "foo,1,0" = "varname,ticks,tickphase"')
     parser.add_argument('--snapshotfile', help='file containing variable definitions to be taken once at startup')
     parser.add_argument('--varfile', help='file containing variable definitions, identical to multiple --var calls')
+
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--out', help='Output file name. ".csv" extension is added if missing. '
                                      'File is overwritten if already exists.')
     group.add_argument('--out_prefix', default='emo', help='Output file prefix. Output is saved to the first free '
                                                            '(not already existing) file of the format "prefix_xxx.csv", '
                                                            'where xxx is a sequential number starting from "001"')
+
+    parser.add_argument('--csv-factory', help='advanced: module[.module]*.function to use as factory for csv file writing', default=None)
+
     parser.add_argument('--verbose', default=True, action='store_false', dest='silent',
                         help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--verbose-kill', default=False, action='store_true')
@@ -667,7 +671,7 @@ async def amain_startup(args):
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
-    client = EmoToolClient(verbose=not args.silent, dump=args.dump, debug=args.debug)
+    client = EmoToolClient(verbose=not args.silent, dump=args.dump, debug=args.debug, csv_writer_factory=resolve(args.csv_factory))
     await start_transport(client=client, args=args)
     return client
 
