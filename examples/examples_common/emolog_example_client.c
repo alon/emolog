@@ -32,7 +32,10 @@ float sine = 0;
 MyStruct my_struct;
 
 
+// allow it to be specified externally to increase rate
+#ifndef TICK_PERIOD_MS
 #define TICK_PERIOD_MS     5
+#endif
 
 
 void emolog_example_main_loop(void)

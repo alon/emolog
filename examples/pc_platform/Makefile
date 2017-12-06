@@ -4,7 +4,7 @@ ifeq ($(shell uname -m),armv7l)
 else
 	FORCE_32_BIT=-m32
 endif
-CFLAGS=$(FORCE_32_BIT) -g -fPIC -I ../../emolog_protocol/source/ -I ../../emolog_embedded/source/ -I ../examples_common
+CFLAGS=$(FORCE_32_BIT) -g -fPIC -I ../../emolog_protocol/source/ -I ../../emolog_embedded/source/ -I ../examples_common -DTICK_PERIOD_MS=0
 CXXFLAGS=$(CFLAGS)
 LDFLAGS=-lm
 
