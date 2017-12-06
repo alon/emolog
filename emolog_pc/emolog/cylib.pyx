@@ -653,7 +653,10 @@ cdef object encode_if_bytes(object b):
     return b
 
 
-def default_csv_factory(filename, *args, **kw):
+def default_csv_factory(filename, fields, *args, **kw):
+    """
+    fields - unused by the default factory.
+    """
     fd = open(filename, 'w+')
     return csv.writer(fd, *args, **kw)
 
@@ -695,6 +698,7 @@ cdef class CSVHandler:
         self._running = False
         self.sample_listeners = set()
         self.write_immediately = True
+        self.csv_fields = ['sequence', 'ticks', 'timestamp'] + self.names
         if csv_writer_factory is None:
             csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
@@ -713,7 +717,6 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
-        self.csv_fields = ['sequence', 'ticks', 'timestamp'] + self.names
         if not self.write_immediately:
             N_cols = 3 + len(self.names)
             data = [[None] * N_cols for i in range(max_ticks)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
@@ -749,7 +752,7 @@ cdef class CSVHandler:
     cdef _init_csv(self):
         if self.csv_filename is None:
             return
-        writer = self.csv_writer_factory(self.csv_filename, lineterminator='\n')
+        writer = self.csv_writer_factory(self.csv_filename, fields=self.csv_fields, lineterminator='\n')
         writer.writerow(self.csv_fields)
         return writer
 
