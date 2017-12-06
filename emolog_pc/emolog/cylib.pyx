@@ -702,8 +702,7 @@ cdef class CSVHandler:
             csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
 
-    def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
-        assert max_ticks > 0, "max_ticks must be none zero, used as stopping condition for saving CSV"
+    def reset(self, str csv_filename, list names, long min_ticks, unsigned long max_ticks):
         if self._running:
             self._save_csv()
         self.csv_filename = csv_filename
