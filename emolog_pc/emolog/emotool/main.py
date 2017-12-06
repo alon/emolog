@@ -219,14 +219,14 @@ def setup_logging(filename, silent):
     logger.info('info first')
 
 
-def start_serial_process(serial, baudrate, hw_flow_control, port):
+def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     """
     Block until serial2tcp is ready to accept a connection
     """
     serial2tcp_cmd = create_python_process_cmdline('serial2tcp.py')
     if hw_flow_control is True:
         serial2tcp_cmd += ['-r']
-    serial2tcp_cmd += ' -b {} -p {} -P {}'.format(baudrate, serial, port).split()
+    serial2tcp_cmd += ' -b {} -p {} -P {}'.format(baudrate, serialurl, port).split()
 
     serial_subprocess = create_process(serial2tcp_cmd)
     return serial_subprocess
@@ -303,7 +303,7 @@ async def start_transport(client, args):
             print(f"error: unfinished support for fake {args.fake}")
             raise SystemExit
     else:
-        start_serial_process(serial=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
+        start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     attempt = 0
     while attempt < 10:
         attempt += 1
@@ -412,7 +412,7 @@ def parse_args(args=None):
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake', # TODO: can I have a hook for choices? i.e. choices=ChoicesOrExecutable['gen', 'pc', 'bench'],
                         help='debug only - fake a client - either generated or pc controller')
-    parser.add_argument('--serial', default='auto', help='serial port to use')
+    parser.add_argument('--serial', default='auto', help='serial URL or device name') # see http://pythonhosted.org/pyserial/pyserial_api.html#serial.serial_for_url
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
     parser.add_argument('--elf', default=None, help='elf executable running on embedded side')

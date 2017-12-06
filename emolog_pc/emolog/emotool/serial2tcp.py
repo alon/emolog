@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(usage=usage, description=descr)
     parser.add_argument("-p", "--port", dest="serial",
-                      help="Serial port, a number, defualt = '/dev/tty0'", type=str, default='auto')
+                      help="Serial URL or port, a number, default = '/dev/tty0'", type=str, default='auto')
     parser.add_argument("-b", "--baud", dest="baudrate",
                       help="Baudrate, default 115200", default=115200, type=int)
     parser.add_argument("-r", "--rtscts", dest="rtscts",
@@ -153,8 +153,8 @@ if __name__ == '__main__':
     log.info("TCP/IP to Serial redirector (Ctrl-C to quit)")
 
     try:
-        ser = serial.Serial(
-            port=options.serial,
+        ser = serial.serial_for_url(
+            options.serial,
             baudrate=options.baudrate,
             rtscts=options.rtscts,
             xonxoff=options.xonxoff,
