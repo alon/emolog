@@ -70,12 +70,14 @@ void comm_setup(void)
 
 static void consume_available_bytes(void)
 {
-    ssize_t ret = recv(cfd, buf, sizeof(buf) - buf_pos, MSG_DONTWAIT);
-    if (ret == -1)
+    ssize_t ret = recv(cfd, &buf[buf_pos], sizeof(buf) - buf_pos, MSG_DONTWAIT);
+    if (ret <= 0)
         return; // this is normal, but there are some cases in which we should quit?
     buf_pos += ret;
     int dec_ret = emo_decode(buf, buf_pos);
     message_available = (dec_ret == 0);
+    //printf("PC: message_available = %d, dec_ret = %d, buf_pos = %d\n",
+    //    message_available, dec_ret, buf_pos);
     if (dec_ret < 0) {
         memcpy(buf, buf - dec_ret, buf_pos + dec_ret);
     }
