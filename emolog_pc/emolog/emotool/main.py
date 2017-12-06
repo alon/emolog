@@ -572,6 +572,7 @@ def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
         return read_all_elf_variables(elf)
     if varfile is not None:
         vars.extend(read_vars_file(varfile))
+    assert len(vars) > 0
     split_vars = [[x.strip() for x in v.split(',')] for v in vars]
     for v, orig in zip(split_vars, vars):
         if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
