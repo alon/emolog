@@ -1,7 +1,6 @@
 import subprocess
 import os
-from time import time
-from functools import wraps
+from importlib import import_module
 
 
 # for kernprof
@@ -36,3 +35,18 @@ def version():
     finally:
         os.chdir(orig_path)
     return output.strip().decode('utf-8')
+
+
+def resolve(module_attr):
+    """
+    resolve the given string such that it is equivalent to doing
+    from module_attr::all_but_last import module_attr::last
+
+    i.e. a.b.c would be
+    from a.b import c
+    """
+    try:
+        module, attr = module_attr.rsplit('.', 1)
+        return getattr(import_module(module), attr)
+    except:
+        return None
