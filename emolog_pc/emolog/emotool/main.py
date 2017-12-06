@@ -562,12 +562,16 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
     return variables
 
 
+def read_vars_file(filename):
+    with open(filename) as fd:
+        return [l for l in fd.readlines() if l.strip()[:1] != '#' and len(l.strip()) > 0]
+
+
 def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
     if vars is None: # debug - will take all vars in ELF - usually not what you want
         return read_all_elf_variables(elf)
     if varfile is not None:
-        with open(varfile) as fd:
-            vars = vars + fd.readlines()
+        vars.extend(read_vars_file(varfile))
     split_vars = [[x.strip() for x in v.split(',')] for v in vars]
     for v, orig in zip(split_vars, vars):
         if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
