@@ -11,7 +11,7 @@ from linecache import getlines
 
 import pytest
 
-from emolog.emotool.main import (read_elf_variables, EmoToolClient)
+from emolog.emotool.main import (read_elf_variables, EmoToolClient, main)
 from emolog.decoders import ArrayDecoder
 from emolog.cylib import SamplerSample, emo_decode
 from emolog.fakeembedded import FakeSineEmbedded
@@ -128,6 +128,13 @@ def setup_emo_decode_sample():
 
 def time_emo_decode_sample(sample):
     return emo_decode(sample, 0)
+
+
+def test_args():
+    try:
+        main(['--fake', 'gen', '--runtime', '0.0001', '--help'])
+    except SystemExit:
+        pass # good
 
 
 if __name__ == '__main__':

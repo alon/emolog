@@ -407,7 +407,7 @@ def kill_all_processes():
     del processes[:]
 
 
-def parse_args():
+def parse_args(args=None):
     parser = argparse.ArgumentParser(
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake', # TODO: can I have a hook for choices? i.e. choices=ChoicesOrExecutable['gen', 'pc', 'bench'],
@@ -451,7 +451,7 @@ def parse_args():
     # Embedded
     parser.add_argument('--embedded', default=False, action='store_true', help='debugging: be a fake embedded target')
 
-    ret, unparsed = parser.parse_known_args()
+    ret, unparsed = parser.parse_known_args(args=args)
 
     if ret.fake is None:
         if not ret.elf and not ret.embedded:
