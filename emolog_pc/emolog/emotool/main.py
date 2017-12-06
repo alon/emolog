@@ -760,9 +760,8 @@ def do_post_process(args, client):
 
 def main(cmdline=None):
     atexit.register(kill_all_processes)
-    if cmdline is not None:
-        sys.argv = cmdline
-    args = parse_args()
+    parse_args_args = [] if cmdline is None else [cmdline]
+    args = parse_args(*parse_args_args)
     global verbose_kill
     verbose_kill = args.verbose_kill
     if args.embedded:
