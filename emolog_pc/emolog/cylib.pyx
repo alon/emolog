@@ -669,18 +669,13 @@ cdef class CSVHandler:
     cdef object writer
 
     cdef public str csv_filename
+    cdef public object csv_writer_factory
     cdef public list csv_fields
     cdef public long max_ticks
     cdef public long ticks_lost
     cdef public long samples_received
 
-    def csv_factory(self, *args, **kw):
-        """
-        overridable - for rotating csv
-        """
-        return csv.writer(*args, **kw)
-
-    def __init__(self, sampler, verbose, dump):
+    def __init__(self, sampler, verbose, dump, csv_writer_factory):
         self.sampler = sampler
         self.verbose = verbose
         self.dump = dump
@@ -695,6 +690,9 @@ cdef class CSVHandler:
         self._running = False
         self.sample_listeners = set()
         self.write_immediately = True
+        if csv_writer_factory is None:
+            csv_writer_factory = csv.writer
+        self.csv_writer_factory = csv_writer_factory
 
     def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
         assert max_ticks > 0, "max_ticks must be none zero, used as stopping condition for saving CSV"
@@ -748,7 +746,7 @@ cdef class CSVHandler:
             return
         fd = open(self.csv_filename, 'w+')
 
-        writer = self.csv_factory(fd, lineterminator='\n')
+        writer = self.csv_writer_factory(fd, lineterminator='\n')
         writer.writerow(self.csv_fields)
         return writer
 
@@ -820,7 +818,7 @@ cdef class EmotoolCylib:
     cdef public Parser parser
     cdef public CSVHandler csv_handler
 
-    def __init__(self, parent, verbose=False, dump=None):
+    def __init__(self, parent, verbose=False, dump=None, csv_writer_factory=None):
         self.parent = parent
         self.verbose = verbose
         self.dump = dump is not None and dump is not False
@@ -830,7 +828,8 @@ cdef class EmotoolCylib:
         self._received_samples = 0
         self.pending_samples = []
         self.parser = Parser(None, debug=self.verbose)
-        self.csv_handler = CSVHandler(sampler=self.sampler, verbose=verbose, dump=dump)
+        self.csv_handler = CSVHandler(sampler=self.sampler, verbose=verbose, dump=dump,
+                                      csv_writer_factory=csv_writer_factory)
 
     @property
     def received_samples(self):

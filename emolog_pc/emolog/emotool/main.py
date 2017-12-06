@@ -26,7 +26,7 @@ from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 from ..util import version
 from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
-from ..lib import AckTimeout, ClientProtocolMixin, EmotoolCylib, SamplerSample
+from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 
 
 logger = logging.getLogger()
@@ -248,13 +248,13 @@ class EmoToolClient(ClientProtocolMixin):
 
     instance = None
 
-    def __init__(self, verbose, dump, debug):
+    def __init__(self, verbose, dump, debug, csv_writer_factory=None):
         if EmoToolClient.instance is not None:
             raise Exception("EmoToolClient is a singleton, can't create another instance")
         if debug:
             print("timeout set to one hour for debugging (gdb)")
             ClientProtocolMixin.ACK_TIMEOUT_SECONDS = 3600.0
-        super().__init__(verbose=verbose, dump=dump)
+        super().__init__(verbose=verbose, dump=dump, csv_writer_factory=csv_writer_factory)
         EmoToolClient.instance = self  # for singleton
 
     @property

@@ -28,7 +28,7 @@ import builtins # profile will be here when run via kernprof
 
 from .cylib import (
     SamplerRegisterVariable, SamplerSample, SamplerClear, SamplerStart, SamplerStop,
-    VariableSampler, Parser, EmotoolCylib,
+    VariableSampler, Parser, EmotoolCylib, CSVHandler,
     Version, Ping,
     Message, Ack, SamplerSample,
     header_size, emo_decode
@@ -112,9 +112,11 @@ class ClientProtocolMixin(Protocol):
     ACK_TIMEOUT_SECONDS = 40.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
 
-    def __init__(self, verbose, dump):
+    def __init__(self, verbose, dump, csv_writer_factory=None):
         Protocol.__init__(self)
-        self.cylib = EmotoolCylib(parent=self, verbose=verbose, dump=dump)
+        self.cylib = EmotoolCylib(
+            parent=self, verbose=verbose, dump=dump,
+            csv_writer_factory=csv_writer_factory)
         self.futures = Futures()
         self.reset_ack()
         self.connection_made_future = self.futures.add_future()
