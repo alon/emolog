@@ -53,11 +53,13 @@ setup(
         'PyInstaller(==3.3)',
         'psutil(==5.4.1)',
     ],
-    extra_requires=[
-        'pyqtgraph(==0.10.0)',
-        'Qt.py(==1.0.0)',
-        'PyQt5(==5.9)',
-    ],
+    extras_require={
+        'summarize': [
+            'pyqtgraph(==0.10.0)',
+            'Qt.py(==1.0.0)',
+            'PyQt5(==5.9)',
+        ]
+    },
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
     data_files=[('etc/emolog', ['config/local_machine_config.ini.example'])],
@@ -65,7 +67,7 @@ setup(
         'console_scripts': [
             'emotool = emolog.emotool.main:main',
             'emogui = emolog.emotool.main_window:main',
-            'summarize = emolog.emotool.summarize:main'
+            'summarize = emolog.emotool.summarize:main [summarize]'
         ]
     }
 )

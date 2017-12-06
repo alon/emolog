@@ -35,7 +35,7 @@ install:
   # target Python version and architecture
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - python -c "import os; print(os.getcwd())"
-  - "pip install -e ."
+  - "pip install -e .[summarize]"
 
 test_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
