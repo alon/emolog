@@ -5,6 +5,7 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
+import traceback
 import atexit
 import argparse
 import os
@@ -725,6 +726,7 @@ def start_callback(args, loop):
     try:
         client = loop.run_until_complete(amain_startup(args))
     except:
+        traceback.print_exc()
         raise SystemExit
     try:
         client = loop.run_until_complete(amain(client=client, args=args))
