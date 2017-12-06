@@ -698,7 +698,6 @@ cdef class CSVHandler:
         self._running = False
         self.sample_listeners = set()
         self.write_immediately = True
-        self.csv_fields = ['sequence', 'ticks', 'timestamp'] + self.names
         if csv_writer_factory is None:
             csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
@@ -712,6 +711,7 @@ cdef class CSVHandler:
         self.last_ticks = -1
         self.min_ticks = min_ticks
         self.names = names
+        self.csv_fields = ['sequence', 'ticks', 'timestamp'] + self.names
         self.name_to_index = {name: i for i, name in enumerate(names)}
         self.samples_received = 0
         self.ticks_lost = 0
