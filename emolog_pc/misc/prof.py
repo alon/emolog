@@ -4,7 +4,7 @@ import os
 
 from emolog.emotool.main import main
 
-sys.argv = ['python', os.path.join('pyinstaller', 'emotool.py'), '--fake', '--runtime', '10']
+sys.argv = ['python', os.path.join('pyinstaller', 'emotool.py'), '--fake', 'gen', '--runtime', '10']
 
 cProfile.runctx("main()", globals(), locals(), "prof.prof")
 
