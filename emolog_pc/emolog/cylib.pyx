@@ -653,6 +653,11 @@ cdef object encode_if_bytes(object b):
     return b
 
 
+def default_csv_factory(filename, *args, **kw):
+    fd = open(filename, 'w+')
+    return csv.writer(fd, *args, **kw)
+
+
 cdef class CSVHandler:
     cdef bint _running
     cdef bint verbose
@@ -691,7 +696,7 @@ cdef class CSVHandler:
         self.sample_listeners = set()
         self.write_immediately = True
         if csv_writer_factory is None:
-            csv_writer_factory = csv.writer
+            csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
 
     def reset(self, str csv_filename, list names, long min_ticks, long max_ticks):
@@ -744,9 +749,7 @@ cdef class CSVHandler:
     cdef _init_csv(self):
         if self.csv_filename is None:
             return
-        fd = open(self.csv_filename, 'w+')
-
-        writer = self.csv_writer_factory(fd, lineterminator='\n')
+        writer = self.csv_writer_factory(self.csv_filename, lineterminator='\n')
         writer.writerow(self.csv_fields)
         return writer
 
