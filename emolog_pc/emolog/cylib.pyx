@@ -669,9 +669,12 @@ cdef class CSVHandler:
     cdef object writer
 
     cdef public str csv_filename
+    cdef public list csv_fields
     cdef public long max_ticks
     cdef public long ticks_lost
     cdef public long samples_received
+
+    csv_factory = lambda self, *args, **kw: csv.DictWriter(*args, **kw) # overridable - for rotating csv
 
     def __init__(self, sampler, verbose, dump):
         self.sampler = sampler
@@ -703,6 +706,7 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_ticks = max_ticks
         self._running = True
+        self.csv_fields = ['sequence', 'ticks', 'timestamp'] + self.names
         if not self.write_immediately:
             N_cols = 3 + len(self.names)
             data = [[None] * N_cols for i in range(max_ticks)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
@@ -739,8 +743,9 @@ cdef class CSVHandler:
         if self.csv_filename is None:
             return
         fd = open(self.csv_filename, 'w+')
-        writer = csv.writer(fd, lineterminator='\n')
-        writer.writerow(['sequence', 'ticks', 'timestamp'] + self.names)
+
+        writer = self.csv_factory(self, fd, lineterminator='\n')
+        writer.writerow(self.csv_fields)
         return writer
 
     # python version for profiling
