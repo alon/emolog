@@ -1,10 +1,13 @@
 import asyncio
 import os
-from os import listdir, unlink, system
+from os import listdir, unlink, system, getcwd, chdir
 from struct import pack, unpack
 from io import BytesIO
 from socket import socketpair
 import sys
+from tempfile import mkdtemp
+from shutil import rmtree
+from linecache import getlines
 
 import pytest
 
@@ -86,12 +89,24 @@ else:
 
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
-    original = getcsv()
-    system('emotool --fake gen --runtime 0.1')
-    newfiles = list(sorted(getcsv() - original))
+    cwd = getcwd()
+    try:
+        d = mkdtemp()
+        chdir(d)
+        original = getcsv()
+        with open('local_machine_config.ini', 'w+') as fd:
+            fd.write("[folders]\noutput_folder=.\n")
+        system('emotool --fake gen --runtime 0.1')
+        newfiles = list(sorted(getcsv() - original))
+        contents = [getlines(f) for f in newfiles]
+    finally:
+        chdir(cwd)
+        rmtree(d)
     assert len(newfiles) == 1
-    for f in newfiles:
-        unlink(f)
+    assert len(contents) == 1
+    lines = contents[0]
+    assert len(lines) >= 2
+    assert lines[0].count(',') == lines[1].count(',')
 
 
 def test_read_elf_variables():

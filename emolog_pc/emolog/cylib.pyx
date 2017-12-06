@@ -674,7 +674,11 @@ cdef class CSVHandler:
     cdef public long ticks_lost
     cdef public long samples_received
 
-    csv_factory = lambda self, *args, **kw: csv.DictWriter(*args, **kw) # overridable - for rotating csv
+    def csv_factory(self, *args, **kw):
+        """
+        overridable - for rotating csv
+        """
+        return csv.writer(*args, **kw)
 
     def __init__(self, sampler, verbose, dump):
         self.sampler = sampler
@@ -744,7 +748,7 @@ cdef class CSVHandler:
             return
         fd = open(self.csv_filename, 'w+')
 
-        writer = self.csv_factory(self, fd, lineterminator='\n')
+        writer = self.csv_factory(fd, lineterminator='\n')
         writer.writerow(self.csv_fields)
         return writer
 
