@@ -475,10 +475,13 @@ def parse_args(args=None):
             ]
         else:
             if ret.elf is None:
-                if not os.path.exists(pc_executable):
-                    print(f"missing pc ELF file: {pc_executable}")
-                    raise SystemExit
-                ret.elf = pc_executable
+                if ret.fake == 'pc':
+                    if not os.path.exists(pc_executable):
+                        print(f"missing pc ELF file: {pc_executable}")
+                        raise SystemExit
+                    ret.elf = pc_executable
+                else:
+                    ret.elf = ret.fake
             if ret.varfile is None:
                 ret.varfile = os.path.join(module_dir, '..', '..', 'vars.csv')
                 ret.snapshotfile = os.path.join(module_dir, '..', '..', 'snapshot_vars.csv')
