@@ -1,9 +1,4 @@
-
-+ the name csvfile and the like is too ambigious, there are lots of csv files (vars, output, snapshot vars, snapshot output)... rename variables to be more explicit
-
 Emotool / Emolog Logic:
-
-+ emotool & emolog: there's both received_samples and samples_received (one in emotool and one in emolog). is this intentional? if yes, rename to reflect different usages. if not, merge them.
 
 + emotool & emolog: emolog has 'stopped' variable, emotool has '_running'. why two of them?
 

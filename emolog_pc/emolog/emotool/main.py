@@ -638,9 +638,9 @@ async def run_client(args, client, variables, allow_kb_stop):
     await client.send_sampler_stop()
 
 
-async def record_snapshot(args, client, csvfile, varsfile):
+async def record_snapshot(args, client, csv_filename, varsfile):
     names, variables = read_elf_variables(elf=args.elf, vars=[], varfile=varsfile)
-    client.reset(csv_filename=csvfile, names=names, min_ticks=1, max_ticks=1)
+    client.reset(csv_filename=csv_filename, names=names, min_ticks=1, max_ticks=1)
     await run_client(args, client, variables, allow_kb_stop=False)
 
 
@@ -702,7 +702,7 @@ async def amain(client, args):
     if args.snapshotfile:
         print("Taking snapshot of parameters")
         snapshot_output_filename = csv_filename[:-4] + '_params.csv'
-        await record_snapshot(args=args, client=client, csvfile=snapshot_output_filename, varsfile=args.snapshotfile)
+        await record_snapshot(args=args, client=client, csv_filename=snapshot_output_filename, varsfile=args.snapshotfile)
         print("parameters saved to: {}".format(snapshot_output_filename))
 
     print("")
