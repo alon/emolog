@@ -19,6 +19,10 @@ void emolog_handle_message(emo_header* header, uint32_t ticks);
 void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 
 
+// This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
+const char emolog_timestamp[] = __TIMESTAMP__;
+
+
 void emolog_init(void)
 {
 	debug_printf("emolog_init\n");
