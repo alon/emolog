@@ -1,0 +1,14 @@
+controller.state.position,1,0
+controller.state.commutation_sensors,1,0
+controller.state.ref_sensor,1,0
+controller.state.motor_state,1,0
+controller.state.required_dir,1,0
+controller.state.actual_dir,1,0
+controller.state.analog_sensors.total_i,1,0
+controller.state.mode,1,0
+controller.state.top_coasting_start,1,0
+controller.state.bottom_coasting_start,1,0
+controller.state.last_dir_change_finish_reason_up,1,0
+controller.state.last_dir_change_finish_reason_down,1,0
+controller.state.last_top_position,1,0
+controller.state.last_bottom_position,1,0
