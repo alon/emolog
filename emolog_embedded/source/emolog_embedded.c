@@ -20,12 +20,13 @@ void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 
 
 // This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
-const char emolog_timestamp[] = __TIMESTAMP__;
+const char emolog_timestamp[] __attribute__((used)) = __DATE__ " " __TIME__;
+#pragma RETAIN(emolog_timestamp)
 
 
 void emolog_init(void)
 {
-	debug_printf("emolog_init\n");
+    debug_printf("emolog_init\n");
     crc_init();
 	comm_setup();
 }
