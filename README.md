@@ -1,3 +1,27 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/ucgxt3386bikt3s4/branch/master?svg=true)](https://ci.appveyor.com/project/alon/emolog/branch/master)
+
+Emolog
+======
+
+Memory reading from processes.
+Use case:
+- Embedded C program
+- PC
+- RS422 connection
+- Debug cycle:
+ - compile ELF
+ - produce log
+ - analyze results
+
+Emolog helps by providing:
+- embeddable C implementation of embedded side of protocol
+ - minimal functions to implement to integrate to your control loop:
+ - examples for TI TIVA, STM32F3 and PC
+- PC side ELF DWARF analyzer and logger:
+ - emotool.py --vars variables.csv --elf output.elf --serial hwgrep://0403:6010 --runtime 1.0
+ - produces CSV output easy to analyze
+ - variables.csv is a simple format specifying rate (relative to clock)
+
 Installation instructions for windows 8
 =======================================
 
