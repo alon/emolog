@@ -9,18 +9,18 @@ Use case:
 - PC
 - RS422 connection
 - Debug cycle:
- - compile ELF
- - produce log
- - analyze results
+  - compile ELF
+  - produce log
+  - analyze results
 
 Emolog helps by providing:
 - embeddable C implementation of embedded side of protocol
- - minimal functions to implement to integrate to your control loop:
- - examples for TI TIVA, STM32F3 and PC
+  - minimal functions to implement to integrate to your control loop:
+  - examples for TI TIVA, STM32F3 and PC
 - PC side ELF DWARF analyzer and logger:
- - emotool.py --vars variables.csv --elf output.elf --serial hwgrep://0403:6010 --runtime 1.0
- - produces CSV output easy to analyze
- - variables.csv is a simple format specifying rate (relative to clock)
+  - emotool.py --vars variables.csv --elf output.elf --serial hwgrep://0403:6010 --runtime 1.0
+  - produces CSV output easy to analyze
+  - variables.csv is a simple format specifying rate (relative to clock)
 
 Installation instructions for windows 8
 =======================================
