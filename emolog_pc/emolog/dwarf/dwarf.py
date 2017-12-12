@@ -96,7 +96,7 @@ class FileParser:
         for v in self.interesting_vars:
             yield from v.visit_leafs()
 
-    def pretty_print(self, children = None, tab=0):
+    def pretty_print(self, children=None, tab=0):
         if children is None:
             children = self.interesting_vars
         for v in children:
