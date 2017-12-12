@@ -55,6 +55,7 @@ import logging
 from functools import reduce
 
 from elftools.elf.elffile import ELFFile
+from elftools.elf.sections import SymbolTableSection
 
 
 logger = logging.getLogger('dwarf')
@@ -63,29 +64,30 @@ logger = logging.getLogger('dwarf')
 class FileParser:
     def __init__(self, filename):
         self.all_dies = {}
-        self.read_dies_from_dwarf_file(filename)
-
+        self.elf_file = None
+        self.symbol_table = None
+        f = open(filename, 'rb')
+        logger.debug('Processing file: {}'.format(filename))
+        self.elf_file = ELFFile(f)
+        self.read_dies_from_dwarf_file()
+        # the following assumes there's just one symbol table (ELF format allows more than one):
+        self.symbol_table = next(x for x in self.elf_file.iter_sections() if isinstance(x, SymbolTableSection))
         var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable' and 'DW_AT_type' in die.attributes}
         logger.debug("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
-
         self.var_descriptors = var_descriptors = []
         for offset, var_die in var_dies.items():
             var_descriptors.append(VarDescriptor(self.all_dies, var_die, None))
-
         self.interesting_vars = [v for v in var_descriptors if v.is_interesting()]
+        # note the file is intentionally kept open, otherwise some functions would fail later
 
-    def read_dies_from_dwarf_file(self, filename):
-        logger.debug('Processing file: {}'.format(filename))
-        with open(filename, 'rb') as f:
-            elffile = ELFFile(f)
-            if not elffile.has_dwarf_info():
-                logger.error('file has no DWARF info')
-                return
-
-            dwarfinfo = elffile.get_dwarf_info()
-            for CU in dwarfinfo.iter_CUs():
-                top_DIE = CU.get_top_DIE()
-                self.read_die_rec(top_DIE)
+    def read_dies_from_dwarf_file(self):
+        if not self.elf_file.has_dwarf_info():
+            logger.error('file has no DWARF info')
+            return
+        dwarfinfo = self.elf_file.get_dwarf_info()
+        for CU in dwarfinfo.iter_CUs():
+            top_DIE = CU.get_top_DIE()
+            self.read_die_rec(top_DIE)
 
     def read_die_rec(self, die):
         self.all_dies[die.offset] = die
@@ -102,6 +104,26 @@ class FileParser:
         for v in children:
             print("{}{!s}".format('   ' * tab, v))
             self.pretty_print(children=v.children, tab=tab + 1)
+
+    def get_const_by_name(self, name):
+        if self.symbol_table is None:
+            return None  # TODO more meaningful error return values?
+        symbol = self.symbol_table.get_symbol_by_name(name)
+        if symbol is None or len(symbol) > 1:
+            return None  # TODO more meaningful error return values?
+        symbol = symbol[0]
+        section_num = symbol.entry['st_shndx']
+        address = symbol['st_value']
+        # size = symbol['st_size']  # NOT GOOD, rounded to multiple of 4 or something.
+        # have to look up size in DWARF data (var_descriptor):
+        var_descriptor = [x for x in self.var_descriptors if x.name == name]
+        if var_descriptor is None or len(var_descriptor) > 1:
+            return None  # TODO more meaningful error return values?
+        var_descriptor = var_descriptor[0]
+        size = var_descriptor.size
+        section = self.elf_file.get_section(section_num)
+        section_start_addr = section['sh_addr']
+        return section.data()[address - section_start_addr : address - section_start_addr + size]
 
 
 DW_OP_plus_uconst = 0x23    # Page 20
