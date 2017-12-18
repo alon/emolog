@@ -23,9 +23,8 @@ from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
 from pickle import dumps
 
-from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
-
-from ..util import version, resolve
+from ..util import version, resolve, create_process, kill_all_processes
+from ..util import verbose as util_verbose
 from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 
@@ -320,13 +319,6 @@ async def start_transport(client, args):
 
 
 args = None
-processes = []
-
-def create_process(cmdline):
-    print(f"starting subprocess: {cmdline}")
-    process = Popen(cmdline)
-    processes.append(process)
-    return process
 
 
 def cancel_outstanding_tasks():
@@ -350,36 +342,6 @@ else:
     def try_getch():
         return None
 
-verbose_kill = False
-
-def kill_proc_tree(pid, including_parent=True, timeout=5):
-    try:
-        parent = Process(pid)
-    except NoSuchProcess:
-        return
-    children = parent.children(recursive=True)
-    for child in children:
-        if verbose_kill:
-            print(f"killing {child.pid}")
-        try:
-            child.kill()
-            child.terminate()
-        except NoSuchProcess:
-            pass
-    gone, still_alive = wait_procs(children, timeout=timeout)
-    if including_parent:
-        try:
-            if verbose_kill:
-                print(f"killing {parent.pid}")
-            parent.kill()
-            parent.terminate()
-            try:
-                parent.wait(timeout)
-            except TimeoutExpired:
-                print(f"timeout expired, process may still be around: {parent.pid}")
-        except NoSuchProcess:
-            pass
-
 
 async def cleanup(args, client):
     if not hasattr(client, 'transport') or client.transport is None:
@@ -396,15 +358,6 @@ async def cleanup(args, client):
         client.transport.close()
     kill_all_processes()
 
-
-def kill_all_processes():
-    for process in processes:
-        #print(f"killing {process.pid}")
-        if hasattr(process, 'send_ctrl_c'):
-            process.send_ctrl_c()
-        else:
-            kill_proc_tree(process.pid)
-    del processes[:]
 
 
 def parse_args(args=None):
@@ -772,8 +725,7 @@ def main(cmdline=None):
     atexit.register(kill_all_processes)
     parse_args_args = [] if cmdline is None else [cmdline]
     args = parse_args(*parse_args_args)
-    global verbose_kill
-    verbose_kill = args.verbose_kill
+    util_verbose.kill = args.verbose_kill
     if args.embedded:
         from .embedded import main as embmain
         embmain()

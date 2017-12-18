@@ -1,6 +1,7 @@
-import subprocess
+from subprocess import check_output, Popen
 import os
 from importlib import import_module
+from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
 
 
 # for kernprof
@@ -29,7 +30,7 @@ def version():
     try:
         orig_path = os.getcwd()
         os.chdir(gitroot)
-        output = subprocess.check_output("git describe --tags".split()).strip()
+        output = check_output("git describe --tags".split()).strip()
     except:
         return "unknown version"
     finally:
@@ -50,3 +51,56 @@ def resolve(module_attr):
         return getattr(import_module(module), attr)
     except:
         return None
+
+
+processes = []
+
+
+def create_process(cmdline):
+    print(f"starting subprocess: {cmdline}")
+    process = Popen(cmdline)
+    processes.append(process)
+    return process
+
+
+def kill_all_processes():
+    for process in processes:
+        #print(f"killing {process.pid}")
+        if hasattr(process, 'send_ctrl_c'):
+            process.send_ctrl_c()
+        else:
+            kill_proc_tree(process.pid)
+    del processes[:]
+
+
+def kill_proc_tree(pid, including_parent=True, timeout=5):
+    try:
+        parent = Process(pid)
+    except NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for child in children:
+        if verbose.kill:
+            print(f"killing {child.pid}")
+        try:
+            child.kill()
+            child.terminate()
+        except NoSuchProcess:
+            pass
+    gone, still_alive = wait_procs(children, timeout=timeout)
+    if including_parent:
+        try:
+            if verbose.kill:
+                print(f"killing {parent.pid}")
+            parent.kill()
+            parent.terminate()
+            try:
+                parent.wait(timeout)
+            except TimeoutExpired:
+                print(f"timeout expired, process may still be around: {parent.pid}")
+        except NoSuchProcess:
+            pass
+
+class verbose:
+    kill = False
+
