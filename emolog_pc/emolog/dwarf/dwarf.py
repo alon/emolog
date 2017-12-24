@@ -58,11 +58,13 @@ from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
 
+from elftools.dwarf.die import AttributeValue, DIE
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 logger = logging.getLogger('dwarf')
 
 
 class FileParser:
-    def __init__(self, filename):
+    def __init__(self, filename: str) -> None:
         self.all_dies = {}
         self.elf_file = None
         self.symbol_table = None
@@ -80,7 +82,7 @@ class FileParser:
         self.interesting_vars = [v for v in var_descriptors if v.is_interesting()]
         # note the file is intentionally kept open, otherwise some functions would fail later
 
-    def read_dies_from_dwarf_file(self):
+    def read_dies_from_dwarf_file(self) -> None:
         if not self.elf_file.has_dwarf_info():
             logger.error('file has no DWARF info')
             return
@@ -89,12 +91,12 @@ class FileParser:
             top_DIE = CU.get_top_DIE()
             self.read_die_rec(top_DIE)
 
-    def read_die_rec(self, die):
+    def read_die_rec(self, die: DIE) -> None:
         self.all_dies[die.offset] = die
         for child in die.iter_children():
             self.read_die_rec(child)
 
-    def visit_interesting_vars_tree_leafs(self):
+    def visit_interesting_vars_tree_leafs(self) -> None:
         for v in self.interesting_vars:
             yield from v.visit_leafs()
 
@@ -168,7 +170,7 @@ class VarDescriptor:
 
     ADDRESS_TYPE_UNSUPPORTED = '(Address Type Unsupported)'
 
-    def __init__(self, all_dies, var_die, parent):
+    def __init__(self, all_dies: Dict[int, DIE], var_die: DIE, parent: None) -> None:
         self.parent = parent
         self.all_dies = all_dies
         self.var_die = var_die
@@ -182,7 +184,7 @@ class VarDescriptor:
         else:
             self.children = []
 
-    def parse_location(self):
+    def parse_location(self) -> Union[str, int]:
         # TODO: handle address parsing better and for more cases (using an interface for processing DWARF expressions?)
         ret = self._parse_member_location()
         if ret is None:
@@ -191,7 +193,7 @@ class VarDescriptor:
             ret = "(No Address)"
         return ret
 
-    def _parse_member_location(self):
+    def _parse_member_location(self) -> None:
         attr = self.get_attribute(self.DW_AT_data_member_location)
         if attr is None:
             return None
@@ -211,7 +213,7 @@ class VarDescriptor:
             return self.ADDRESS_TYPE_UNSUPPORTED
         return self.parent.address + offset
 
-    def _parse_location_attribute(self):
+    def _parse_location_attribute(self) -> Union[str, int]:
         loc = self.get_attribute(self.DW_AT_location)
         if loc is None:
             return None
@@ -221,18 +223,18 @@ class VarDescriptor:
             return self._parse_address_block1(loc)
         return self.ADDRESS_TYPE_UNSUPPORTED
 
-    def _parse_address_exprloc(self, loc):
+    def _parse_address_exprloc(self, loc: AttributeValue) -> Union[str, int]:
         # TODO right now only supporting exprloc of the same format as block1:
         return self._parse_address_block1(loc)
 
-    def _parse_address_block1(self, loc):
+    def _parse_address_block1(self, loc: AttributeValue) -> Union[str, int]:
         opcode = loc.value[0]
         if len(loc.value) != 5 or opcode != DW_OP_addr:
             return self.ADDRESS_TYPE_UNSUPPORTED
         a, b, c, d = loc.value[1:]
         return a + (b << 8) + (c << 16) + (d << 24)
 
-    def _die_at_attr(self, die, attr_name):
+    def _die_at_attr(self, die: DIE, attr_name: str) -> DIE:
         attr = die.attributes[attr_name]
         if attr.form == 'DW_FORM_ref_addr':
             die_offset = attr.value  # store offset is absolute offset in the DWARF info
@@ -243,13 +245,13 @@ class VarDescriptor:
         return self.all_dies[die_offset]
 
 
-    def get_type_die(self, die):
+    def get_type_die(self, die: DIE) -> DIE:
         if 'DW_AT_type' not in die.attributes:
             return "No type die"
         type_die = self._die_at_attr(die, self.DW_AT_type)
         return type_die
 
-    def is_interesting(self):
+    def is_interesting(self) -> bool:
         # TODO: better criteria than the address?
         return (
             isinstance(self.address, int)       # either an address was not specified or is not a fixed address in RAM (local var, const in flash memory, etc)
@@ -257,37 +259,37 @@ class VarDescriptor:
             and not self.name.startswith('$')   # not sure when these pop up but they are not interesting
             and not self.name in VarDescriptor.uninteresting_var_names)
 
-    def get_die_tags(self):
+    def get_die_tags(self) -> List[str]:
         type_chain, last_type = self.visit_type_chain()
         type_chain.append(last_type)
         return [die.tag for die in type_chain]
 
-    def is_pointer(self):
+    def is_pointer(self) -> bool:
         return self.DW_TAG_pointer_type in self.get_die_tags()
 
     def is_external(self):
         return self.get_attribute_value(self.DW_AT_external, False)
 
-    def is_array(self):
+    def is_array(self) -> bool:
         return self.get_array_type() is not None
 
     def is_enum(self):
         return self.get_enum_type() is not None
 
-    def get_attribute(self, name, required=False):
+    def get_attribute(self, name: str, required: bool = False) -> Optional[AttributeValue]:
         if name in self.var_die.attributes:
             return self.var_die.attributes[name]
         if required:
             raise DwarfTypeMissingRequiredAttribute(self, name)
         return None
 
-    def get_attribute_value(self, name, default=None, required=False):
+    def get_attribute_value(self, name: str, default: None = None, required: bool = False) -> bytes:
         attr = self.get_attribute(name, required=required)
         if attr is None:
             return default
         return attr.value
 
-    def get_array_type(self):
+    def get_array_type(self) -> Optional[DIE]:
         type_chain, last_type = self.visit_type_chain()
         type_chain.append(last_type)
         for die in type_chain:
@@ -295,7 +297,7 @@ class VarDescriptor:
                 return die
         return None
 
-    def visit_type_chain(self):
+    def visit_type_chain(self) -> Union[Tuple[List[DIE], DIE], Tuple[List[Any], DIE]]:
         cur_type = self.type
         all_but_last = []
         while self.DW_AT_type in cur_type.attributes:     # while not the final link in the type-chain
@@ -303,14 +305,14 @@ class VarDescriptor:
             cur_type = self.get_type_die(cur_type)
         return all_but_last, cur_type
 
-    def visit_leafs(self):
+    def visit_leafs(self) -> Iterator['VarDescriptor']:
         if self.children == []:
             yield self
         else:
             for child in self.children:
                 yield from child.visit_leafs()
 
-    def get_only_die_in_type_chain(self, tag, required=True):
+    def get_only_die_in_type_chain(self, tag: str, required: bool = True) -> None:
         all_but_last, last_cur_type = self.visit_type_chain()
         with_tag = [x for x in all_but_last + [last_cur_type] if x.tag == tag]
         if not required and len(with_tag) == 0:
@@ -318,7 +320,7 @@ class VarDescriptor:
         assert len(with_tag) == 1, f'more than a single tag {tag} in {v}'
         return with_tag[0]
 
-    def get_enum_type(self):
+    def get_enum_type(self) -> None:
         return self.get_only_die_in_type_chain(self.DW_TAG_enumeration_type, required=False)
 
     def get_enum_dict(self):
@@ -327,7 +329,7 @@ class VarDescriptor:
                     c.attributes['DW_AT_const_value'].value
                 for c in enum_type.iter_children()}
 
-    def get_type_str(self):
+    def get_type_str(self) -> str:
         type_str = []
         all_but_last, last_cur_type = self.visit_type_chain()
         for cur_type in all_but_last:
@@ -348,7 +350,7 @@ class VarDescriptor:
 
         return ' '.join(type_str)
 
-    def get_array_sizes(self):
+    def get_array_sizes(self) -> List[int]:
         res = []
         array_type = self.get_array_type()
         assert array_type is not None, f"cannot find array type in type chain: {self}"
@@ -358,21 +360,21 @@ class VarDescriptor:
             res.append(child.attributes[self.DW_AT_upper_bound].value + 1)
         return res
 
-    def get_array_flat_length(self):
+    def get_array_flat_length(self) -> int:
         bounds = self.get_array_sizes()
         if bounds is None or len(bounds) == 0:
             return None
         array_len = reduce(lambda x, y: x * y, bounds)
         return array_len
 
-    def _get_byte_size_from_die(self, die):
+    def _get_byte_size_from_die(self, die: DIE) -> int:
         byte_size = die.attributes.get(self.DW_AT_byte_size, None)
         if byte_size is not None:
             assert(byte_size.form in ['DW_FORM_data1', 'DW_FORM_data2'])
             return byte_size.value
         return None
 
-    def _get_size(self):
+    def _get_size(self) -> int:
         type_chain, last_type = self.visit_type_chain()
         type_chain.append(last_type)
 
@@ -399,13 +401,13 @@ class VarDescriptor:
             byte_size = elem_size
         return byte_size
 
-    def _create_children(self):
+    def _create_children(self) -> List[Any]:
         all_but_last, last = self.visit_type_chain()
         if last.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'} and last.has_children:
             return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member' and 'DW_AT_type' in v.attributes]
         return []
 
-    def get_full_name(self):
+    def get_full_name(self) -> str:
         if self.parent is None:
             return self.name
         return self.parent.get_full_name() + '.' + self.name
