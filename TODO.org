@@ -38,6 +38,18 @@ NOTE: had old Todo entry, possibly related: "ACK of last sampler_stop is receive
 
 + post processor: partition_to_half_cycles doesn't work well in some corner cases (e.g. 3 half-cycles) and crashes. see TODO comment in the function.
 
++ timestmap output in CSV seems to be broken. also, consider just removing this - and also the seq number - except with --debug (or possibly a special flag for them)
+
++ timeout is no longer working? e.g. try disconnecting the UART (but keep the FTDI connected to USB so the COM is available). proper timeout or stuck and needs ctrl-C?
+
++ proper error message for ELF not found (currently exception)
+
++ embedded_comm implementation can't really be in the embedded project as it is now. it needs stuff from the user's app project. Suggest including the .h and advise / example the implementation
+
++ order of library inclusion in linker is important! document this somewhere. took tons of time to track this down. correct order in command line to linker: first emolog_embedded.lib, then emolog_protocol.lib.
+
+
+
 -------------- 
 this is older stuff --> Updated it on 1/7/2017.
 
