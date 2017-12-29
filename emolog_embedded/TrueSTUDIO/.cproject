@@ -22,8 +22,9 @@
 						<toolChain id="com.atollic.truestudio.lib.debug.toolchain.689096861" name="Atollic ARM Tools" superClass="com.atollic.truestudio.lib.debug.toolchain">
 							<option id="com.atollic.truestudio.toolchain_options.mcu.1596939047" name="Microcontroller" superClass="com.atollic.truestudio.toolchain_options.mcu" value="STM32F302R8" valueType="string"/>
 							<option id="com.atollic.truestudio.toolchain_options.vendor.1961534750" name="Vendor name" superClass="com.atollic.truestudio.toolchain_options.vendor" value="STMicroelectronics" valueType="string"/>
+							<option id="com.atollic.truestudio.general.runtimelib.1769400601" name="Runtime Library" superClass="com.atollic.truestudio.general.runtimelib" value="com.atollic.truestudio.ld.general.clib.small" valueType="enumerated"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.lib.debug.toolchain.platform.2053299817" isAbstract="false" name="Debug platform" superClass="com.atollic.truestudio.lib.debug.toolchain.platform"/>
-							<builder buildPath="${workspace_loc:/emolog_embedded}/Debug" customBuilderProperties="toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for ARM 7.1.2\\ARMTools\\bin|toolChainpathType=1|com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|" id="com.atollic.truestudio.mbs.builder1.214632396" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
+							<builder buildPath="${workspace_loc:/emolog_embedded}/Debug" customBuilderProperties="toolChainpathString=C:\\Program Files (x86)\\Atollic\\TrueSTUDIO for ARM 8.1.0\\ARMTools\\bin|toolChainpathType=1|com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|" id="com.atollic.truestudio.mbs.builder1.214632396" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
 							<tool id="com.atollic.truestudio.lib.debug.toolchain.as.204282500" name="Assembler" superClass="com.atollic.truestudio.lib.debug.toolchain.as">
 								<option id="com.atollic.truestudio.common_options.target.mcpu.987404988" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32F302R8" valueType="enumerated"/>
 								<option id="com.atollic.truestudio.common_options.target.endianess.900251074" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess"/>
@@ -88,7 +89,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="source/STM32F3|source/Linux|source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -123,6 +124,7 @@
 						<toolChain id="com.atollic.truestudio.lib.release.toolchain.377600901" name="Atollic ARM Tools" superClass="com.atollic.truestudio.lib.release.toolchain">
 							<option id="com.atollic.truestudio.toolchain_options.mcu.903084125" name="Microcontroller" superClass="com.atollic.truestudio.toolchain_options.mcu" value="STM32F302R8" valueType="string"/>
 							<option id="com.atollic.truestudio.toolchain_options.vendor.474217583" name="Vendor name" superClass="com.atollic.truestudio.toolchain_options.vendor" value="STMicroelectronics" valueType="string"/>
+							<option id="com.atollic.truestudio.general.runtimelib.411995689" name="Runtime Library" superClass="com.atollic.truestudio.general.runtimelib" value="com.atollic.truestudio.ld.general.clib.small" valueType="enumerated"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.atollic.truestudio.lib.release.toolchain.platform.1176567296" isAbstract="false" name="Release platform" superClass="com.atollic.truestudio.lib.release.toolchain.platform"/>
 							<builder buildPath="${workspace_loc:/emolog_embedded}/Release" customBuilderProperties="com.atollic.truestudio.common_options.target.vendor=STMicroelectronics|com.atollic.truestudio.common_options.target.mcu=STM32F302R8|" id="com.atollic.truestudio.mbs.builder1.1333327272" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="CDT Internal Builder" superClass="com.atollic.truestudio.mbs.builder1"/>
 							<tool id="com.atollic.truestudio.lib.release.toolchain.as.18221390" name="Assembler" superClass="com.atollic.truestudio.lib.release.toolchain.as">
@@ -172,7 +174,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="source/STM32F3|source/Linux|source/STM32F3/Drivers/STM32F3xx_HAL_Driver|source/Tiva|source/emolog_comm_tiva.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
