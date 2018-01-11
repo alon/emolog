@@ -47,9 +47,6 @@
 								<option id="com.atollic.truestudio.gcc.directories.select.1934778969" name="Include path" superClass="com.atollic.truestudio.gcc.directories.select" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/emolog_protocol/source}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/STM32F3xx_HAL_Driver/Inc}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/CMSIS/Device/ST/STM32F3xx/Include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/source/STM32F3/Drivers/CMSIS/Include}&quot;"/>
 								</option>
 								<option id="com.atollic.truestudio.gcc.symbols.defined.797819745" name="Defined symbols" superClass="com.atollic.truestudio.gcc.symbols.defined" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="EMOLOG_PLATFORM_STM32"/>
