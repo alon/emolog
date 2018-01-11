@@ -1,4 +1,0 @@
-#!/bin/bash
-export OS=Windows_NT
-export CC=x86_64-w64-mingw32-gcc
-make $@
