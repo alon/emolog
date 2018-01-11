@@ -14,6 +14,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "emolog_protocol.h"
 
