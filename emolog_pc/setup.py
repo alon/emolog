@@ -23,8 +23,8 @@ macros = []
 # extension.py:131: UserWarning: Unknown Extension options: 'compiler_directives'
 
 cylib = Extension(name="emolog.cylib",
-                  sources=["emolog/cylib.pyx", "../emolog_protocol/source/emolog_protocol.cpp"],
-                  include_dirs=['../emolog_protocol/source'] + [numpy.get_include()],
+                  sources=["emolog/cylib.pyx", "../emolog_protocol/emolog_protocol.cpp"],
+                  include_dirs=['../emolog_protocol'] + [numpy.get_include()],
                   define_macros=macros,
                   language="c++")
 fakeembedded = Extension(name="emolog.fakeembedded", sources=["emolog/fakeembedded.pyx"])
