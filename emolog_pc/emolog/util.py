@@ -104,3 +104,35 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
 class verbose:
     kill = False
 
+
+def gcd(*args):
+    """
+    Implement Euclid's algorithm for calculating the greatest common divisor.
+
+    >>> gcd(10, 3)
+    1
+
+    >>> gcd(10, 15)
+    5
+
+    >>> gcd(10, 10)
+    10
+
+    >>> gcd(6, 9, 15)
+    3
+
+    >>> gcd(*(x + 1 for x in range(3)))
+    1
+    """
+    args = list(args)
+    assert all(x > 0 and isinstance(x, int) for x in args)
+    assert len(args) >= 1
+    while len(args) >= 2:
+        args = list(set([x for x in args if x != 0]))
+        m = min(args)
+        args = [x % m if x != m else m for x in args]
+    if len(args) == 1:
+        return args[0]
+    # error
+    return None
+

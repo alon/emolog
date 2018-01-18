@@ -23,7 +23,7 @@ from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
 from pickle import dumps
 
-from ..util import version, resolve, create_process, kill_all_processes
+from ..util import version, resolve, create_process, kill_all_processes, gcd
 from ..util import verbose as util_verbose
 from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
@@ -669,7 +669,7 @@ async def amain(client, args):
     max_ticks = args.ticks_per_second * args.runtime if args.runtime else 0
     if max_ticks > 0:
         print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
-    min_ticks = min(var['period_ticks'] for var in variables)  # this is wrong, use gcd
+    min_ticks = gcd(*(var['period_ticks'] for var in variables))
 
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
     if args.listen:

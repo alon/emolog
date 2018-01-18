@@ -39,7 +39,7 @@ install:
 
 test_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
-  - pytest --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml tests
+  - pytest --fulltrace --doctest-modules --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml tests emolog/util.py
   # sanity of pyinstaller artifacts
   - mkdir "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
   - cd "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
