@@ -59,7 +59,7 @@ from elftools.elf.sections import SymbolTableSection
 
 
 from elftools.dwarf.die import AttributeValue, DIE
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Generator
 logger = logging.getLogger('dwarf')
 
 
@@ -96,7 +96,7 @@ class FileParser:
         for child in die.iter_children():
             self.read_die_rec(child)
 
-    def visit_interesting_vars_tree_leafs(self) -> None:
+    def visit_interesting_vars_tree_leafs(self) -> Generator['VarDescriptor', None, None]:
         for v in self.interesting_vars:
             yield from v.visit_leafs()
 
