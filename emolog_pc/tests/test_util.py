@@ -5,7 +5,15 @@ sys.path.append(os.path.join(os.path.dirname(sys.modules[__name__].__file__), '.
 
 
 from emolog.cython_util import coalesce_meth
-from emolog.util import resolve
+from emolog.util import resolve, gcd
+
+
+def test_gcd():
+    assert gcd(10, 3) == 1
+    assert gcd(10, 15) == 5
+    assert gcd(10, 10) == 10
+    assert gcd(6, 9, 15) == 3
+    assert gcd(*(x + 1 for x in range(3))) == 1
 
 
 def test_coalesce():

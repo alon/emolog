@@ -108,21 +108,6 @@ class verbose:
 def gcd(*args):
     """
     Implement Euclid's algorithm for calculating the greatest common divisor.
-
-    >>> gcd(10, 3)
-    1
-
-    >>> gcd(10, 15)
-    5
-
-    >>> gcd(10, 10)
-    10
-
-    >>> gcd(6, 9, 15)
-    3
-
-    >>> gcd(*(x + 1 for x in range(3)))
-    1
     """
     args = list(args)
     assert all(x > 0 and isinstance(x, int) for x in args)
