@@ -29,3 +29,4 @@ profile*.txt
 *.launch
 .ropeproject
 driverlib
+.eggs
