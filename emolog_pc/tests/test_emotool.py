@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import os
 from os import listdir, unlink, system, getcwd, chdir
 from struct import pack, unpack
@@ -98,6 +99,7 @@ else:
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
     cwd = getcwd()
+    start = datetime.utcnow().timestamp() * 1000
     try:
         d = mkdtemp()
         chdir(d)
@@ -115,6 +117,8 @@ def test_emotool_with_gen():
     lines = contents[0]
     assert len(lines) >= 2
     assert lines[0].count(',') == lines[1].count(',')
+    res_t = float(lines[1].split(',')[2])
+    assert abs(res_t - start) < 1000
 
 
 def test_read_elf_variables():
