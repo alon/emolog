@@ -26,7 +26,7 @@ API otherwise, plus helpers.
 from array import array
 import sys
 from math import sin
-from time import time
+from datetime import datetime
 from logging import getLogger
 from struct import pack, unpack
 import csv
@@ -46,6 +46,10 @@ ENDIANESS = '<'
 
 
 logger = getLogger('emolog')
+
+
+def utc():
+    return datetime.utcnow().timestamp()
 
 
 ### Wrap emolog_protocol.cpp
@@ -265,7 +269,8 @@ cdef class SamplerSample(Message):
 
     def handle_by(self, handler):
         if handler.sampler.running:
-            handler.pending_samples.append((self.seq, self.ticks, self.payload))
+            now = utc() * 1000
+            handler.pending_samples.append((now, self.seq, self.ticks, self.payload))
             #logger.debug(f"Got Sample: {self}")
         else:
             #logger.debug("ignoring sample since PC sampler is not primed")
@@ -756,16 +761,16 @@ cdef class CSVHandler:
         return writer
 
     # python version for profiling
-    cpdef handle_sampler_samples(self, msgs):
+    cpdef handle_sampler_samples(self, time_and_msgs):
         """
         Write to CSV, add points to plots
-        :param msgs: [(seq, ticks, {name: value})]
+        :param msgs: [(time, seq, ticks, {name: value})]
         :return: None
         """
         cdef list data
         cdef list new_float_only_msgs
         cdef int missing
-        cdef float now
+        cdef double now
         cdef bint have_listeners
 
         if not self._running:
@@ -775,15 +780,14 @@ cdef class CSVHandler:
         # prune messages if we got too many
         if self.max_ticks > 0:
             missing = self.max_ticks - self.samples_received
-            if len(msgs) > missing:
-                del msgs[missing:]
+            if len(time_and_msgs) > missing:
+                del time_and_msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
-        now = time() * 1000
         have_listeners = len(self.sample_listeners) > 0
         if have_listeners:
             new_float_only_msgs = []
         name_to_index = self.name_to_index
-        for seq, ticks, payload in msgs:
+        for now, seq, ticks, payload in time_and_msgs:
             types, values = self.sampler.list_from_ticks_and_payload(name_to_index=name_to_index, ticks=ticks, payload=payload)
             row_start = [seq, ticks, now]
             if self.write_immediately:
@@ -804,7 +808,7 @@ cdef class CSVHandler:
         if have_listeners:
             for listener in self.sample_listeners:
                 listener(new_float_only_msgs)
-        self.samples_received += len(msgs)
+        self.samples_received += len(time_and_msgs)
         if self.max_ticks != 0 and self.total_ticks() + 1 >= self.max_ticks:
             self.stop()
 
@@ -840,7 +844,7 @@ cdef class EmotoolCylib:
         return self.csv_handler.samples_received
 
     def dump_buf(self, buf):
-        self.dump_out.write(pack('<fI', time(), len(buf)) + buf)
+        self.dump_out.write(pack('<fI', utc(), len(buf)) + buf)
         #self.dump.flush()
 
     def _debug_log(self, s):
