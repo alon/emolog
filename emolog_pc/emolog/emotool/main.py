@@ -13,11 +13,10 @@ from os import path
 import sys
 import string
 import logging
-from struct import pack, unpack
+from struct import pack
 import random
 from time import time, sleep, clock
 from socket import socket
-from subprocess import Popen
 from configparser import ConfigParser
 from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
