@@ -393,9 +393,6 @@ def parse_args(args=None):
     parser.add_argument('--ticks-per-second', default=1000000 / 50, type=float,
                         help='number of ticks per second. used in conjunction with runtime')
     parser.add_argument('--debug', default=False, action='store_true', help='produce more verbose debugging output')
-    parser.add_argument('--truncate', default=False, action="store_true", help='Only save first 5000 samples for quick debug runs.')
-    parser.add_argument('--no-processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
-    parser.add_argument('--no_processing', default=False, action="store_true", help="Don't run the post processor after sampling" )
 
     # Server - used for GUI access
     parser.add_argument('--listen', default=None, type=int, help='enable listening TCP port for samples') # later: add a command interface, making this suitable for interactive GUI
@@ -706,21 +703,6 @@ def start_callback(args, loop):
     return client
 
 
-def do_post_process(args, client):
-    from .post_processor import post_process
-    if client.csv_filename is None or not os.path.exists(client.csv_filename):
-        print("no csv file created, exiting before post processing")
-        return
-    print()
-    if args.no_processing is False:
-        print("Running post processor (this may take some time)...")
-        print("processing {}".format(client.csv_filename))
-        post_process(client.csv_filename, truncate_data=args.truncate, verbose=True)
-        print("Post processing done.")
-    else:
-        print("No post-processing was requested, exiting.")
-
-
 def main(cmdline=None):
     atexit.register(kill_all_processes)
     parse_args_args = [] if cmdline is None else [cmdline]
@@ -736,7 +718,8 @@ def main(cmdline=None):
             raise SystemExit
         loop.set_exception_handler(exception_handler)
         client = start_callback(args, loop)
-        do_post_process(args, client)
+        if client.csv_filename is None or not os.path.exists(client.csv_filename):
+            print("no csv file created.")
 
 
 if __name__ == '__main__':
