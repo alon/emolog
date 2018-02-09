@@ -21,8 +21,9 @@ void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 
 // This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
 const char emolog_timestamp[] __attribute__((used)) = __DATE__ " " __TIME__;
-#pragma RETAIN(emolog_timestamp)  // TODO #ifdef this just for the compiler that supports this to avoid warning
-
+#ifdef __TI_ARM__
+#pragma RETAIN(emolog_timestamp)
+#endif
 
 void emolog_init(void)
 {
