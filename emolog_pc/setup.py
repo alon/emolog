@@ -34,7 +34,7 @@ decoders = Extension(name="emolog.decoders", sources=["emolog/decoders.pyx"])
 cython_extensions = [cylib, fakeembedded, cython_util, decoders]
 
 setup(
-    name='Emotool',
+    name='emolog',
     description='Command & Control side for emolog protocol',
     version="0.1",
     setup_requires=[
