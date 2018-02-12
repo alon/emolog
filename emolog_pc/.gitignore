@@ -3,3 +3,4 @@ emolog/*.cpp
 build
 dist
 Emotool.egg-info
+emolog/protocol
