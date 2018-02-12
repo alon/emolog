@@ -63,5 +63,13 @@ setup(
             'emogui = emolog.emotool.main_window:main',
             'summarize = emolog.emotool.summarize:main [summarize]'
         ]
-    }
+    },
+    classifiers = ['Development Status :: 3 - Alpha',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: GPL License',
+        'Natural Language :: English',
+        'Programming Language :: Python :: 3',
+        'Topic :: Utilities',
+    ],
 )
