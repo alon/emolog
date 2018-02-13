@@ -86,11 +86,15 @@ setup(
         'XlsxWriter(==1.0.2)',
         'pandas(==0.21.0)',
         'pyserial(==3.2.1)',
-        'pyserial-asyncio(==0.2)',
-        'PyInstaller(==3.3)',
+        'pyserial-asyncio(>=0.4)',
         'psutil(==5.4.1)',
         'colorama>=0.3.7',
     ] + cython_install_requires,
+    extras_require={
+        'pyinstaller': [
+            'PyInstaller(==3.3)',
+        ]
+    },
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
     data_files=[
