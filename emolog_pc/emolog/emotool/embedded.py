@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/bin/env python3
 
 """
 Create an emolog speaking embedded client for testing purposes
