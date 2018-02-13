@@ -57,18 +57,27 @@ if use_cython:
         'Cython(==0.27.3)',
     ]
 else:
+    cylib_sources = [
+        join('emolog', 'cylib.cpp'),
+        join('emolog', 'protocol', 'emolog_protocol.cpp'),
+    ]
+    fakeembedded_sources = [join('emolog', 'fakeembedded.c')]
+    cython_util_sources = [join('emolog', 'cython_util.c')]
+    decoders_sources = [join('emolog', 'decoders.c')]
+    sources = cylib_sources + fakeembedded_sources + cython_util_sources + decoders_sources
+    if not all([path.exists(x) for x in sources]):
+        print("error: no cython but no c/c++ sources either")
+        raise SystemExit
     cylib = Extension(name="emolog.cylib",
-                      sources=[join('emolog', 'cylib.cpp'),
-                               join('emolog', 'protocol', 'emolog_protocol.cpp'),
-                               ],
+                      sources=cylib_sources,
                       include_dirs=[join('emolog', 'protocol')] + [numpy.get_include()],
                       define_macros=macros,
                       language="c++",
                       #data=[join('emolog', 'protocol', 'emolog_protocol.h')]
                       )
-    fakeembedded = Extension(name="emolog.fakeembedded", sources=[join('emolog', 'fakeembedded.c')])
-    cython_util = Extension(name="emolog.cython_util", sources=[join('emolog', 'cython_util.c')])
-    decoders = Extension(name="emolog.decoders", sources=[join('emolog', 'decoders.c')])
+    fakeembedded = Extension(name="emolog.fakeembedded", sources=fakeembedded_sources)
+    cython_util = Extension(name="emolog.cython_util", sources=cython_util_sources)
+    decoders = Extension(name="emolog.decoders", sources=decoders_sourcees)
     cython_setup_requires = cython_install_requires = []
 
 cython_extensions = [cylib, fakeembedded, cython_util, decoders]
