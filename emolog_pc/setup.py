@@ -101,7 +101,6 @@ setup(
         'console_scripts': [
             'emotool = emolog.emotool.main:main',
             'emogui = emolog.emotool.main_window:main',
-            'summarize = emolog.emotool.summarize:main [summarize]'
         ]
     },
     classifiers = ['Development Status :: 3 - Alpha',
