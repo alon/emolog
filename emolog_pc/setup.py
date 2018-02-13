@@ -77,7 +77,7 @@ else:
                       )
     fakeembedded = Extension(name="emolog.fakeembedded", sources=fakeembedded_sources)
     cython_util = Extension(name="emolog.cython_util", sources=cython_util_sources)
-    decoders = Extension(name="emolog.decoders", sources=decoders_sourcees)
+    decoders = Extension(name="emolog.decoders", sources=decoders_sources)
     cython_setup_requires = cython_install_requires = []
 
 cython_extensions = [cylib, fakeembedded, cython_util, decoders]
