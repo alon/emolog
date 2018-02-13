@@ -3,6 +3,7 @@ from os import path
 from os.path import join
 from setuptools import setup, Extension
 import shutil
+from emolog import VERSION
 
 try:
     import numpy
@@ -15,6 +16,7 @@ try:
     from Cython.Build import cythonize
 except:
     use_cython = False
+
     def cythonize(*args, **kw):
         return args[0]
 else:
@@ -40,7 +42,6 @@ for f in ["emolog_protocol.h", "emolog_protocol.cpp", 'emolog_debug.h']:
 
 
 if use_cython:
-    print("*" * 10 + "WITH CYTHON" + "*" * 10)
     cylib = Extension(name='emolog.cylib',
                       sources=[join('emolog', 'cylib.pyx'), join('..', 'emolog_protocol', 'emolog_protocol.cpp')],
                       include_dirs=[join('..', 'emolog_protocol')] + [numpy.get_include()],
@@ -75,7 +76,7 @@ cython_extensions = [cylib, fakeembedded, cython_util, decoders]
 setup(
     name='emolog',
     description='Command & Control side for emolog protocol',
-    version="0.1",
+    version=f'{VERSION[0]}.{VERSION[1]}.{VERSION[2]}',
     setup_requires=[
         'setuptools>=18.0', # cython extensions
         'numpy'
