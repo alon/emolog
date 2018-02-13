@@ -9,6 +9,7 @@ python:
  - "3.6"
 
 script:
+ cd emolog_pc
  pip install -e .
  python setup.py sdist
  python setup.py install
