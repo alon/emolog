@@ -1,0 +1,14 @@
+notifications:
+ email:
+  on_failure: change
+  on_success: change
+
+dist: trusty
+language: python
+python:
+ - "3.6"
+
+script:
+ pip install -e .
+ python setup.py sdist
+ python setup.py install
