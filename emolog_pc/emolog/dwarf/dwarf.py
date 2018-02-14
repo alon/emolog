@@ -52,6 +52,7 @@ typedef enum {
 
 import sys
 import logging
+import struct
 from functools import reduce
 
 from elftools.elf.elffile import ELFFile
@@ -229,6 +230,9 @@ class VarDescriptor:
 
     def _parse_address_block1(self, loc: AttributeValue) -> Union[str, int]:
         opcode = loc.value[0]
+        if len(loc.value) == 9 and opcode == DW_OP_addr: # seen with amd64 compilation of static variables
+            # should use host endianess
+            return struct.unpack('<q', struct.pack('bbbbbbbb', *loc.value[1:]))[0]
         if len(loc.value) != 5 or opcode != DW_OP_addr:
             return self.ADDRESS_TYPE_UNSUPPORTED
         a, b, c, d = loc.value[1:]
