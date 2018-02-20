@@ -10,7 +10,7 @@ basedir = os.path.dirname(__file__)
 one_shot_vars = ['controller.state.required_dir,0,1']
 data = [
     #(os.path.join(basedir, 'tests', 'example.out'), ['var_unsigned_char,1,0', 'var_int,1,0', 'var_float,1,0', 'var_float_arr_2,1,0'])
-    ('../../pump_drive/Release/pump_drive_tiva.out', None)
+    ('../../pump_drive/Debug/pump_drive_tiva.out', None)
     #('../examples/pc_platform/pc', one_shot_vars)
     ]
 for filename, vars in data:

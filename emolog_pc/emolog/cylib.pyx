@@ -388,6 +388,17 @@ cdef class RegisteredVariable:
         self._type = _type
 
 
+class Once:
+    def __init__(self):
+        self.printed = False
+
+    def print_once(self, s):
+        if self.printed:
+            return
+        self.printed = True
+        print(s)
+
+
 @cython.final
 cdef class VariableSampler:
     # variables
@@ -400,12 +411,14 @@ cdef class VariableSampler:
     cdef bint _use_unpack
     cdef bint _single_sample
     cdef bytes _single_sample_unpack_str
+    cdef object once
 
     cdef public bint running
 
     def __init__(self):
         self._set_variables([])
         self.running = False
+        self.once = Once()
 
     def clear(self):
         self._set_variables([])
@@ -475,6 +488,10 @@ cdef class VariableSampler:
                 for t, i in types_enum:
                     size = self.size[i]
                     encoded = payload[offset:offset + size]
+                    if len(encoded) == 0:
+                        self.once.print_once('EMBEDDED ERROR: ran out of bytes in sample')
+                        val = None
+                        continue
                     if hasattr(t, 'decode'):
                         val = t.decode(encoded)
                     else:
