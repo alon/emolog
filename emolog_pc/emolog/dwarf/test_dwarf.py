@@ -1,16 +1,22 @@
+from os import path
 from unittest import TestCase
 
 from . import FileParser
 
 
+module_dir = path.dirname(__file__)
+
+sanity_out = path.join(module_dir, 'sanity.out')
+linked_list_out = path.join(module_dir, 'linked_list.out')
+
 class TestDwarf(TestCase):
 
     def test_sanity(self):
-        parser = FileParser("sanity.out")
+        parser = FileParser(sanity_out)
         data = sorted([(ivar.get_type_str(), ivar) for ivar in parser.interesting_vars])
         for (ivar_type, ivar), (expected_type, expected_name, expected_size) in zip(data, [
                                         ('Foo', 'foo', 16),
-                                        ('MyEnum', 'enum_instance', 1),
+                                        ('enum MyEnum', 'enum_instance', 1),
                                         ('volatile int', 'global_var', 4)
                                   ]):
             self.assertEqual(ivar_type, expected_type)
@@ -18,7 +24,7 @@ class TestDwarf(TestCase):
             self.assertEqual(ivar.size, expected_size)
 
     def test_class(self):
-        parser = FileParser("sanity.out")
+        parser = FileParser(sanity_out)
         foo = [v for v in parser.interesting_vars if v.name == 'foo'][0]
         self.assertEqual(foo.get_type_str(), 'Foo')
         # look for children
@@ -33,7 +39,7 @@ class TestDwarf(TestCase):
             self.assertEqual(v.address - p.address, offset)
 
     def test_linked_list(self):
-        parser = FileParser("linked_list.out")
+        parser = FileParser(linked_list_out)
 
         foo = [v for v in parser.interesting_vars if v.name == 'foo'][0]
 
