@@ -44,7 +44,7 @@ def remove_unneeded_columns(data):
 
 
 def add_time_column(data, tick_time_ms):
-    data.loc[:, 'Time'] = pd.Series(data.index * tick_time_ms)
+    data.loc[:, 'Time'] = data.index * tick_time_ms
     return data
 
 
