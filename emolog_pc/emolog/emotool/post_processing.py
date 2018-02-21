@@ -51,7 +51,8 @@ def add_time_column(data, tick_time_ms):
 def reorder_columns(data, first_cols):
     all_cols = data.columns.tolist()
     rest_of_cols = [c for c in all_cols if c not in first_cols]
-    data = data[first_cols + rest_of_cols]
+    existing_first_cols = [c for c in first_cols if c in all_cols]
+    data = data[existing_first_cols + rest_of_cols]
     return data
 
 
