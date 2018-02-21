@@ -119,36 +119,36 @@ def set_column_formats(ws, cols, wb_formats, col_name_to_format):
             ws.set_column(col_index, col_index, format_dict['width'], wb_formats[format_dict['format']])
 
 
-# TEMP config should probably not be passed, but rather the specific relevant parameters
-def add_scatter_graph(wb, data_sheet_name, x_axis, y_axes, chart_sheet_name, config, tick_time_ms):
+def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_name, requested_columns, col_formats,
+                      min_row, max_row, axes_ranges):
     sheet = wb.add_chartsheet()
     chart = wb.add_chart({'type': 'scatter', 'subtype': 'straight'})
-    for y_axis in y_axes:
-        chart.add_series({
-            'name': y_axis['name'],
-            'categories': [data_sheet_name, x_axis['min_row'], x_axis['col'], x_axis['max_row'], x_axis['col']],
-            'values': [data_sheet_name, y_axis['min_row'], y_axis['col'], y_axis['max_row'], y_axis['col']],
-            'y2_axis': y_axis['secondary'],
-            'line': y_axis['line']
-        })
-    # TODO: touching the config directly here breaks modularity. get these options as parameters
-    #       and let the caller worry about the config.
+    x_axis_col = data.columns.tolist().index(x_axis_col_name)
+
+    existing_columns = [c for c in requested_columns if c in data.columns and c != x_axis_col_name]
+    for col_name in existing_columns:
+        col_num = data.columns.tolist().index(col_name) + 1
+        col_params = {'name': col_name,
+                      'categories': [data_sheet_name, min_row, x_axis_col, max_row, x_axis_col],
+                      'values': [data_sheet_name, min_row, col_num, max_row, col_num],
+                      }
+        # add either known column formats or the default format
+        col_params.update(col_formats.get(col_name, col_formats['default']))
+        chart.add_series(col_params)
+
     chart.set_x_axis({'label_position': 'low',
-                      'min': config.getfloat('post_processor', 'graph_t_axis_min', fallback=0),
-                      'max': config.getfloat('post_processor', 'graph_t_axis_max', fallback=x_axis['max_row'] * tick_time_ms),
+                      'min': axes_ranges['x']['min'],
+                      'max': axes_ranges['x']['max'],
                       'line': {'none': True},
                       })
     chart.set_y_axis({'major_gridlines': {'visible': False},
-                      'min': config.getfloat('post_processor', 'graph_y1_axis_min', fallback=None),
-                      'max': config.getfloat('post_processor', 'graph_y1_axis_max', fallback=None),
+                      'min': axes_ranges['y']['min'],
+                      'max': axes_ranges['y']['max'],
                       })
     chart.set_y2_axis({'major_gridlines': {'visible': True},
-                       'min': config.getfloat('post_processor', 'graph_y2_axis_min', fallback=None),
-                       'max': config.getfloat('post_processor', 'graph_y2_axis_max', fallback=None),
+                       'min': axes_ranges['y2']['min'],
+                       'max': axes_ranges['y2']['max'],
                        })
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
-
-
-
