@@ -174,12 +174,7 @@ if __name__ == '__main__':
     srv.listen(1)
 
     def signal_handler(signal, frame):
-        try:
-            srv.close()
-        except Exception as e:
-            log.warning(repr(e))
-        finally:
-            sys.exit(0)
+        pass
 
     signal.signal(signal.SIGINT, signal_handler)
 
