@@ -30,3 +30,4 @@ profile*.txt
 .ropeproject
 driverlib
 .eggs
+emolog.egg-info
