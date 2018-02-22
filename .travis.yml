@@ -13,3 +13,5 @@ script:
  - pip install -e .
  - python setup.py sdist
  - python setup.py install
+ - pip install -y pytest
+ - pytest tests
