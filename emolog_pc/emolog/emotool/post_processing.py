@@ -207,3 +207,53 @@ def find_newest_file(files):
     timestamps = [os.stat(f).st_mtime for f in files]
     latest_index = timestamps.index(max(timestamps))
     return files[latest_index]
+
+
+def process_file(args, config, input_filename, output_filename, summary, truncate, verbose, success_msg, process_func):
+    try:
+        process_func(input_filename, output_filename, config, truncate_data=truncate, verbose=verbose)
+        print(success_msg)
+        summary['processed'] += 1
+        if args.open_output:
+            os.startfile(output_filename)
+    except Exception as ex:
+        print('Post-processing failed.')
+        if verbose:
+            raise ex
+        summary['failed'] += 1
+
+
+def print_summary(summary):
+    print()
+    print()
+    print('Summary:')
+    print('--------')
+    print('Successfully processed: {}'.format(summary['processed']))
+    print('Failed: {}'.format(summary['failed']))
+    print('Skipped (Excel already exists): {}'.format(summary['skipped']))
+
+
+def post_processing_main(process_func):
+    args = get_args()
+    config = read_config('local_machine_config.ini')
+    files = calc_file_list(args, config)
+
+    verbose = True if len(files) == 1 else args.verbose
+    truncate = config.getboolean('post_processor', 'truncate_data', fallback=False)
+
+    summary = {'processed': 0, 'failed': 0, 'skipped': 0}
+    for filename in files:
+        print(os.path.basename(filename) + ':  ', end='')
+        output_filename = filename[:-4] + '.xlsx'
+        if not os.path.exists(output_filename):
+            process_file(args, config, filename, output_filename, summary, truncate, verbose,
+                         'Finished post-processing.', process_func)
+        else:  # output file exists, only run if overwrite is requested
+            if args.overwrite:
+                process_file(args, config, filename, output_filename, summary, truncate, verbose,
+                             'Overwritten existing Excel file.', process_func)
+            else:
+                print('Excel file already exists, skipping file.')
+                summary['skipped'] += 1
+
+    print_summary(summary)
