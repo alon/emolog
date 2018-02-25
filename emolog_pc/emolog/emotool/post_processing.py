@@ -1,5 +1,8 @@
 import os
 import pandas as pd
+import glob
+import argparse
+import configparser
 
 
 def load_and_clean(input_csv_filename, prefixes_to_remove):
@@ -152,3 +155,55 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Emolog Post Processor Tool")
+    parser.add_argument('input_csv', help='CSV file to parse. Wildcards are accepted. If the input is a folder, '
+                                          'all CSV files in the folder are processed. If this parameter is not '
+                                          'supplied, all CSV files in the default outputs folder are processed.',
+                        nargs='?')
+    parser.add_argument('--overwrite', action="store_true", help='If a matching .xlsx file exists, overwrite it.')
+    parser.add_argument('--verbose', default=False, action="store_true",
+                        help='prints all processing messages for every file')
+    parser.add_argument('--newest', default=False, action="store_true",
+                        help='Process only the file with the most recent timestamp')
+    parser.add_argument('--open-output', default=False, action="store_true", help='Open the resulting Excel file(s).')
+    args = parser.parse_args()
+    return args
+
+
+def read_config(filename):
+    config = configparser.ConfigParser()
+    if os.path.exists(filename):
+        config.read(filename)
+    return config
+
+
+def calc_file_list(args, config):
+    if args.input_csv is None:
+        output_folder = config.get('folders', 'output_folder')
+        if output_folder is None:
+            print("No input was provided and configuration file {} is missing,"
+                  " I don't know what to process. Exiting.".format(CONFIG_FILE_NAME))
+            raise SystemExit
+        args.input_csv = os.path.join(output_folder, '*.csv')
+    elif os.path.isdir(args.input_csv):
+        args.input_csv = os.path.join(args.input_csv, '*.csv')
+    print("Looking at: {}".format(args.input_csv))
+    files = glob.glob(args.input_csv)
+    files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
+    if len(files) == 0:
+        print('No CSV files found. Exiting.')
+        raise SystemExit
+    print('Found {} CSV files:'.format(len(files)))
+    if args.newest:
+        print("--newest specified, processing the most recent .csv file:")
+        files = [find_newest_file(files)]
+    return files
+
+
+def find_newest_file(files):
+    timestamps = [os.stat(f).st_mtime for f in files]
+    latest_index = timestamps.index(max(timestamps))
+    return files[latest_index]
