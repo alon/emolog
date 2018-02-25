@@ -114,10 +114,9 @@ def set_data_header(ws, cols, wb_formats, output_col_names):
 
 def set_column_formats(ws, cols, wb_formats, col_name_to_format):
     for col in cols:
-        if col in col_name_to_format:
-            col_index = cols.index(col)
-            format_dict = col_name_to_format[col]
-            ws.set_column(col_index, col_index, format_dict['width'], wb_formats[format_dict['format']])
+        col_index = cols.index(col)
+        format_dict = col_name_to_format.get(col, col_name_to_format['default'])
+        ws.set_column(col_index, col_index, format_dict['width'], wb_formats[format_dict['format']])
 
 
 def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_name, requested_columns, col_formats,
