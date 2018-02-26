@@ -205,14 +205,15 @@ def add_data_sheet(writer, data, wb_formats, data_col_formats, output_col_names)
     set_column_formats(data_sheet, [''] + data.columns.tolist(), wb_formats, data_col_formats)
 
 
-def add_params_sheet(wb, params, wb_formats):
+def add_params_sheet(wb, params, param_formats, wb_formats):
     sheet = wb.add_worksheet('Parameters')
     row = 0
     sheet.set_column(0, 0, width=32)
     sheet.set_column(1, 1, width=32)
     for col in params.columns:
         sheet.write(row, 0, col, wb_formats['header'])
-        sheet.write(row, 1, params[col][params.first_valid_index()], wb_formats['general'])
+        field_format = param_formats.get(col, param_formats['default'])
+        sheet.write(row, 1, params[col][params.first_valid_index()], wb_formats[field_format['format']])
         row += 1
 
 
