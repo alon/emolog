@@ -217,6 +217,22 @@ def add_params_sheet(wb, params, param_formats, wb_formats):
         row += 1
 
 
+def add_summary_sheet(wb, summary_stats, wb_formats):
+    sheet = wb.add_worksheet('Summary')
+    row = 0
+    sheet.set_column(0, 0, width=36)
+    for section in summary_stats:
+        sheet.write(row, 0, section['title'], wb_formats['title'])
+        row += 1
+        for field in section['fields']:
+            sheet.write(row, 0, field['name'], wb_formats['header'])
+            if isnan(field['value']):
+                field['value'] = 'N/A'
+            sheet.write(row, 1, field['value'], wb_formats[field['format']])
+            row += 1
+        row += 1  # extra line between sections
+
+
 def set_data_header(ws, cols, wb_formats, output_col_names):
     ws.set_row(row=0, height=30, cell_format=wb_formats['header'])
     for (col_num, col_name) in enumerate(cols):
