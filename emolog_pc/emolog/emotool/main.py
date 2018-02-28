@@ -232,11 +232,11 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
 
 def create_python_process_cmdline(script):
     script_path = os.path.join(module_dir, script)
-    return ['python3', script_path]
+    return ['python', script_path]
 
 
 def create_python_process_cmdline_command(command):
-    return ['python3', '-c', command]
+    return ['python', '-c', command]
 
 
 class EmoToolClient(ClientProtocolMixin):
