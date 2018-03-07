@@ -105,7 +105,7 @@ def start_fake_sine(ticks_per_second, port):
     # Run in a separate process so it doesn't hog the CPython lock
     # Use our executable to work with a development environment (python executable)
     # or pyinstaller (emotool.exe)
-    if sys.argv[0].endswith('python3'):
+    if sys.argv[0].endswith(path.basename(get_python_executable())):
         cmdline = sys.argv[:2]
     elif path.isfile(sys.argv[0]) or path.isfile(sys.argv[0] + '.exe'):
         cmdline = [sys.argv[0]]
@@ -113,7 +113,7 @@ def start_fake_sine(ticks_per_second, port):
         cmdline = [sys.argv[0]]
     # force usage of python if the first parameter is a python script; use extension as predicate
     if cmdline[0].endswith('.py'):
-        cmdline = ['python3'] + cmdline
+        cmdline = [get_python_executable()] + cmdline
     #print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
     return create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
 
@@ -230,13 +230,17 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     return serial_subprocess
 
 
+def get_python_executable():
+    return 'python'
+
+
 def create_python_process_cmdline(script):
     script_path = os.path.join(module_dir, script)
-    return ['python', script_path]
+    return [get_python_executable(), script_path]
 
 
 def create_python_process_cmdline_command(command):
-    return ['python', '-c', command]
+    return [get_python_executable(), '-c', command]
 
 
 class EmoToolClient(ClientProtocolMixin):
