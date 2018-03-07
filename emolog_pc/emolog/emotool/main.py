@@ -231,7 +231,9 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
 
 
 def get_python_executable():
-    return 'python'
+    if 'win' in sys.platform:
+        return 'python'
+    return 'python3'
 
 
 def create_python_process_cmdline(script):
