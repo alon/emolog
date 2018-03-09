@@ -37,7 +37,7 @@ async def _client_test_helper(client, loop):
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
-    client_orig = EmoToolClient.instance if EmoToolClient.instance is not None else EmoToolClient(dump=False, verbose=True, debug=False)
+    client_orig = EmoToolClient(dump=False, verbose=True, debug=False)
     client_transport, client = await loop.create_connection(lambda: client_orig, sock=client_end)
     if embedded_end is not None:
         embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000), sock=embedded_end)
@@ -53,12 +53,6 @@ async def _test_client_and_sine_socket_pair(loop):
 
 
 def test_client_and_fake_thingy():
-    """
-    TODO: broke with fixing of received_samples & samples_received - actually
-    didn't break, since the test never really parsed the messages so it is
-    better now.. problem is with registration of variables, with the Decoder
-    refactor.
-    """
     loop = asyncio.get_event_loop()
     def exception_handler(loop, context):
         print(f"caught exception in test: {context}")

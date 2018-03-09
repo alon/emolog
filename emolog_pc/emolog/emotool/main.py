@@ -246,21 +246,12 @@ def create_python_process_cmdline_command(command):
 
 
 class EmoToolClient(ClientProtocolMixin):
-    # must be singleton!
-    # to allow multiple instances, some refactoring is needed, namely around the transport and subprocess
-    # currently the serial subprocess only accepts a connection once, and the transport is never properly released
-    # until the final cleanup. This means multiple instances will fail to communicate.
-
-    instance = None
 
     def __init__(self, verbose, dump, debug, csv_writer_factory=None):
-        if EmoToolClient.instance is not None:
-            raise Exception("EmoToolClient is a singleton, can't create another instance")
         if debug:
             print("timeout set to one hour for debugging (gdb)")
             ClientProtocolMixin.ACK_TIMEOUT_SECONDS = 3600.0
         super().__init__(verbose=verbose, dump=dump, csv_writer_factory=csv_writer_factory)
-        EmoToolClient.instance = self  # for singleton
 
     @property
     def running(self):
