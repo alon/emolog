@@ -378,6 +378,7 @@ cdef class RegisteredVariable:
     cdef public unsigned address
     cdef public unsigned size
     cdef public object _type
+
     def __init__(self, name, phase_ticks, period_ticks, address, size, _type):
         self.name = name
         self.phase_ticks = phase_ticks
@@ -385,6 +386,12 @@ cdef class RegisteredVariable:
         self.address = address
         self.size = size
         self._type = _type
+
+    def __str__(self):
+        return f'<RegisteredVariable {self.name} {self.address}/{self.size} {self.period_ticks}/{self.phase_ticks} _type={self._type}>'
+
+    def __repr__(self):
+        return f'<RegisteredVariable {self.name} {self.address}/{self.size} {self.period_ticks}/{self.phase_ticks} _type={self._type}>'
 
 
 class Once:
