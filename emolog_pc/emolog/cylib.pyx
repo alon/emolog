@@ -5,22 +5,21 @@
 Emolog is a logging protocol for debugging embedded c programs.
 
 It consists of:
-    1. python high-level library (this)
-    2. c library compilable both on linux/windows hosts and embedded targets
+    1. Python high-level library (this)
+    2. C library supporting embedded targets, linux and windows hosts
 
 Usage for real life:
-    1. link c library into your program
-    2. call init
-    3. select a serial channel for transport
-    4. call handler on arriving data
-    5. implement sending of response messages
+    1. Link c library into your program
+    2. Call init
+    3. Select a serial channel for transport
+    4. Call handler on arriving data
+    5. Implement sending of response messages
 
 Usage for testing purposes:
     1. TODO
 
-
-Wrap emolog_protocol.cpp library. Build it if it doesn't exist. Provides the same
-API otherwise, plus helpers.
+Wraps emolog_protocol.cpp. Provides a higher level API including classes
+for each message and parsing of variable samples.
 """
 
 from array import array
