@@ -57,16 +57,23 @@ cdef class FakeSineEmbeddedBase:
     cdef bint verbose
     cdef object parser # TODO - how to specify this is Parser extension type - resides in cylib.pyx
 
-    def __init__(self, ticks_per_second):
+    def __init__(self, ticks_per_second, stop_after=None):
+        self.eventloop = get_event_loop()
         self.ticks_per_second = ticks_per_second
         self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
         self.verbose = True
         self.parser = None
+        self.stop_after = stop_after
+        self.reset()
+
+    def reset(self):
+        """
+        Simulate a reset - return to not transmitting state, forget variables
+        """
         self.sines_num = 0
         self.start_time = time()
         self.running = False
         self.ticks = 0
-        self.eventloop = get_event_loop()
 
     def connection_made(self, transport):
         self.parser = Parser(transport, debug=self.verbose)
@@ -121,6 +128,9 @@ cdef class FakeSineEmbeddedBase:
         # easy.
         if not self.running:
             return
+        if self.stop_after is not None and self.ticks >= self.stop_after:
+            self.reset()
+            return
         t = self.ticks * self.tick_time
         var_size_pairs = []
         for i in range(self.sines_num):
@@ -136,7 +146,7 @@ cdef class FakeSineEmbeddedBase:
 
 
 class FakeSineEmbedded(FakeSineEmbeddedBase, Protocol):
-    def __init__(self, ticks_per_second, **kw):
-        FakeSineEmbeddedBase.__init__(self, ticks_per_second)
+    def __init__(self, ticks_per_second, stop_after=None, **kw):
+        FakeSineEmbeddedBase.__init__(self, ticks_per_second=ticks_per_second, stop_after=stop_after)
         Protocol.__init__(self, **kw)
 

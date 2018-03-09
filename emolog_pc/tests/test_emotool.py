@@ -9,6 +9,7 @@ import sys
 from tempfile import mkdtemp
 from shutil import rmtree
 from linecache import getlines
+from time import time
 
 import pytest
 
@@ -26,7 +27,7 @@ async def _client_test_helper(client, loop):
         dict(
             name="foo",
             phase_ticks=0,
-            period_ticks=2,
+            period_ticks=1,
             address=123,
             size=4,
             _type=Decoder(b'f', b'l'))])
@@ -36,32 +37,54 @@ async def _client_test_helper(client, loop):
     await asyncio.sleep(0.1)
 
 
-async def _test_client_and_sine_helper(loop, client_end, embedded_end=None):
+async def _test_client_and_sine_helper(loop, client_end, embedded_end=None, stop_after=None):
     client_orig = EmoToolClient(dump=False, verbose=True, debug=False)
     client_transport, client = await loop.create_connection(lambda: client_orig, sock=client_end)
     if embedded_end is not None:
-        embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000), sock=embedded_end)
+        embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000, stop_after=stop_after), sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
 
 
-async def _test_client_and_sine_socket_pair(loop):
+async def _test_client_and_sine_socket_pair(loop, stop_after=None):
     rsock, wsock = socketpair()
     return await _test_client_and_sine_helper(loop=loop,
                                         client_end=wsock,
-                                        embedded_end=rsock)
+                                        embedded_end=rsock,
+                                        stop_after=stop_after)
 
 
-def test_client_and_fake_thingy():
+def get_event_loop_with_exception_handler():
     loop = asyncio.get_event_loop()
     def exception_handler(loop, context):
         print(f"caught exception in test: {context}")
         raise Exception(str(context))
     loop.set_exception_handler(exception_handler)
+    return loop
+
+
+def test_client_and_fake_thingy():
+    loop = get_event_loop_with_exception_handler()
     client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop))
     client.reset('temp.csv', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 1, 100)
     loop.run_until_complete(main(loop))
-    assert client.cylib.samples_received > 0
+    assert client.cylib.samples_received == 100
+
+
+def test_client_restart():
+    loop = get_event_loop_with_exception_handler()
+    client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop, stop_after=500))
+    client.reset('temp.csv', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 1, 1000)
+    log = []
+    def add_log():
+        log.append((time(), client.samples_received))
+        loop.call_later(0.001, add_log)
+    add_log()
+    loop.run_until_complete(main(loop))
+    print(log)
+    print(client.cylib.samples_received)
+    assert client.cylib.samples_received > 500 # assert that client restarted after it detected the pause at 500
+
 
 
 def qt_event_loop():
