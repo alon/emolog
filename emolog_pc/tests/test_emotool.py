@@ -13,7 +13,7 @@ from linecache import getlines
 import pytest
 
 from emolog.emotool.main import (read_elf_variables, EmoToolClient, main)
-from emolog.decoders import ArrayDecoder
+from emolog.decoders import ArrayDecoder, Decoder
 from emolog.cylib import SamplerSample, emo_decode
 from emolog.fakeembedded import FakeSineEmbedded
 
@@ -29,7 +29,7 @@ async def _client_test_helper(client, loop):
             period_ticks=2,
             address=123,
             size=4,
-            _type=lambda s: struct.unpack('<l', s)[0])])
+            _type=Decoder(b'f', b'l'))])
     await client.send_sampler_start()
     # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
     # worthy of checking. How will it affect serial?
@@ -52,7 +52,7 @@ async def _test_client_and_sine_socket_pair(loop):
                                         embedded_end=rsock)
 
 
-def temporarily_disabled_test_client_and_fake_thingy():
+def test_client_and_fake_thingy():
     """
     TODO: broke with fixing of received_samples & samples_received - actually
     didn't break, since the test never really parsed the messages so it is
