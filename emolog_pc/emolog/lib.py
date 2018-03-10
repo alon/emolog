@@ -147,8 +147,17 @@ class ClientProtocolMixin(Protocol):
         self.ack.set_result(True)
 
     async def await_ack(self):
-        await self.ack
-        is_timeout = self.ack.result() == self.ACK_TIMEOUT
+        try:
+            await self.ack
+        except Exception as e:
+            import pdb; pdb.set_trace()
+        # XXX sometimes result is not available. Probably as a result of an ack
+        # being set to a new one. Treat it as no timeout.
+        try:
+            result = self.ack.result()
+        except:
+            result = None
+        is_timeout = result == self.ACK_TIMEOUT
         self.reset_ack()
         if is_timeout:
             print(f"{self.futures._futures!r}")
