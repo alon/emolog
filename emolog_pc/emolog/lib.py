@@ -167,7 +167,7 @@ class ClientProtocolMixin(Protocol):
         await self.send_sampler_clear()
         self.cylib.sampler.clear()
         for d in variables:
-            await self.send_sampler_register_variable(
+            await self._send_sampler_register_variable(
                 phase_ticks=d['phase_ticks'],
                 period_ticks=d['period_ticks'],
                 address=d['address'],
@@ -178,7 +178,7 @@ class ClientProtocolMixin(Protocol):
     async def send_sampler_clear(self):
         await self.send_and_ack(SamplerClear)
 
-    async def send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
+    async def _send_sampler_register_variable(self, phase_ticks, period_ticks, address, size):
         await self.send_and_ack(SamplerRegisterVariable,
             phase_ticks=phase_ticks, period_ticks=period_ticks, address=address, size=size)
 
