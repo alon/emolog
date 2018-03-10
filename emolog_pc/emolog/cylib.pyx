@@ -710,7 +710,7 @@ cdef class CSVHandler:
     cdef public str csv_filename
     cdef public object csv_writer_factory
     cdef public list csv_fields
-    cdef public long max_ticks
+    cdef public long max_samples
     cdef public long ticks_lost
     cdef public long samples_received
 
@@ -725,7 +725,7 @@ cdef class CSVHandler:
         self.names = []
         self.samples_received = 0
         self.ticks_lost = 0
-        self.max_ticks = 0
+        self.max_samples = 0
         self._running = False
         self.sample_listeners = set()
         self.write_immediately = True
@@ -733,7 +733,7 @@ cdef class CSVHandler:
             csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
 
-    def reset(self, str csv_filename, list names, long min_ticks, unsigned long max_ticks):
+    def reset(self, str csv_filename, list names, long min_ticks, unsigned long max_samples):
         if self._running:
             self._save_csv()
         self.csv_filename = csv_filename
@@ -745,12 +745,12 @@ cdef class CSVHandler:
         self.name_to_index = {name: i for i, name in enumerate(names)}
         self.samples_received = 0
         self.ticks_lost = 0
-        self.max_ticks = max_ticks
+        self.max_samples = max_samples
         self._running = True
         if not self.write_immediately:
             N_cols = 3 + len(self.names)
-            data = [[None] * N_cols for i in range(max_ticks)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
-            #self.data = np.array(data, dtype='string_').reshape(max_ticks, N_cols)
+            data = [[None] * N_cols for i in range(max_samples)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
+            #self.data = np.array(data, dtype='string_').reshape(max_samples, N_cols)
             self.data = data
         else:
             self.writer = self._init_csv()
@@ -760,11 +760,6 @@ cdef class CSVHandler:
 
     cpdef bint running(self):
         return self._running
-
-    cpdef long total_ticks(self):
-        if self.first_ticks == -1 or self.last_ticks == -1:
-            return 0
-        return self.last_ticks - self.first_ticks
 
     def stop(self):
         if not self._running:
@@ -804,8 +799,8 @@ cdef class CSVHandler:
         # cdef np.ndarray[np.double_t, ndim = 2]
         data = self.data
         # prune messages if we got too many
-        if self.max_ticks > 0:
-            missing = self.max_ticks - self.samples_received
+        if self.max_samples > 0:
+            missing = self.max_samples - self.samples_received
             if len(time_and_msgs) > missing:
                 del time_and_msgs[missing:]
         # TODO - decode variables (integer/float) in emolog VariableSampler
@@ -835,7 +830,7 @@ cdef class CSVHandler:
             for listener in self.sample_listeners:
                 listener(new_float_only_msgs)
         self.samples_received += len(time_and_msgs)
-        if self.max_ticks != 0 and self.total_ticks() + 1 >= self.max_ticks:
+        if self.max_samples != 0 and self.samples_received >= self.max_samples:
             self.stop()
 
 #####

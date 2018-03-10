@@ -258,10 +258,6 @@ class EmoToolClient(ClientProtocolMixin):
         return self.cylib.running()
 
     @property
-    def total_ticks(self):
-        return self.cylib.csv_handler.total_ticks
-
-    @property
     def ticks_lost(self):
         return self.cylib.csv_handler.ticks_lost
 
@@ -587,7 +583,7 @@ async def run_client(args, client, variables, allow_kb_stop):
 
 async def record_snapshot(args, client, csv_filename, varsfile):
     names, variables = read_elf_variables(elf=args.elf, vars=[], varfile=varsfile)
-    client.reset(csv_filename=csv_filename, names=names, min_ticks=1, max_ticks=1)
+    client.reset(csv_filename=csv_filename, names=names, min_ticks=1, max_samples=1)
     await run_client(args, client, variables, allow_kb_stop=False)
 
 
@@ -659,12 +655,12 @@ async def amain(client, args):
         bandwidth_bps / 1e6,
         args.baud / 1e6,
         100 * bandwidth_bps / args.baud))
-    max_ticks = args.ticks_per_second * args.runtime if args.runtime else 0
-    if max_ticks > 0:
-        print("running for {} seconds = {} ticks".format(args.runtime, int(max_ticks)))
+    max_samples = args.ticks_per_second * args.runtime if args.runtime else 0 # TODO - off by a factor of at least min_ticks_between_samples
+    if max_samples > 0:
+        print("running for {} seconds = {} samples".format(args.runtime, int(max_samples)))
     min_ticks = gcd(*(var['period_ticks'] for var in variables))
 
-    client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_ticks=max_ticks)
+    client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_samples=max_samples)
     if args.listen:
         await start_tcp_listener(client, args.listen)
 
@@ -672,7 +668,7 @@ async def amain(client, args):
     start_clock = clock()
     await run_client(args=args, client=client, variables=variables, allow_kb_stop=True)
 
-    logger.debug("stopped at time={} ticks={}".format(time(), client.total_ticks))
+    logger.debug("stopped at time={} samples={}".format(time(), client.samples_received))
     setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
     total_clock = clock() - start_clock
