@@ -126,7 +126,7 @@ class ClientProtocolMixin(Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.cylib.parser.transport = transport
+        self.cylib.parser.set_transport(transport)
         self.set_future_result(self.connection_made_future, self)
 
     def connection_lost(self, exc):

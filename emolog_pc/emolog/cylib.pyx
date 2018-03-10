@@ -590,15 +590,15 @@ cdef class Parser:
     cdef unsigned send_seq
     cdef unsigned empty_count
     cdef bytes buf
-    cdef public object transport
+    cdef object transport
     cdef bint debug_message_encoding
     cdef bint debug_message_decoding
 
     def __init__(self, transport, bint debug=False):
-        self.transport = transport
         self.buf = b''
         self.send_seq = 0
         self.empty_count = 0
+        self.set_transport(transport)
 
         # debug flags
         self.debug_message_encoding = debug
@@ -655,6 +655,9 @@ cdef class Parser:
         if self.debug_message_encoding:
             logger.debug("sending: {}, encoded as {}".format(command, encoded))
         self.transport.write(encoded)
+
+    def set_transport(self, transport):
+        self.transport = transport
 
     def __str__(self):
         return '<Parser: #{}: {!r}'.format(len(self.buf), self.buf)
