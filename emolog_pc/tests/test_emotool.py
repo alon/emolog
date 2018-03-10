@@ -34,7 +34,7 @@ async def _client_test_helper(client, loop):
     await client.send_sampler_start()
     # NOTE: linux passes with 0.01, windows needs more time, 0.1.. why?
     # worthy of checking. How will it affect serial?
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(1.0)
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None, stop_after=None):
@@ -78,17 +78,11 @@ def test_client_and_fake_thingy():
 
 def test_client_restart():
     loop = get_event_loop_with_exception_handler()
-    client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop, stop_after=500))
-    client.reset('temp.csv', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 1, 1000)
-    log = []
-    def add_log():
-        log.append((time(), client.samples_received))
-        loop.call_later(0.001, add_log)
-    add_log()
+    loop.set_debug(True)
+    client, main = loop.run_until_complete(_test_client_and_sine_socket_pair(loop, stop_after=10))
+    client.reset('temp.csv', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 1, 50)
     loop.run_until_complete(main(loop))
-    print(log)
-    print(client.cylib.samples_received)
-    assert client.cylib.samples_received > 500 # assert that client restarted after it detected the pause at 500
+    assert client.cylib.samples_received >= 50 # assert that client restarted after it detected the pause at 500
 
 
 
