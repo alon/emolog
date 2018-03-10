@@ -17,6 +17,7 @@
 # build_protocol_library,
 # )
 
+import asyncio
 from asyncio import Future, Protocol, sleep, get_event_loop
 from asyncio.futures import InvalidStateError
 from time import time
@@ -111,6 +112,7 @@ class ClientProtocolMixin(Protocol):
     """
     ACK_TIMEOUT_SECONDS = 40.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
+    MISSED_MESSAGES_BEFORE_REREGISTRATION = 2
 
     def __init__(self, verbose, dump, ticks_per_second, csv_writer_factory=None):
         Protocol.__init__(self)
@@ -121,6 +123,8 @@ class ClientProtocolMixin(Protocol):
         self.futures = Futures()
         self.reset_ack()
         self.connection_made_future = self.futures.add_future()
+        self._reset_task = None
+        self.start_check_progress()
 
     def set_future_result(self, future, result):
         self.futures.set_future_result(future, result)
@@ -175,6 +179,7 @@ class ClientProtocolMixin(Protocol):
                 size=d['size']
             )
         self.cylib.sampler.register_variables(variables)
+        self._variables = variables
 
     async def send_sampler_clear(self):
         await self.send_and_ack(SamplerClear)
@@ -193,6 +198,37 @@ class ClientProtocolMixin(Protocol):
     async def send_sampler_stop(self):
         await self.send_and_ack(SamplerStop)
         self.cylib.sampler.on_stopped()
+
+    def start_check_progress(self):
+        if self._reset_task is not None:
+            return
+        self._reset_task = get_event_loop().create_task(self.check_progress())
+
+    async def check_progress(self):
+        loop = get_event_loop()
+        last_samples_received = None
+        while True:
+            if not self.cylib.sampler.running:
+                # remain until we start running
+                await sleep(0.01)
+                continue
+            dt = (self.MISSED_MESSAGES_BEFORE_REREGISTRATION *
+                float(self.cylib.sampler.max_ticks_between_messages()) / self._ticks_per_second)
+            dt = max(dt, 0.1)
+            #print(f"DEBUG {time()}: check_progress: new/old/dt {self.samples_received}/{last_samples_received} {dt}")
+            redo_registration = self.samples_received == last_samples_received
+            last_samples_received = self.samples_received
+            if redo_registration:
+                print(f"DEBUG {time()}: redoing registration, samples {self.samples_received}")
+                await self.redo_registration_and_start()
+            # regardless of redo, we continue to monitor (until stopped)
+            #print(f"DEBUG: check_progress: sleeping {time()}")
+            await sleep(dt)
+
+    async def redo_registration_and_start(self):
+        await self.send_sampler_stop()
+        await self.send_set_variables(self._variables)
+        await self.send_sampler_start()
 
     async def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care

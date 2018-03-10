@@ -435,6 +435,11 @@ cdef class VariableSampler:
     def on_stopped(self):
         self.running = False
 
+    def max_ticks_between_messages(self):
+        if len(self.period_ticks) == 0:
+            return None
+        return min(self.period_ticks)
+
     def register_variables(self, variables):
         out = []
         for d in variables:
