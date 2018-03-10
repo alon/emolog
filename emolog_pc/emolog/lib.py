@@ -112,8 +112,9 @@ class ClientProtocolMixin(Protocol):
     ACK_TIMEOUT_SECONDS = 40.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
 
-    def __init__(self, verbose, dump, csv_writer_factory=None):
+    def __init__(self, verbose, dump, ticks_per_second, csv_writer_factory=None):
         Protocol.__init__(self)
+        self._ticks_per_second = ticks_per_second
         self.cylib = EmotoolCylib(
             parent=self, verbose=verbose, dump=dump,
             csv_writer_factory=csv_writer_factory)

@@ -247,11 +247,13 @@ def create_python_process_cmdline_command(command):
 
 class EmoToolClient(ClientProtocolMixin):
 
-    def __init__(self, verbose, dump, debug, csv_writer_factory=None):
+    def __init__(self, ticks_per_second, verbose, dump, debug, csv_writer_factory=None):
         if debug:
             print("timeout set to one hour for debugging (gdb)")
             ClientProtocolMixin.ACK_TIMEOUT_SECONDS = 3600.0
-        super().__init__(verbose=verbose, dump=dump, csv_writer_factory=csv_writer_factory)
+        super().__init__(verbose=verbose, dump=dump,
+            ticks_per_second=ticks_per_second,
+            csv_writer_factory=csv_writer_factory)
 
     @property
     def running(self):
@@ -623,7 +625,9 @@ async def amain_startup(args):
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
     banner("Emotool {}".format(version()))
 
-    client = EmoToolClient(verbose=not args.silent, dump=args.dump, debug=args.debug, csv_writer_factory=resolve(args.csv_factory))
+    client = EmoToolClient(ticks_per_second=args.ticks_per_second,
+        verbose=not args.silent, dump=args.dump, debug=args.debug,
+        csv_writer_factory=resolve(args.csv_factory))
     await start_transport(client=client, args=args)
     return client
 

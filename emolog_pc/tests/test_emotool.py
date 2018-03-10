@@ -38,10 +38,15 @@ async def _client_test_helper(client, loop):
 
 
 async def _test_client_and_sine_helper(loop, client_end, embedded_end=None, stop_after=None):
-    client_orig = EmoToolClient(dump=False, verbose=True, debug=False)
+    ticks_per_second = 20000
+    client_orig = EmoToolClient(
+        ticks_per_second=ticks_per_second,
+        dump=False, verbose=True, debug=False)
     client_transport, client = await loop.create_connection(lambda: client_orig, sock=client_end)
     if embedded_end is not None:
-        embedded_transport, embedded = await loop.create_connection(lambda: FakeSineEmbedded(20000, stop_after=stop_after), sock=embedded_end)
+        embedded_transport, embedded = await loop.create_connection(
+            lambda: FakeSineEmbedded(ticks_per_second, stop_after=stop_after),
+            sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
 
