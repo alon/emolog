@@ -110,7 +110,7 @@ class ClientProtocolMixin(Protocol):
     You cannot inherit from it here to avoid two classes with predefined structure
     inheriting and resulting in an error
     """
-    ACK_TIMEOUT_SECONDS = 40.0
+    ACK_TIMEOUT_SECONDS = 1.0
     ACK_TIMEOUT = 'ACK_TIMEOUT'
     MISSED_MESSAGES_BEFORE_REREGISTRATION = 2
 
