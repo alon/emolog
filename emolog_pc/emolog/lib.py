@@ -226,9 +226,14 @@ class ClientProtocolMixin(Protocol):
             await sleep(dt)
 
     async def redo_registration_and_start(self):
-        await self.send_sampler_stop()
-        await self.send_set_variables(self._variables)
-        await self.send_sampler_start()
+        while True:
+            try:
+                await self.send_sampler_stop()
+                await self.send_set_variables(self._variables)
+                await self.send_sampler_start()
+                break
+            except AckTimeout:
+                pass
 
     async def send_version(self):
         # We don't tell our version to the embedded right now - it doesn't care
