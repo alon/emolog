@@ -248,7 +248,7 @@ def set_column_formats(ws, cols, wb_formats, col_name_to_format):
 
 
 def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_name, requested_columns, col_formats,
-                      min_row, max_row, axes_ranges):
+                      output_col_names, min_row, max_row, axes_ranges):
     sheet = wb.add_chartsheet()
     chart = wb.add_chart({'type': 'scatter', 'subtype': 'straight'})
     x_axis_col = data.columns.tolist().index(x_axis_col_name) + 1
@@ -256,7 +256,7 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
     existing_columns = [c for c in requested_columns if c in data.columns and c != x_axis_col_name]
     for col_name in existing_columns:
         col_num = data.columns.tolist().index(col_name) + 1
-        col_params = {'name': col_name,
+        col_params = {'name': output_col_names.get(col_name, col_name),
                       'categories': [data_sheet_name, min_row, x_axis_col, max_row, x_axis_col],
                       'values': [data_sheet_name, min_row, col_num, max_row, col_num],
                       }
