@@ -251,7 +251,7 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
                       min_row, max_row, axes_ranges):
     sheet = wb.add_chartsheet()
     chart = wb.add_chart({'type': 'scatter', 'subtype': 'straight'})
-    x_axis_col = data.columns.tolist().index(x_axis_col_name)
+    x_axis_col = data.columns.tolist().index(x_axis_col_name) + 1
 
     existing_columns = [c for c in requested_columns if c in data.columns and c != x_axis_col_name]
     for col_name in existing_columns:
