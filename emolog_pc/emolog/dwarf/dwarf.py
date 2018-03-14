@@ -204,7 +204,12 @@ class VarDescriptor:
             opcode = attr.value[0]
             if opcode != DW_OP_plus_uconst:
                 return self.ADDRESS_TYPE_UNSUPPORTED
-            offset = attr.value[1]
+            # LEB128 encoding parsing. we ASSUME the dwarf stack holds the parent's address...
+            offset = 0
+            multiplier = 1
+            for val in attr.value[1:]:
+                offset += multiplier * (val & 0x7F)
+                multiplier <<= 7
         elif attr.form in ['DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4']:
             offset = attr.value
         else:
