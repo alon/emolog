@@ -57,11 +57,14 @@ from functools import reduce
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-
+from elftools.dwarf.structs import _ULEB128
 
 from elftools.dwarf.die import AttributeValue, DIE
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Generator
 logger = logging.getLogger('dwarf')
+
+
+uleb128 = _ULEB128('dummy')
 
 
 class FileParser:
@@ -204,12 +207,7 @@ class VarDescriptor:
             opcode = attr.value[0]
             if opcode != DW_OP_plus_uconst:
                 return self.ADDRESS_TYPE_UNSUPPORTED
-            # LEB128 encoding parsing. we ASSUME the dwarf stack holds the parent's address...
-            offset = 0
-            multiplier = 1
-            for val in attr.value[1:]:
-                offset += multiplier * (val & 0x7F)
-                multiplier <<= 7
+            offset = uleb128.parse(bytes(attr.value[1:]))
         elif attr.form in ['DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4']:
             offset = attr.value
         else:
