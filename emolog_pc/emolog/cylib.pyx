@@ -706,10 +706,8 @@ cdef class CSVHandler:
     cdef long min_ticks
     cdef list names
     cdef set sample_listeners
-    cdef list data # (np.ndarray not good enough for array types ; can specialize (fast use case doesn't have arrays)) to be made into an array
     cdef dict name_to_index
     cdef VariableSampler sampler
-    cdef bint write_immediately # for testing - should commit
     cdef object writer
 
     cdef public str csv_filename
@@ -733,14 +731,11 @@ cdef class CSVHandler:
         self.max_samples = 0
         self._running = False
         self.sample_listeners = set()
-        self.write_immediately = True
         if csv_writer_factory is None:
             csv_writer_factory = default_csv_factory
         self.csv_writer_factory = csv_writer_factory
 
     def reset(self, str csv_filename, list names, long min_ticks, unsigned long max_samples):
-        if self._running:
-            self._save_csv()
         self.csv_filename = csv_filename
         self.first_ticks = -1
         self.last_ticks = -1
@@ -752,13 +747,7 @@ cdef class CSVHandler:
         self.ticks_lost = 0
         self.max_samples = max_samples
         self._running = True
-        if not self.write_immediately:
-            N_cols = 3 + len(self.names)
-            data = [[None] * N_cols for i in range(max_samples)] # TODO: 64 bytes per entry - so for 20 seconds, 10 variables, 20e3/sec ~ 120 MiB
-            #self.data = np.array(data, dtype='string_').reshape(max_samples, N_cols)
-            self.data = data
-        else:
-            self.writer = self._init_csv()
+        self.writer = self._init_csv()
 
     def register_listener(self, callback):
         self.sample_listeners.add(callback)
@@ -770,14 +759,6 @@ cdef class CSVHandler:
         if not self._running:
             return
         self._running = False
-        self._save_csv()
-
-    def _save_csv(self):
-        if self.write_immediately:
-            return
-        writer = self._init_csv()
-        for i, row in enumerate(self.data):
-            writer.writerow(row[:3] + [encode_if_bytes(t.to_csv_val(v)) for t, v in zip(self.sampler._type, row[3:])])
 
     cdef _init_csv(self):
         if self.csv_filename is None:
@@ -796,7 +777,6 @@ cdef class CSVHandler:
         :param msgs: [(time, seq, ticks, {name: value})]
         :return: None
         """
-        cdef list data
         cdef list new_float_only_msgs
         cdef int missing
         cdef double now
@@ -805,7 +785,6 @@ cdef class CSVHandler:
         if not self._running:
             return
         # cdef np.ndarray[np.double_t, ndim = 2]
-        data = self.data
         # prune messages if we got too many
         if self.max_samples > 0:
             missing = self.max_samples - self.samples_received
@@ -819,14 +798,7 @@ cdef class CSVHandler:
         for now, seq, ticks, payload in time_and_msgs:
             types, values = self.sampler.list_from_ticks_and_payload(name_to_index=name_to_index, ticks=ticks, payload=payload)
             row_start = [seq, ticks, now]
-            if self.write_immediately:
-                self.writer.writerow(row_start + [(encode_if_bytes(t.to_csv_val(v)) if v is not None else None) for t, v in zip(types, values)])
-            elif 0 <= ticks < len(self.data):
-                data[ticks] = row_start + values
-                if have_listeners:
-                    new_float_only_msgs.append((ticks, [(self.names[i], v) for i, v in enumerate(values) if v is not None and type(v) == float]))
-            else:
-                print(f"error {ticks} > {len(self.data)} or {ticks} < 1")
+            self.writer.writerow(row_start + [(encode_if_bytes(t.to_csv_val(v)) if v is not None else None) for t, v in zip(types, values)])
             if self.first_ticks == -1:
                 self.first_ticks = ticks
             if self.last_ticks != -1 and ticks - self.last_ticks != self.min_ticks:
