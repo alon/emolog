@@ -783,7 +783,10 @@ cdef class CSVHandler:
         if self.csv_filename is None:
             return
         writer = self.csv_writer_factory(self.csv_filename, fields=self.csv_fields, lineterminator='\n')
-        writer.writerow(self.csv_fields)
+        if hasattr(writer, 'writeheader'):
+            writer.writeheader()
+        else:
+            writer.writerow(self.csv_fields)
         return writer
 
     # python version for profiling
