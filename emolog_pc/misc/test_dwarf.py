@@ -9,14 +9,18 @@ basedir = os.path.dirname(__file__)
 # snapshot_vars = open('snapshot_vars.csv').readlines()
 one_shot_vars = ['controller.state.required_dir,0,1']
 data = [
-    #(os.path.join(basedir, 'tests', 'example.out'), ['var_unsigned_char,1,0', 'var_int,1,0', 'var_float,1,0', 'var_float_arr_2,1,0'])
-    ('../../pump_drive/Debug/pump_drive_tiva.out', None)
+    (os.path.join(basedir, '..', 'tests', 'example.out'), ['var_unsigned_char,1,0', 'var_int,1,0', 'var_float,1,0', 'var_float_arr_2,1,0'])
+    #('../../pump_drive/Release/pump_drive_tiva.out', None)
     #('../examples/pc_platform/pc', one_shot_vars)
     ]
-for filename, vars in data:
+for filename, vars_defs in data:
+    if vars_defs is not None:
+        vars_names = [x.split(',')[0] for x in vars_defs]
+    else:
+        vars_names = None
     parsed = FileParser(filename)
     # 'var_float8,1,0',
-    variables = dwarf_get_variables_by_name(filename, vars)
+    variables = dwarf_get_variables_by_name(filename, vars_names)
     timestamp = parsed.get_const_by_name('emolog_timestamp')
     for name, var in variables.items():
         print(f"=== {name} ===")
