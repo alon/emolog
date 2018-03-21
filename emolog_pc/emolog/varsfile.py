@@ -44,7 +44,7 @@ def main():
     import argparse
     import sys
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--file', type=argparse.FileType, help='file to check')
+    parser.add_argument('-f', '--file', type=argparse.FileType('r'), help='file to check', required=True)
     args = parser.parse_args()
     try:
         res = read_vars_from_fd(args.file, check_errors=True)
