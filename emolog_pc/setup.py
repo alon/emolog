@@ -115,7 +115,8 @@ setup(
         'console_scripts': [
             'emotool = emolog.emotool.main:main',
             'emogui = emolog.emotool.main_window:main',
-            'emotool-varsfile = emolog.varsfile:main',
+            'emotool-vars = emolog.varsfile:main',
+            'emotool-dwarf = emolog.dwarfutil:main',
         ]
     },
     classifiers = ['Development Status :: 3 - Alpha',
