@@ -42,7 +42,7 @@ chdir(setup_root)
 # better solution: emolog-protocol package
 for f in ["emolog_protocol.h", "emolog_protocol.cpp", 'emolog_debug.h']:
     src = path.join(emolog_protocol_root, f)
-    dst = path.join(emolog_root, f)
+    dst = path.join(emolog_root, 'protocol', f)
     if not path.exists(dst):
         shutil.copyfile(src, dst)
 
