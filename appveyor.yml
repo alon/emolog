@@ -35,18 +35,12 @@ install:
   # target Python version and architecture
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - python -c "import os; print(os.getcwd())"
-  - "pip install -e .[summarize]"
+  - "pip install -e ."
 
 test_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - pytest --fulltrace --doctest-modules --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml tests emolog/util.py
   # sanity of pyinstaller artifacts
-  - mkdir "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
-  - cd "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
-  - 7z x "%APPVEYOR_BUILD_FOLDER%\emolog_pc\dist\summarize.zip"
-  - cd summarize
-  - summarize.exe --help
-  - cd ..\
   - 7z x  "%APPVEYOR_BUILD_FOLDER%\emolog_pc\dist\emotool.zip"
   - cd emotool
   - emotool.exe --help
@@ -64,11 +58,9 @@ test_script:
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - "python setup.py install"
-  - "pyinstaller pyinstaller\\summarize.spec"
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\\dist"
   # TODO: proper versions for both the zipped directory and the zip file
-  # TODO -1: version reporting correctly for both summarize and emotool
-  - 7z a summarize.zip summarize
+  # TODO -1: version reporting correctly for emotool
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
   - "pyinstaller pyinstaller\\emotool.spec"
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc\\dist"
@@ -77,7 +69,5 @@ build_script:
   - dir %APPVEYOR_BUILD_FOLDER%\emolog_pc\dist
 
 artifacts:
-  - path: emolog_pc\dist\summarize.zip
-    name: Summarize
   - path: emolog_pc\dist\emotool.zip
     name: emotool
