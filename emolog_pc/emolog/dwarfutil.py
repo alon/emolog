@@ -214,6 +214,20 @@ def read_all_elf_variables(elf):
         names, name_to_ticks_and_phase, dwarf_variables, skip_not_supported=True)
 
 
+def main_dump():
+    import argparse
+    import os
+    from pprint import pprint
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--elf', required=True, type=str, help='ELF file')
+    args = parser.parse_args()
+    if not os.path.exists(args.elf):
+        print(f"error: missing file {args.elf}")
+        raise SystemExit
+    out = read_elf_variables(elf=args.elf, vars=None, varfile=args.vars)
+    pprint(out)
+
+
 def main():
     import argparse
     import os

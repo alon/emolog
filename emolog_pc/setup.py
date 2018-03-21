@@ -117,6 +117,7 @@ setup(
             'emogui = emolog.emotool.main_window:main',
             'emotool-vars = emolog.varsfile:main',
             'emotool-dwarf = emolog.dwarfutil:main',
+            'emotool-dwarf-dump = emolog.dwarfutil:main_dump',
         ]
     },
     classifiers = ['Development Status :: 3 - Alpha',
