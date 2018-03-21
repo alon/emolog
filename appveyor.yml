@@ -50,11 +50,16 @@ test_script:
   - 7z x  "%APPVEYOR_BUILD_FOLDER%\emolog_pc\dist\emotool.zip"
   - cd emotool
   - emotool.exe --help
+  - emotool-vars.exe --help
+  - emotool-dwarf.exe --help
+  - emotool-dwarf-dump.exe --help 
+  - emotool-dwarf-dump.exe -e tests\example.out -v tests\vars.csv
   - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
   - copy config\local_machine_config.ini.example local_machine_config.ini
   # TODO: full run of summarize, compare to known file
   # TODO: full run of emotool, compare to known result (include post_processing)
   - python misc\prof.py
+  # sanity for the tools we have
 
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
