@@ -26,6 +26,7 @@ from ..util import version, resolve, create_process, kill_all_processes, gcd
 from ..util import verbose as util_verbose
 from ..decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
+from ..varsfile import read_vars_file, VarsFileError, parse_vars_definition
 
 
 logger = logging.getLogger()
@@ -506,23 +507,22 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
     return variables
 
 
-def read_vars_file(filename):
-    with open(filename) as fd:
-        return [l for l in fd.readlines() if l.strip()[:1] != '#' and len(l.strip()) > 0]
-
-
 def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
     if vars is None: # debug - will take all vars in ELF - usually not what you want
         return read_all_elf_variables(elf)
+    num_command_line_args = len(vars)
     if varfile is not None:
-        vars.extend(read_vars_file(varfile))
-    assert len(vars) > 0
-    split_vars = [[x.strip() for x in v.split(',')] for v in vars]
-    for v, orig in zip(split_vars, vars):
-        if len(v) != 3 or not v[1].isdigit() or not v[2].isdigit():
-            logger.error(f"problem with variable definition {orig!r}")
-            logger.error("--var parameter must be a 3 element comma separated list of: <name>,<period:int>,<phase:int>")
-            raise SystemExit
+        vars.extend(read_vars_file(varfile, check_errors=False))
+    if len(vars) == 0:
+        logger.error('no variable definitions supplied. use --var or --varsfile')
+        raise SystemExit
+    try:
+        # Note hack: using negative numbers for command line arguments.
+        # rust: would have used an enum :)
+        split_vars = [parse_vars_definition(line=v, linenumber=i - num_command_line_args) for i, v in enumerate(vars)]
+    except VarsFileError as e:
+        logger.error(str(e))
+        raise SystemExit
     names = [name for name, ticks, phase in split_vars]
     if elf is None:
         dwarf_variables = fake_dwarf(names)
