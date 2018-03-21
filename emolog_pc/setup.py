@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from os import path
+from os import path, chdir
 from os.path import join
 from setuptools import setup, Extension
 import shutil
@@ -31,25 +31,31 @@ macros = []
 # gives
 # extension.py:131: UserWarning: Unknown Extension options: 'compiler_directives'
 
+setup_root = path.abspath(path.dirname(__file__))
+emolog_root = path.join(setup_root, 'emolog')
+emolog_protocol_root = path.join(setup_root, '..', 'emolog_protocol')
+
+# allow running from different directory
+chdir(setup_root)
 
 # hack: copy files internally
 # better solution: emolog-protocol package
 for f in ["emolog_protocol.h", "emolog_protocol.cpp", 'emolog_debug.h']:
-    src = path.join("..", "emolog_protocol", f)
-    dst = path.join("emolog", "protocol", f)
+    src = path.join(emolog_protocol_root, f)
+    dst = path.join(emolog_root, f)
     if not path.exists(dst):
         shutil.copyfile(src, dst)
 
 
 if use_cython:
     cylib = Extension(name='emolog.cylib',
-                      sources=[join('emolog', 'cylib.pyx'), join('..', 'emolog_protocol', 'emolog_protocol.cpp')],
-                      include_dirs=[join('..', 'emolog_protocol')] + [numpy.get_include()],
+                      sources=[join(emolog_root, 'cylib.pyx'), join(emolog_protocol_root, 'emolog_protocol.cpp')],
+                      include_dirs=[emolog_protocol_root] + [numpy.get_include()],
                       define_macros=macros,
                       language="c++")
-    fakeembedded = Extension(name="emolog.fakeembedded", sources=[join('emolog', 'fakeembedded.pyx')])
-    cython_util = Extension(name="emolog.cython_util", sources=[join('emolog', 'cython_util.pyx')])
-    decoders = Extension(name="emolog.decoders", sources=[join('emolog', 'decoders.pyx')])
+    fakeembedded = Extension(name="emolog.fakeembedded", sources=[join(emolog_root, 'fakeembedded.pyx')])
+    cython_util = Extension(name="emolog.cython_util", sources=[join(emolog_root, 'cython_util.pyx')])
+    decoders = Extension(name="emolog.decoders", sources=[join(emolog_root, 'decoders.pyx')])
     cython_install_requires = [
         'Cython(>=0.27.3)',
     ]
@@ -58,19 +64,19 @@ if use_cython:
     ]
 else:
     cylib_sources = [
-        join('emolog', 'cylib.cpp'),
-        join('emolog', 'protocol', 'emolog_protocol.cpp'),
+        join(emolog_root, 'cylib.cpp'),
+        join(emolog_root, 'protocol', 'emolog_protocol.cpp'),
     ]
-    fakeembedded_sources = [join('emolog', 'fakeembedded.c')]
-    cython_util_sources = [join('emolog', 'cython_util.c')]
-    decoders_sources = [join('emolog', 'decoders.c')]
+    fakeembedded_sources = [join(emolog_root, 'fakeembedded.c')]
+    cython_util_sources = [join(emolog_root, 'cython_util.c')]
+    decoders_sources = [join(emolog_root, 'decoders.c')]
     sources = cylib_sources + fakeembedded_sources + cython_util_sources + decoders_sources
     if not all([path.exists(x) for x in sources]):
         print("error: no cython but no c/c++ sources either")
         raise SystemExit
     cylib = Extension(name="emolog.cylib",
                       sources=cylib_sources,
-                      include_dirs=[join('emolog', 'protocol')] + [numpy.get_include()],
+                      include_dirs=[join(emolog_root, 'protocol')] + [numpy.get_include()],
                       define_macros=macros,
                       language="c++",
                       #data=[join('emolog', 'protocol', 'emolog_protocol.h')]
