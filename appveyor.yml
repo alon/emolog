@@ -28,6 +28,9 @@ install:
 
   # Should this be done here or via setup some how? it should not be part of the build/install requirements, just development
   - "pip install pytest"
+ 
+  # Need cython first. TODO: pip install -e . should just work
+  - "pip install cython"
 
   # Install the build dependencies of the project. If some dependencies contain
   # compiled extensions and are not provided as pre-built wheel packages,
