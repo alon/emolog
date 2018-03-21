@@ -224,7 +224,7 @@ def main_dump():
     if not os.path.exists(args.elf):
         print(f"error: missing file {args.elf}")
         raise SystemExit
-    out = read_elf_variables(elf=args.elf, vars=None, varfile=args.vars)
+    out = read_elf_variables(elf=args.elf, vars=None, varfile=None)
     pprint(out)
 
 
