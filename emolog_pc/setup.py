@@ -51,10 +51,10 @@ if use_cython:
     cython_util = Extension(name="emolog.cython_util", sources=[join('emolog', 'cython_util.pyx')])
     decoders = Extension(name="emolog.decoders", sources=[join('emolog', 'decoders.pyx')])
     cython_install_requires = [
-        'Cython(==0.27.3)',
+        'Cython(>=0.27.3)',
     ]
     cython_setup_requires = [
-        'Cython(==0.27.3)',
+        'Cython(>=0.27.3)',
     ]
 else:
     cylib_sources = [
