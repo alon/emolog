@@ -134,7 +134,7 @@ def test_emotool_with_gen():
     assert len(lines) >= 2
     assert lines[0].count(',') == lines[1].count(',')
     res_t = float(lines[1].split(',')[2])
-    assert abs(res_t - start) < 1000
+    assert abs(res_t - start) < 1500
 
 
 def test_read_elf_variables():
