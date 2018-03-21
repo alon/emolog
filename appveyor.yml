@@ -50,6 +50,7 @@ test_script:
   - emotool-vars.exe --help
   - emotool-dwarf.exe --help
   - emotool-dwarf-dump.exe --help 
+  - cd %APPVEYOR_BUILD_FOLDER%\emolog_pc
   - emotool-dwarf-dump.exe -e tests\example.out
   - emotool-dwarf.exe -e tests\example.out -v tests\vars_example.csv
   - cd "%APPVEYOR_BUILD_FOLDER%\emolog_pc"
