@@ -378,8 +378,11 @@ async def run_client(args, client, variables, allow_kb_stop):
     await client.send_sampler_stop()
 
 
-async def record_snapshot(args, client, csv_filename, varsfile):
-    names, variables = read_elf_variables(elf=args.elf, vars=[], varfile=varsfile)
+async def record_snapshot(args, client, csv_filename, varsfile, extra_vars=None):
+    if extra_vars is None:
+        extra_vars = []
+    defs = merge_vars_from_file_and_list(filename=varsfile, def_lines=extra_vars)
+    names, variables = read_elf_variables(elf=args.elf, defs=defs)
     client.reset(csv_filename=csv_filename, names=names, min_ticks=1, max_samples=1)
     await run_client(args, client, variables, allow_kb_stop=False)
 
@@ -428,7 +431,8 @@ async def amain_startup(args):
 
 
 async def amain(client, args):
-    names, variables = read_elf_variables(elf=args.elf, vars=args.var, varfile=args.varfile)
+    defs = merge_vars_from_file_and_list(def_lines=args.var, filename=args.varfile)
+    names, variables = read_elf_variables(elf=args.elf, defs=defs)
 
     config = ConfigParser()
     config.read(CONFIG_FILE_NAME)

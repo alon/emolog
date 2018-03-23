@@ -174,23 +174,11 @@ def fake_dwarf(names):
     return {name: fake_variable(name) for name in names}
 
 
-def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
-    if vars is None: # debug - will take all vars in ELF - usually not what you want
-        return read_all_elf_variables(elf)
-    num_command_line_args = len(vars)
-    if varfile is not None:
-        vars.extend(read_vars_file(varfile, check_errors=False))
-    if len(vars) == 0:
-        logger.error('no variable definitions supplied. use --var or --varsfile')
-        raise SystemExit
-    try:
-        # Note hack: using negative numbers for command line arguments.
-        # rust: would have used an enum :)
-        split_vars = [parse_vars_definition(line=v, linenumber=i - num_command_line_args) for i, v in enumerate(vars)]
-    except VarsFileError as e:
-        logger.error(str(e))
-        raise SystemExit
-    names = [name for name, ticks, phase in split_vars]
+def read_elf_variables(elf, defs, skip_not_supported=False):
+    """
+    defs - list of (name, ticks, phase)
+    """
+    names = [name for name, ticks, phase in defs]
     if elf is None:
         dwarf_variables = fake_dwarf(names)
     else:
@@ -198,7 +186,7 @@ def read_elf_variables(elf, vars, varfile, skip_not_supported=False):
     if len(dwarf_variables) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
-    name_to_ticks_and_phase = {name: (int(ticks), int(phase)) for name, ticks, phase in split_vars}
+    name_to_ticks_and_phase = {name: (ticks, phase) for name, ticks, phase in defs}
     return names, variables_from_dwarf_variables(
         names=names,
         name_to_ticks_and_phase=name_to_ticks_and_phase,
@@ -224,7 +212,7 @@ def main_dump():
     if not os.path.exists(args.elf):
         print(f"error: missing file {args.elf}")
         raise SystemExit
-    out = read_elf_variables(elf=args.elf, vars=None, varfile=None)
+    out = read_all_elf_variables(args.elf)
     pprint(out)
 
 
