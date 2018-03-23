@@ -25,7 +25,7 @@ from ..util import version, resolve, create_process, kill_all_processes, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import read_vars_file, VarsFileError, parse_vars_definition
-from ..dwarfutil import dwarf_get_variables_by_name, read_elf_variables
+from ..dwarfutil import read_elf_variables
 
 
 logger = logging.getLogger()
