@@ -689,12 +689,31 @@ cdef object encode_if_bytes(object b):
     return b
 
 
+class ClosingWriter:
+
+    def __init__(self, fd, *args, **kw):
+        self.writer = csv.writer(fd, *args, **kw)
+        self.fd = fd
+
+    def close(self):
+        self.fd.flush()
+        self.fd.close()
+
+    def writerow(self, *args, **kw):
+        self.writer.writerow(*args, **kw)
+
+
 def default_csv_factory(filename, fields, *args, **kw):
     """
     fields - unused by the default factory.
+
+    return a regular writer, with an additional close method that
+    flushes the file.
+    we need that to read the snapshot variables without adding new functions
+    to return all the samples which would imply keeping them in memory.
     """
     fd = open(filename, 'w+')
-    return csv.writer(fd, *args, **kw)
+    return ClosingWriter(fd, *args, **kw)
 
 
 cdef class CSVHandler:
@@ -759,6 +778,7 @@ cdef class CSVHandler:
         if not self._running:
             return
         self._running = False
+        self.writer.close()
 
     cdef _init_csv(self):
         if self.csv_filename is None:
