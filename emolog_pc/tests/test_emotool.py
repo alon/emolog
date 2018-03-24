@@ -6,10 +6,11 @@ from struct import pack, unpack
 from io import BytesIO
 from socket import socketpair
 import sys
-from tempfile import mkdtemp
+from tempfile import TemporaryDirectory
 from shutil import rmtree
 from linecache import getlines
 from time import time
+from contextlib import contextmanager
 
 import pytest
 
@@ -111,34 +112,39 @@ else:
             assert client.cylib.samples_received > 0
 
 
+@contextmanager
+def TemporaryDirectoryWithChdir():
+    cwd = getcwd()
+    with TemporaryDirectory() as d:
+        chdir(d)
+        try:
+            yield d
+        finally:
+            chdir(cwd)
+
+
 
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
-    cwd = getcwd()
     start = datetime.utcnow().timestamp() * 1000
-    try:
-        d = mkdtemp()
-        chdir(d)
+    with TemporaryDirectoryWithChdir() as d:
         original = getcsv()
         with open('local_machine_config.ini', 'w+') as fd:
             fd.write("[folders]\noutput_folder=.\n")
         system('emotool --fake gen --runtime 0.1')
         newfiles = list(sorted(getcsv() - original))
         contents = [getlines(f) for f in newfiles]
-    finally:
-        chdir(cwd)
-        rmtree(d)
-    assert len(newfiles) == 1
-    assert len(contents) == 1
-    lines = contents[0]
-    assert len(lines) >= 2
-    assert lines[0].count(',') == lines[1].count(',')
-    res_t = float(lines[1].split(',')[2])
-    assert abs(res_t - start) < 1500
+        assert len(newfiles) == 1
+        assert len(contents) == 1
+        lines = contents[0]
+        assert len(lines) >= 2
+        assert lines[0].count(',') == lines[1].count(',')
+        res_t = float(lines[1].split(',')[2])
+        assert abs(res_t - start) < 1500
 
 
 def test_read_elf_variables():
-    read_elf_variables(os.path.join('tests', 'example.out'), ['var_int,1,0', 'var_float,1,0', 'var_unsigned_char,1,0', 'var_float8,1,0'], None)
+    read_elf_variables(os.path.join('tests', 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
 
 
 def test_array_decoder():

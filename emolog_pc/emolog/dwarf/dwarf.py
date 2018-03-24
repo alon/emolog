@@ -54,9 +54,10 @@ import sys
 import logging
 import struct
 from functools import reduce
+from itertools import chain
 
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import SymbolTableSection
+from elftools.elf.sections import SymbolTableSection, Symbol
 from elftools.dwarf.structs import _ULEB128
 
 from elftools.dwarf.die import AttributeValue, DIE
@@ -79,12 +80,13 @@ class FileParser:
         self.elf_file = ELFFile(f)
         self.read_dies_from_dwarf_file()
         # the following assumes there's just one symbol table (ELF format allows more than one):
-        self.symbol_table = next(x for x in self.elf_file.iter_sections() if isinstance(x, SymbolTableSection))
+        self.symbol_tables = [x for x in self.elf_file.iter_sections() if isinstance(x, SymbolTableSection)]
+        self.symbol_table = {x.name: x for x in chain(*[s.iter_symbols() for s in self.symbol_tables])}
         var_dies = {offset: die for offset, die in self.all_dies.items() if die.tag == 'DW_TAG_variable' and 'DW_AT_type' in die.attributes}
         logger.debug("read %d DIEs which include %d variable DIEs" % (len(self.all_dies), len(var_dies)))
         self.var_descriptors = var_descriptors = []
         for offset, var_die in var_dies.items():
-            var_descriptors.append(VarDescriptor(self.all_dies, var_die, None))
+            var_descriptors.append(VarDescriptor(self, self.all_dies, var_die, None))
         self.interesting_vars = [v for v in var_descriptors if v.is_interesting()]
         # note the file is intentionally kept open, otherwise some functions would fail later
 
@@ -113,21 +115,34 @@ class FileParser:
             print("{}{!s}".format('   ' * tab, v))
             self.pretty_print(children=v.children, tab=tab + 1)
 
-    def get_const_by_name(self, name):
+    def read_value_at_address(self, address, size, section_name='st_shndx'):
+        """
+        """
+        return None
+        section_num = symbol.entry[section_name]
+        section = self.elf_file.get_section(section_num)
+        section_start_addr = section['sh_addr']
+        return section.data()[address - section_start_addr : address - section_start_addr + size]
+
+    def get_value_by_name(self, name, var_descriptor=None):
         if self.symbol_table is None:
             return None  # TODO more meaningful error return values?
-        symbol = self.symbol_table.get_symbol_by_name(name)
-        if symbol is None or len(symbol) > 1:
+        if name not in self.symbol_table:
+            return None
+        symbol = self.symbol_table[name]
+        if symbol is None:
             return None  # TODO more meaningful error return values?
-        symbol = symbol[0]
+        if not isinstance(symbol, Symbol):
+            symbol = symbol[0]
         section_num = symbol.entry['st_shndx']
         address = symbol['st_value']
         # size = symbol['st_size']  # NOT GOOD, rounded to multiple of 4 or something.
         # have to look up size in DWARF data (var_descriptor):
-        var_descriptor = [x for x in self.var_descriptors if x.name == name]
-        if var_descriptor is None or len(var_descriptor) > 1:
-            return None  # TODO more meaningful error return values?
-        var_descriptor = var_descriptor[0]
+        if var_descriptor is None: # hack - mixed use cases. should fix
+            var_descriptor = [x for x in self.var_descriptors if x.name == name]
+            if var_descriptor is None or len(var_descriptor) > 1:
+                return None  # TODO more meaningful error return values?
+            var_descriptor = var_descriptor[0]
         size = var_descriptor.size
         section = self.elf_file.get_section(section_num)
         section_start_addr = section['sh_addr']
@@ -143,6 +158,17 @@ class DwarfTypeMissingRequiredAttribute(Exception):
         self.var = var
         self.name = name
         super().__init__(f'DWARF var {var.name} missing attribute {name}')
+
+
+int_unpack_from_size = {
+    k: lambda v, s=s: struct.unpack('<' + s, v)[0]
+    for k, s in {
+        8: 'q',
+        4: 'l',
+        2: 'h',
+        1: 'b'
+    }.items()
+}
 
 
 class VarDescriptor:
@@ -176,7 +202,8 @@ class VarDescriptor:
 
     ADDRESS_TYPE_UNSUPPORTED = '(Address Type Unsupported)'
 
-    def __init__(self, all_dies: Dict[int, DIE], var_die: DIE, parent: None) -> None:
+    def __init__(self, parser: FileParser, all_dies: Dict[int, DIE], var_die: DIE, parent: None) -> None:
+        self.parser = parser
         self.parent = parent
         self.all_dies = all_dies
         self.var_die = var_die
@@ -184,6 +211,12 @@ class VarDescriptor:
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
+        # look for default value
+        init_value = self.parser.get_value_by_name(self.name, self)
+        if init_value is not None and self.size in int_unpack_from_size:
+            self.init_value = int_unpack_from_size[self.size](init_value)
+        else:
+            self.init_value = init_value
 
         if not self.is_pointer():
             self.children = self._create_children()
@@ -413,7 +446,7 @@ class VarDescriptor:
     def _create_children(self) -> List[Any]:
         all_but_last, last = self.visit_type_chain()
         if last.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'} and last.has_children:
-            return [VarDescriptor(self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member' and 'DW_AT_type' in v.attributes]
+            return [VarDescriptor(self.parser, self.all_dies, v, self) for v in last.iter_children() if v.tag == 'DW_TAG_member' and 'DW_AT_type' in v.attributes]
         return []
 
     def get_full_name(self) -> str:

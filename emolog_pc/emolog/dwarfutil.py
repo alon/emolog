@@ -4,7 +4,8 @@ import sys
 
 from .dwarf import FileParser
 from .decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
-from .varsfile import read_vars_file, parse_vars_definition, VarsFileError
+from .varsfile import (read_vars_file, parse_vars_definition, VarsFileError,
+    merge_vars_from_file_and_list)
 
 
 logger = logging.getLogger()
@@ -138,6 +139,7 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
             address=v.address,
             size=v.size,
             v=v,
+            init_value=v.init_value,
             _type=decoder))
     return variables
 
@@ -153,13 +155,14 @@ class DwarfFakeVariable:
         cls.next_address += size
         return ret
 
-    def __init__(self, name, type):
+    def __init__(self, name, type, init_value=None):
         self.type = type
         self.type_str = self.type_data[type]['type_str']
         self.name = name
         size = self.type_data[type]['size']
         self.address = DwarfFakeVariable.allocate(size)
         self.size = size
+        self.init_value = None
 
     def get_type_str(self):
         return self.type_str
@@ -222,19 +225,21 @@ def main():
     from pprint import pprint
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--elf', required=True, type=str, help='ELF file')
-    parser.add_argument('-v', '--vars', required=True, type=str, help='vars file')
+    parser.add_argument('-v', '--vars', default=None, type=str, help='vars file')
     parser.add_argument('--verbose', action='store_true', default=False, help='verbose')
     # slight logic duplication with emotool.main, but at least in one project
     args = parser.parse_args()
     if not os.path.exists(args.elf):
         print(f"error: missing file {args.elf}")
         raise SystemExit
-    if not os.path.exists(args.vars):
+    if args.vars is not None and not os.path.exists(args.vars):
         print(f"error: missing file {args.vars}")
         raise SystemExit
-    # TODO: read_elf_variables abuses vars=None to mean no check; make the
-    # argument explicit
-    out = read_elf_variables(elf=args.elf, vars=[], varfile=args.vars)
+    if args.vars is None:
+        out = read_all_elf_variables(elf=args.elf)
+    else:
+        defs = merge_vars_from_file_and_list(filename=args.vars)
+        out = read_elf_variables(elf=args.elf, defs=defs)
     if args.verbose:
         pprint(out)
     print("ok")

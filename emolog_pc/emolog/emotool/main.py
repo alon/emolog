@@ -24,7 +24,7 @@ from pickle import dumps
 from ..util import version, resolve, create_process, kill_all_processes, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
-from ..varsfile import read_vars_file, VarsFileError, parse_vars_definition
+from ..varsfile import merge_vars_from_file_and_list
 from ..dwarfutil import read_elf_variables
 
 
