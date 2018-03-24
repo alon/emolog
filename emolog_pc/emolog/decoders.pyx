@@ -57,7 +57,9 @@ cdef class NamedDecoder(Decoder):
 
 
 def unpack_str_from_size(size):
-    if size == 4:
+    if size == 8:
+        s = b'q'
+    elif size == 4:
         s = b'l'
     elif size == 2:
         s = b'h'
