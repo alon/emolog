@@ -1,23 +1,21 @@
 import asyncio
 from datetime import datetime
 import os
-from os import listdir, unlink, system, getcwd, chdir
-from struct import pack, unpack
-from io import BytesIO
+from os import listdir, system, getcwd, chdir, path
+from struct import pack
 from socket import socketpair
-import sys
 from tempfile import TemporaryDirectory
-from shutil import rmtree
 from linecache import getlines
-from time import time
 from contextlib import contextmanager
 
-import pytest
 
 from emolog.emotool.main import (read_elf_variables, EmoToolClient, main)
 from emolog.decoders import ArrayDecoder, Decoder
 from emolog.cylib import SamplerSample, emo_decode
 from emolog.fakeembedded import FakeSineEmbedded
+
+
+module_path = path.dirname(__file__)
 
 
 async def _client_test_helper(client, loop):
@@ -144,7 +142,7 @@ def test_emotool_with_gen():
 
 
 def test_read_elf_variables():
-    read_elf_variables(os.path.join('tests', 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
+    read_elf_variables(path.join(module_path, 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
 
 
 def test_array_decoder():
