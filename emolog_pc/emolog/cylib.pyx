@@ -24,7 +24,6 @@ for each message and parsing of variable samples.
 
 from array import array
 import sys
-from math import sin
 from datetime import datetime
 from logging import getLogger
 from struct import pack, unpack
