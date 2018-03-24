@@ -533,6 +533,8 @@ cdef uint8_t *to_str(val, size):
         return pack('<h', val)
     elif size == 1:
         return pack('<b', val)
+    elif size == 8:
+        return pack('<q', val) # long long
     raise Exception("unknown size {}".format(size))
 
 

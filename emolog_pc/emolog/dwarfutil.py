@@ -2,6 +2,7 @@ import logging
 from string import ascii_lowercase
 import sys
 
+from .consts import BUILD_TIMESTAMP_VARNAME
 from .dwarf import FileParser
 from .decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from .varsfile import (read_vars_file, parse_vars_definition, VarsFileError,
@@ -144,8 +145,17 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
     return variables
 
 
+class FakeElf:
+    build_timestamp_address = 12341234
+
+    def __init__(self, build_timestamp):
+        self.build_timestamp = build_timestamp
+
+
 class DwarfFakeVariable:
-    type_data = {float: dict(type_str='float', size=4)}
+    type_data = {
+        float: dict(type_str='float', size=4)
+    }
 
     next_address = 0
 
@@ -155,14 +165,26 @@ class DwarfFakeVariable:
         cls.next_address += size
         return ret
 
-    def __init__(self, name, type, init_value=None):
-        self.type = type
-        self.type_str = self.type_data[type]['type_str']
+    def __init__(self, fake_elf, name, type, init_value=None):
         self.name = name
         size = self.type_data[type]['size']
-        self.address = DwarfFakeVariable.allocate(size)
+        # hack - different behavior for the timestamp
+        if name == BUILD_TIMESTAMP_VARNAME:
+            address = fake_elf.build_timestamp_address
+            size = 8
+            init_value = fake_elf.build_timestamp
+            logger.error(f"DwarfFakeVariable: {address}, {init_value}")
+            type = int
+            type_str = 'long long'
+        else:
+            address = DwarfFakeVariable.allocate(size)
+            init_value = None
+            type_str = self.type_data[type]['type_str']
+        self.type = type
+        self.type_str = type_str
+        self.address = address
         self.size = size
-        self.init_value = None
+        self.init_value = init_value
 
     def get_type_str(self):
         return self.type_str
@@ -171,19 +193,20 @@ class DwarfFakeVariable:
         return False
 
 
-def fake_dwarf(names):
+def fake_dwarf(build_timestamp, names):
+    fake_elf = FakeElf(build_timestamp=build_timestamp)
     def fake_variable(name):
-        return DwarfFakeVariable(name, type=float)
-    return {name: fake_variable(name) for name in names}
+        return DwarfFakeVariable(fake_elf=fake_elf, name=name, type=float)
+    return {name: fake_variable(name=name) for name in names}
 
 
-def read_elf_variables(elf, defs, skip_not_supported=False):
+def read_elf_variables(elf, defs, skip_not_supported=False, fake_build_timestamp=None):
     """
     defs - list of (name, ticks, phase)
     """
     names = [name for name, ticks, phase in defs]
     if elf is None:
-        dwarf_variables = fake_dwarf(names)
+        dwarf_variables = fake_dwarf(build_timestamp=fake_build_timestamp, names=names)
     else:
         dwarf_variables = dwarf_get_variables_by_name(elf, names)
     if len(dwarf_variables) == 0:

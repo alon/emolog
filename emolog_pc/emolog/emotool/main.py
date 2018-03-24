@@ -5,6 +5,7 @@
 # import logging
 # logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
+from datetime import datetime
 import traceback
 import atexit
 import argparse
@@ -20,7 +21,9 @@ from configparser import ConfigParser
 from shutil import which
 from asyncio import sleep, Protocol, get_event_loop, Task
 from pickle import dumps
+import csv
 
+from ..consts import BUILD_TIMESTAMP_VARNAME
 from ..util import version, resolve, create_process, kill_all_processes, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
@@ -40,7 +43,7 @@ def start_fake_bench(port):
     return start_fake_sine(ticks_per_second=0, port=port)
 
 
-def start_fake_sine(ticks_per_second, port):
+def start_fake_sine(ticks_per_second, port, build_timestamp_value):
     # Run in a separate process so it doesn't hog the CPython lock
     # Use our executable to work with a development environment (python executable)
     # or pyinstaller (emotool.exe)
@@ -54,7 +57,8 @@ def start_fake_sine(ticks_per_second, port):
     if cmdline[0].endswith('.py'):
         cmdline = [get_python_executable()] + cmdline
     #print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
-    return create_process(cmdline + ['--embedded', str(ticks_per_second), str(port)])
+    return create_process(cmdline + ['--embedded', '--ticks-per-second', str(ticks_per_second), '--port', str(port),
+                                     '--build-timestamp-value', str(build_timestamp_value)])
 
 
 def start_pc(port, exe, debug):
@@ -177,7 +181,7 @@ async def start_transport(client, args):
     port = random.randint(10000, 50000)
     if args.fake is not None:
         if args.fake == 'gen':
-            start_fake_sine(args.ticks_per_second, port)
+            start_fake_sine(ticks_per_second=args.ticks_per_second, port=port, build_timestamp_value=args.fake_gen_build_timestamp_value)
         elif args.fake == 'bench':
             start_fake_bench(port)
         elif args.fake == 'pc' or os.path.exists(args.fake):
@@ -250,6 +254,9 @@ def parse_args(args=None):
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake', # TODO: can I have a hook for choices? i.e. choices=ChoicesOrExecutable['gen', 'pc', 'bench'],
                         help='debug only - fake a client - either generated or pc controller')
+    now_timestamp = int(datetime.utcnow().timestamp() * 1000)
+    parser.add_argument('--fake-elf-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
+    parser.add_argument('--fake-gen-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
     parser.add_argument('--serial', default='auto', help='serial URL or device name') # see http://pythonhosted.org/pyserial/pyserial_api.html#serial.serial_for_url
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
@@ -285,6 +292,8 @@ def parse_args(args=None):
 
     # Embedded
     parser.add_argument('--embedded', default=False, action='store_true', help='debugging: be a fake embedded target')
+
+    parser.add_argument('--check-timestamp', action='store_true', default=False, help='wip off by default for now')
 
     ret, unparsed = parser.parse_known_args(args=args)
 
@@ -382,9 +391,22 @@ async def record_snapshot(args, client, csv_filename, varsfile, extra_vars=None)
     if extra_vars is None:
         extra_vars = []
     defs = merge_vars_from_file_and_list(filename=varsfile, def_lines=extra_vars)
-    names, variables = read_elf_variables(elf=args.elf, defs=defs)
+    names, variables = read_elf_variables(elf=args.elf, defs=defs, fake_build_timestamp=args.fake_elf_build_timestamp_value)
+    elf_by_name = {x['name']: x for x in variables}
     client.reset(csv_filename=csv_filename, names=names, min_ticks=1, max_samples=1)
     await run_client(args, client, variables, allow_kb_stop=False)
+    read_values = {}
+    try:
+        with open(csv_filename) as fd:
+            lines = list(csv.reader(fd))
+    except IOError as io:
+        logger.warning("snapshot failed, no file created")
+        lines = []
+    if len(lines) < 2:
+        logger.warning("snapshot failed, no data saved")
+    else:
+        read_values = dict(zip(lines[0], lines[1]))
+    return elf_by_name, read_values
 
 
 CONFIG_FILE_NAME = 'local_machine_config.ini'
@@ -430,6 +452,20 @@ async def amain_startup(args):
     return client
 
 
+def check_timestamp(params, elf_variables):
+    if BUILD_TIMESTAMP_VARNAME not in params:
+        logger.error(f'timestamp not received from target')
+        raise SystemExit
+    read_value = int(params[BUILD_TIMESTAMP_VARNAME])
+    elf_value = int(elf_variables[BUILD_TIMESTAMP_VARNAME]['init_value'])
+    if read_value != elf_value:
+        if read_value < elf_value:
+            logger.error('target build timestamp is older than ELF')
+        else:
+            logger.error('target build timestamp is newer than ELF')
+        raise SystemExit
+
+
 async def amain(client, args):
     defs = merge_vars_from_file_and_list(def_lines=args.var, filename=args.varfile)
     names, variables = read_elf_variables(elf=args.elf, defs=defs)
@@ -445,11 +481,20 @@ async def amain(client, args):
     else:   # either --out or --out_prefix must be specified
         csv_filename = next_available(output_folder, args.out_prefix)
 
-    if args.snapshotfile:
+    take_snapshot = args.check_timestamp or args.snapshotfile
+    if take_snapshot:
         print("Taking snapshot of parameters")
         snapshot_output_filename = csv_filename[:-4] + '_params.csv'
-        await record_snapshot(args=args, client=client, csv_filename=snapshot_output_filename, varsfile=args.snapshotfile)
+        (elf_variables, params) = await record_snapshot(
+            args=args, client=client,
+            csv_filename=snapshot_output_filename,
+            varsfile=args.snapshotfile,
+            # TODO: why do we use 20000 in snapshot_vars.csv? ask Guy
+            extra_vars = [f'{BUILD_TIMESTAMP_VARNAME},20000,1'] if args.check_timestamp else [])
         print("parameters saved to: {}".format(snapshot_output_filename))
+
+        if args.check_timestamp:
+            check_timestamp(params, elf_variables)
 
     print("")
     print("output file: {}".format(csv_filename))

@@ -57,13 +57,15 @@ cdef class FakeSineEmbeddedBase:
     cdef bint verbose
     cdef object parser # TODO - how to specify this is Parser extension type - resides in cylib.pyx
 
-    def __init__(self, ticks_per_second, stop_after=None):
+    def __init__(self, ticks_per_second, build_timestamp_addr, build_timestamp_value, stop_after=None):
         self.eventloop = get_event_loop()
         self.ticks_per_second = ticks_per_second
         self.tick_time = 1.0 / (ticks_per_second if ticks_per_second > 0 else 20000)
         self.verbose = True
         self.parser = None
         self.stop_after = stop_after
+        self.build_timestamp_addr = build_timestamp_addr
+        self.build_timestamp_value = build_timestamp_value
         self.reset()
 
     def reset(self):
@@ -135,8 +137,12 @@ cdef class FakeSineEmbeddedBase:
         var_size_pairs = []
         for i in range(self.sines_num):
             sine = self.sines[i]
+            # hack - would be nice to factor these out to VariableBehavior
             if self.ticks % sine.period_ticks == sine.phase_ticks:
-                var_size_pairs.append((float(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
+                if sine.address == self.build_timestamp_addr:
+                    var_size_pairs.append((self.build_timestamp_value, 8))
+                else:
+                    var_size_pairs.append((float(sine.amp * sin(sine.phase + sine.freq * t)), sine.size))
         # We could use the gcd to find the minimal tick size but this is good enough
         if len(var_size_pairs) > 0:
             self.parser.send_message(SamplerSample, ticks=self.ticks, var_size_pairs=var_size_pairs)
@@ -146,7 +152,9 @@ cdef class FakeSineEmbeddedBase:
 
 
 class FakeSineEmbedded(FakeSineEmbeddedBase, Protocol):
-    def __init__(self, ticks_per_second, stop_after=None, **kw):
-        FakeSineEmbeddedBase.__init__(self, ticks_per_second=ticks_per_second, stop_after=stop_after)
+    def __init__(self, ticks_per_second, build_timestamp_addr, build_timestamp_value, stop_after=None, **kw):
+        FakeSineEmbeddedBase.__init__(
+            self, ticks_per_second=ticks_per_second, stop_after=stop_after,
+            build_timestamp_addr=build_timestamp_addr,
+            build_timestamp_value=build_timestamp_value)
         Protocol.__init__(self, **kw)
-

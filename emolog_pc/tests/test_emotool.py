@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-import os
+import csv
 from os import listdir, system, getcwd, chdir, path
 from struct import pack
 from socket import socketpair
@@ -9,6 +9,7 @@ from linecache import getlines
 from contextlib import contextmanager
 
 
+from emolog.consts import BUILD_TIMESTAMP_VARNAME
 from emolog.emotool.main import (read_elf_variables, EmoToolClient, main)
 from emolog.decoders import ArrayDecoder, Decoder
 from emolog.cylib import SamplerSample, emo_decode
@@ -44,7 +45,7 @@ async def _test_client_and_sine_helper(loop, client_end, embedded_end=None, stop
     client_transport, client = await loop.create_connection(lambda: client_orig, sock=client_end)
     if embedded_end is not None:
         embedded_transport, embedded = await loop.create_connection(
-            lambda: FakeSineEmbedded(ticks_per_second, stop_after=stop_after),
+            lambda: FakeSineEmbedded(ticks_per_second, stop_after=stop_after, build_timestamp_addr=74747, build_timestamp_value=91929),
             sock=embedded_end)
     _client_sine_test = lambda loop: _client_test_helper(client=client, loop=loop)
     return client, _client_sine_test
@@ -125,20 +126,38 @@ def TemporaryDirectoryWithChdir():
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
     start = datetime.utcnow().timestamp() * 1000
-    with TemporaryDirectoryWithChdir() as d:
-        original = getcsv()
-        with open('local_machine_config.ini', 'w+') as fd:
-            fd.write("[folders]\noutput_folder=.\n")
-        system('emotool --fake gen --runtime 0.1')
-        newfiles = list(sorted(getcsv() - original))
-        contents = [getlines(f) for f in newfiles]
-        assert len(newfiles) == 1
-        assert len(contents) == 1
-        lines = contents[0]
-        assert len(lines) >= 2
-        assert lines[0].count(',') == lines[1].count(',')
-        res_t = float(lines[1].split(',')[2])
-        assert abs(res_t - start) < 1500
+    for check_timestamp, same_timestamp in [(False, False), (True, False), (True, True)]:
+        with TemporaryDirectoryWithChdir() as d:
+            original = getcsv()
+            with open('local_machine_config.ini', 'w+') as fd:
+                fd.write("[folders]\noutput_folder=.\n")
+            if same_timestamp:
+                elf_timestamp = gen_timestamp = 7572
+            else:
+                elf_timestamp, gen_timestamp = 8822, 2288
+            system('emotool --fake gen --runtime 0.1' +
+                   (f' --check-timestamp --fake-elf-build-timestamp-value {elf_timestamp} --fake-gen-build-timestamp-value {gen_timestamp}' if check_timestamp else ''))
+            newfiles = list(sorted(getcsv() - original))
+            contents = [getlines(f) for f in newfiles]
+            expect_params_file = check_timestamp
+            expect_vars_file = not check_timestamp or (check_timestamp and same_timestamp)
+            expected_file_count = expect_vars_file + expect_params_file
+            assert len(newfiles) == expected_file_count
+            assert len(contents) == expected_file_count
+            if expect_vars_file:
+                ind = [i for i, x in enumerate(newfiles) if 'params' not in x][0]
+                lines = contents[ind]
+                assert len(lines) >= 2
+                assert lines[0].count(',') == lines[1].count(',')
+                res_t = float(lines[1].split(',')[2])
+                assert abs(res_t - start) < 1500
+            if check_timestamp:
+                ind = [i for i, x in enumerate(newfiles) if 'params' in x][0]
+                assert len(contents[ind]) == 2
+                d = dict(zip(*csv.reader(contents[ind])))
+                assert BUILD_TIMESTAMP_VARNAME in d
+                val = int(d[BUILD_TIMESTAMP_VARNAME])
+                assert (same_timestamp and val == elf_timestamp) or val != elf_timestamp
 
 
 def test_read_elf_variables():
