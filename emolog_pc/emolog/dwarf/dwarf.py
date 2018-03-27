@@ -135,6 +135,11 @@ class FileParser:
         if not isinstance(symbol, Symbol):
             symbol = symbol[0]
         section_num = symbol.entry['st_shndx']
+        if not isinstance(section_num, int):  # several special cases are possible
+            if section_num == 'SHN_ABS':  # special case, means symbol['st_value'] isn't an address but an actual value
+                return symbol['st_value']
+            else:  # other special cases are not implemented
+                return None  # TODO more meaningful error return values?
         address = symbol['st_value']
         # size = symbol['st_size']  # NOT GOOD, rounded to multiple of 4 or something.
         # have to look up size in DWARF data (var_descriptor):
@@ -144,6 +149,8 @@ class FileParser:
                 return None  # TODO more meaningful error return values?
             var_descriptor = var_descriptor[0]
         size = var_descriptor.size
+        if size is None:
+            return None  # TODO more meaningful error return values?
         section = self.elf_file.get_section(section_num)
         section_start_addr = section['sh_addr']
         return section.data()[address - section_start_addr : address - section_start_addr + size]
@@ -213,7 +220,10 @@ class VarDescriptor:
         self.size = self._get_size()
         # look for default value
         init_value = self.parser.get_value_by_name(self.name, self)
-        if init_value is not None and self.size in int_unpack_from_size:
+        if init_value is not None and \
+                not isinstance(init_value, int) and \
+                len(init_value) > 0 and \
+                self.size in int_unpack_from_size:
             self.init_value = int_unpack_from_size[self.size](init_value)
         else:
             self.init_value = init_value
@@ -398,7 +408,10 @@ class VarDescriptor:
         assert array_type is not None, f"cannot find array type in type chain: {self}"
         for child in array_type.iter_children():
             if self.DW_AT_upper_bound not in child.attributes:
-                return None # better be safe - we don't know the meaning in this case.
+                return None  # better be safe - we don't know the meaning in this case.
+            # special case: zero length array with gcc gets this value:
+            if child.attributes[self.DW_AT_upper_bound].value == 0xFFFFFFFF:
+                return [0]
             res.append(child.attributes[self.DW_AT_upper_bound].value + 1)
         return res
 

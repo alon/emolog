@@ -82,6 +82,7 @@ unpack_str_from_type_name = dict(
     int=b'i',
     unsigned=b'I',
     short=b'h',
+    char=b'c'
 )
 
 
@@ -114,9 +115,12 @@ def variable_to_decoder(v, type_name, size):
     elif type_name.endswith('bool'):
         return NamedDecoder(name=name_bytes, max_unsigned_val=2, unpack_str=b'b', val_to_name={1: 'True', 0: 'False'})
 
-    else:  # TODO this should be "if it's an int". also should handle signed/unsigned correctly
+    elif type_name.endswith('int'):
+        # TODO should handle signed/unsigned correctly
         unpack_str = unpack_str_from_size(size)
         return Decoder(name=name_bytes, unpack_str=unpack_str)
+    else:
+        return None
 
     raise VariableNotSupported(v, size)
 
@@ -266,3 +270,7 @@ def main():
     if args.verbose:
         pprint(out)
     print("ok")
+
+
+if __name__ == '__main__':
+    main()
