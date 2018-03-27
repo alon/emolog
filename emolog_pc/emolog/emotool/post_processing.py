@@ -111,13 +111,13 @@ def post_processing_main(process_func):
 
 # ---------------   Generic Post-Processing Library Functions  ---------------
 
-def load_and_clean(input_csv_filename, prefixes_to_remove):
+def load_and_clean(input_csv_filename, prefixes_to_remove, suffixes_to_remove):
     data = pd.read_csv(input_csv_filename)
-    data.columns = [clean_col_name(c, prefixes_to_remove) for c in data.columns]
+    data.columns = [clean_col_name(c, prefixes_to_remove, suffixes_to_remove) for c in data.columns]
     data = remove_unneeded_columns(data)
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
-    params = process_params_snapshot(input_csv_filename, prefixes_to_remove)
+    params = process_params_snapshot(input_csv_filename, prefixes_to_remove, suffixes_to_remove)
     return data, params
 
 
@@ -133,9 +133,11 @@ def output_name_to_std_name(output_name, output_col_names_inv):
     return output_name
 
 
-def clean_col_name(name, prefixes):
+def clean_col_name(name, prefixes, suffixes):
     for prefix in prefixes:  # remove all annoying prefixes that may exist
         name = remove_prefix(name, prefix)
+    for suffix in suffixes:
+        name = remove_suffix(name, suffix)
     name = name.replace("_", " ")
     name = name[0].upper() + name[1:]
     return name
@@ -144,6 +146,12 @@ def clean_col_name(name, prefixes):
 def remove_prefix(x, prefix):
     if x.startswith(prefix):
         return x[len(prefix):]
+    return x
+
+
+def remove_suffix(x, suffix):
+    if x.endswith(suffix):
+        return x[:-len(suffix)]
     return x
 
 
@@ -170,13 +178,13 @@ def interpolate_missing_data(data):
     return data
 
 
-def process_params_snapshot(input_csv_filename, prefixes_to_remove):
+def process_params_snapshot(input_csv_filename, prefixes_to_remove, suffixes_to_remove):
     snapshot_csv_filename = input_csv_filename[:-4] + '_params.csv'
     if not os.path.isfile(snapshot_csv_filename):
         return None
     params = pd.read_csv(snapshot_csv_filename)
     assert(len(params) == 1)
-    params.columns = [clean_col_name(c, prefixes_to_remove) for c in params.columns]
+    params.columns = [clean_col_name(c, prefixes_to_remove, suffixes_to_remove) for c in params.columns]
     params.drop(['Sequence', 'Timestamp', 'Ticks'], inplace=True, axis=1)
     return params
 
