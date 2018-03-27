@@ -99,10 +99,13 @@ def variable_to_decoder(v, type_name, size):
     elif v.is_array():
         # this currently flattens multi-dimensional arrays to a long one dimensional array
         elem_type = type_name.rsplit(' ', 1)[1]
-        elem_unpack_str = unpack_str_from_type_name[elem_type]
+        if elem_type in unpack_str_from_type_name:
+            elem_unpack_str = unpack_str_from_type_name[elem_type]
+        else:
+            return None  # an array of non-POD type is currently unsupported
         assert len(elem_unpack_str) == 1
         array_len = v.get_array_flat_length()
-        if size is None:
+        if size is None or size == 0:
             raise VariableNotSupported(v, size)
         elem_size = int(size / array_len)
         assert (elem_size * array_len == size)

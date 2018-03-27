@@ -239,7 +239,12 @@ class VarDescriptor:
         if ret is None:
             ret = self._parse_location_attribute()
         if ret is None:
-            ret = "(No Address)"
+            # in some cases DWARF doesn't have address info but the symbol table does,
+            # for example singletons that are referenced through extern declaration in other files
+            if self.name in self.parser.symbol_table:
+                ret = self.parser.symbol_table[self.name].entry['st_value']
+            else:
+                ret = "(No Address)"
         return ret
 
     def _parse_member_location(self) -> None:
