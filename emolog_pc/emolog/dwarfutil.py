@@ -138,8 +138,8 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
         except VariableNotSupported:
             if skip_not_supported:
                 print(f"debug: unsupported by our DWARF DIE parser (dwarf package): {name}")
-                continue
-            raise
+                raise
+            continue
         variables.append(dict(
             name=name,
             phase_ticks=phase_ticks,
