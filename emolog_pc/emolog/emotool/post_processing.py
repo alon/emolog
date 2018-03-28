@@ -3,6 +3,7 @@ import pandas as pd
 import glob
 import argparse
 import configparser
+import numpy as np
 
 
 # ---------------   main() Related Logic   ---------------
@@ -118,6 +119,7 @@ def load_and_clean(input_csv_filename, prefixes_to_remove, suffixes_to_remove):
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
     params = process_params_snapshot(input_csv_filename, prefixes_to_remove, suffixes_to_remove)
+    params.columns = [clean_col_name(c, prefixes_to_remove, suffixes_to_remove) for c in params.columns]
     return data, params
 
 
@@ -139,6 +141,7 @@ def clean_col_name(name, prefixes, suffixes):
     for suffix in suffixes:
         name = remove_suffix(name, suffix)
     name = name.replace("_", " ")
+    name = name.replace(".", " ")
     name = name[0].upper() + name[1:]
     return name
 
@@ -221,7 +224,10 @@ def add_params_sheet(wb, params, param_formats, wb_formats):
     for col in params.columns:
         sheet.write(row, 0, col, wb_formats['header'])
         field_format = param_formats.get(col, param_formats['default'])
-        sheet.write(row, 1, params[col][params.first_valid_index()], wb_formats[field_format['format']])
+        val = params[col][params.first_valid_index()]
+        if isinstance(val, np.bool_):
+            val = bool(val)
+        sheet.write(row, 1, val, wb_formats[field_format['format']])
         row += 1
 
 
