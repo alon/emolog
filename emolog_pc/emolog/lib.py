@@ -117,6 +117,7 @@ class ClientProtocolMixin(Protocol):
     def __init__(self, verbose, dump, ticks_per_second, csv_writer_factory=None):
         Protocol.__init__(self)
         self._ticks_per_second = ticks_per_second
+        self.last_samples_received = None
         self.cylib = EmotoolCylib(
             parent=self, verbose=verbose, dump=dump,
             csv_writer_factory=csv_writer_factory)
@@ -206,7 +207,6 @@ class ClientProtocolMixin(Protocol):
 
     async def check_progress(self):
         loop = get_event_loop()
-        last_samples_received = None
         while True:
             if not self.cylib.sampler.running:
                 # remain until we start running
@@ -216,8 +216,8 @@ class ClientProtocolMixin(Protocol):
                 float(self.cylib.sampler.max_ticks_between_messages()) / self._ticks_per_second)
             dt = max(dt, 0.1)
             #print(f"DEBUG {time()}: check_progress: new/old/dt {self.samples_received}/{last_samples_received} {dt}")
-            redo_registration = self.samples_received == last_samples_received
-            last_samples_received = self.samples_received
+            redo_registration = self.samples_received == self.last_samples_received
+            self.last_samples_received = self.samples_received
             if redo_registration:
                 print(f"DEBUG {time()}: redoing registration, samples {self.samples_received}")
                 await self.redo_registration_and_start()

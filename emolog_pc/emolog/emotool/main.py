@@ -87,7 +87,6 @@ def next_available(folder, prefix):
             return candidate
 
 
-
 def setup_logging(filename, silent):
     if silent:
         logger.setLevel(logging.ERROR)
@@ -167,6 +166,7 @@ class EmoToolClient(ClientProtocolMixin):
         return self.cylib.csv_handler.csv_filename
 
     def reset(self, *args, **kw):
+        self.last_samples_received = None  # don't trigger the check_progress() watchdog on the next sample
         self.cylib.csv_handler.reset(*args, **kw)
 
     def register_listener(self, *args, **kw):
