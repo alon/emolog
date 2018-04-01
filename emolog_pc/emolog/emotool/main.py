@@ -451,6 +451,14 @@ async def amain_startup(args):
     await start_transport(client=client, args=args)
     return client
 
+def reasonable_timestamp_ms(timestamp):
+    """
+    checks that the timestamp is within 100 years and not zero
+    this means a random value from memory will probably not be interpreted as a valid timestamp
+    and a better error message could be printed
+    """
+    return timestamp != 0 and timestamp < 1000 * 3600 * 24 * 365 * 100
+
 
 def check_timestamp(params, elf_variables):
     if BUILD_TIMESTAMP_VARNAME not in params:
@@ -467,6 +475,10 @@ def check_timestamp(params, elf_variables):
         raise SystemExit
     elf_value = int(elf_variables[BUILD_TIMESTAMP_VARNAME]['init_value'])
     if read_value != elf_value:
+        if not reasonable_timestamp_ms(read_value):
+            logger.error(f"Build timestamp mismatch: the embedded target probably doesn't contain a timestamp variable")
+            raise SystemExit
+
         if read_value < elf_value:
             logger.error('target build timestamp is older than ELF')
         else:
