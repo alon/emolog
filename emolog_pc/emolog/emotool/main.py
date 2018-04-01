@@ -485,7 +485,7 @@ async def amain(client, args):
     if take_snapshot:
         print("Taking snapshot of parameters")
         snapshot_output_filename = csv_filename[:-4] + '_params.csv'
-        (elf_variables, params) = await record_snapshot(
+        (snapshot_elf_variables, params) = await record_snapshot(
             args=args, client=client,
             csv_filename=snapshot_output_filename,
             varsfile=args.snapshotfile,
@@ -494,7 +494,7 @@ async def amain(client, args):
         print("parameters saved to: {}".format(snapshot_output_filename))
 
         if args.check_timestamp:
-            check_timestamp(params, elf_variables)
+            check_timestamp(params, snapshot_elf_variables)
 
     print("")
     print("output file: {}".format(csv_filename))
