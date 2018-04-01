@@ -35,10 +35,12 @@ def dwarf_get_variables_by_name(filename, names):
         names = []
     name_filter = (lambda v_name: v_name in names) if regular_mode else (lambda v_name: True)
     missing_check = (lambda found, given: given != found) if regular_mode else (lambda found, given: False)
-    file_parser = FileParser(filename=filename)
+    if not hasattr(dwarf_get_variables_by_name, 'file_parser') or dwarf_get_variables_by_name.prev_filename != filename:
+        dwarf_get_variables_by_name.file_parser = FileParser(filename=filename)
+        dwarf_get_variables_by_name.prev_filename = filename
     sampled_vars = {}
     found = set()
-    elf_vars = list(file_parser.visit_interesting_vars_tree_leafs())
+    elf_vars = list(dwarf_get_variables_by_name.file_parser.visit_interesting_vars_tree_leafs())
     elf_var_names = [v.get_full_name() for v in elf_vars]
     lower_to_actual = {name.lower(): name for name in elf_var_names}
     elf_var_names_set_lower = set(lower_to_actual.keys())
