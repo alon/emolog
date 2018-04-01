@@ -173,6 +173,7 @@ class ClientProtocolMixin(Protocol):
         await self.send_sampler_clear()
         self.cylib.sampler.clear()
         for d in variables:
+            logger.info(f"Sending 'Register variable': {d!r}")
             await self._send_sampler_register_variable(
                 phase_ticks=d['phase_ticks'],
                 period_ticks=d['period_ticks'],

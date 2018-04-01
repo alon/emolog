@@ -184,7 +184,6 @@ class Ack(Message):
         return emo_encode_ack(self.buf, self.reply_to_seq, self.error)
 
     def handle_by(self, handler):
-        #print("Ack.handle_by")
         if self.error != 0:
             logger.error(f"embedded responded to {self.reply_to_seq} with ERROR: {self.error}")
         handler.ack_received()
@@ -397,11 +396,11 @@ class Once:
     def __init__(self):
         self.printed = False
 
-    def print_once(self, s):
+    def print_error_once(self, s):
         if self.printed:
             return
         self.printed = True
-        print(s)
+        logger.error(s)
 
 
 @cython.final
@@ -467,15 +466,15 @@ cdef class VariableSampler:
             self._use_unpack = self._single_sample = False
             return
         if not self._use_unpack:
-            print(f"sample decoding mode: mixed unpack and decoder")
+            logger.info(f"sample decoding mode: mixed unpack and decoder")
             self._single_sample = False
         else:
             self._single_sample = all(x == 0 for x in self.phase_ticks) and all (x == 1 for x in self.period_ticks)
             if len(variables) > 0 and self._single_sample:
-                print("sample decoding mode: single unpack")
+                logger.info("sample decoding mode: single unpack")
                 self._single_sample_unpack_str = b'<' + b''.join(t.unpack_str for t in self._type)
             else:
-                print("sample decoding mode: multiple unpack")
+                logger.info("sample decoding mode: multiple unpack")
 
     cdef list_from_ticks_and_payload(self, dict name_to_index, int ticks, bytes payload):
         cdef unsigned offset = 0
@@ -499,7 +498,7 @@ cdef class VariableSampler:
                     size = self.size[i]
                     encoded = payload[offset:offset + size]
                     if len(encoded) == 0:
-                        self.once.print_once('EMBEDDED ERROR: ran out of bytes in sample')
+                        self.once.print_error_once('EMBEDDED ERROR: ran out of bytes in sample')
                         val = None
                         continue
                     if hasattr(t, 'decode'):
@@ -512,14 +511,14 @@ cdef class VariableSampler:
                         types[ind] = t
                     except:
                         try:
-                            print(f'{i}')
-                            print(f'{self.name[i]}')
-                            print(f'{name_to_index[self.name[i]]}')
+                            logger.info(f'{i}')
+                            logger.info(f'{self.name[i]}')
+                            logger.info(f'{name_to_index[self.name[i]]}')
                         finally:
                             raise SystemExit
                     offset += size
                 if offset != len(payload):
-                    print(f"payload {len(payload)} but only unpacked {offset}")
+                    logger.error(f"payload {len(payload)} but only unpacked {offset}")
         return types, values
 
 
@@ -615,7 +614,7 @@ cdef class Parser:
             self.empty_count += 1
             # stream closed - quit - but wait a bit to be sure
             if self.empty_count > 2:
-                print("DEBUG - SHOULD WE SYSTEM EXIT HERE?")
+                logger.info("DEBUG - SHOULD WE SYSTEM EXIT HERE?")
                 raise SystemExit()
         self.buf = self.buf + s
         cdef unsigned i = 0
@@ -646,7 +645,7 @@ cdef class Parser:
             i = i_next
         self.buf = self.buf[i:]
         if len(self.buf) > 1024:
-            print("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
+            logger.warning("WARNING: something is wrong with the packet decoding: {} bytes left (from {})".format(
                 len(self.buf), len(self.buf) + i))
         return ret
 
@@ -823,7 +822,7 @@ cdef class CSVHandler:
             if self.first_ticks == -1:
                 self.first_ticks = ticks
             if self.last_ticks != -1 and ticks - self.last_ticks != self.min_ticks:
-                print("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
+                logger.warning("{:8.5}: ticks jump {:6} -> {:6} [{:6}]".format(
                     now / 1000, self.last_ticks, ticks, ticks - self.last_ticks))
                 self.ticks_lost += ticks - self.last_ticks - self.min_ticks
             self.last_ticks = ticks
