@@ -1,5 +1,26 @@
 Emotool / Emolog Logic:
 
+- Timestamp verification:
+    - bug: address zero of timestamp --> timestamp variable optimized out, requires usage of the variable
+    - move errors that can be emitted before comms to as early as possible (before comms...)
+    + error message when timestamp is not in the ELF
+    + error message when timestamp is unequal
+    + error message when embedded doesn't have a timestamp (heuristic: date not in viable range; otherwise it would just be an "unequal timestamp" error)
+    - change default to check timestamp, command line switch should be --ignore-timestamp
+    - scripts for pre- and post-build steps
+
+- in variables_from_dwarf_variables(), dict returned contains both v and v.address and v.size. remove them and refactor to use v
+
+- cache the reading of ELF (or optimize some other way)
+
+- better README
+
+- timing tests in appveyor
+
+- STM32 ELF's, preferably non-toy ones, in appveyor
+
+- scream bloody murder at unknown arguments
+
 + emotool & emolog: emolog has 'stopped' variable, emotool has '_running'. why two of them?
 
 + not sure if cleanup() is really sending sampler_stop. note that transmission stopping can also be because CTS goes inactive when closing the port. need to check for actual receive of stop (log from embedded?). Also, it seems it doesn't receive an ack (or pops an exception for some other reason), run with --verbose to see log message about it.
