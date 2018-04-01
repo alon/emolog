@@ -457,6 +457,14 @@ def check_timestamp(params, elf_variables):
         logger.error(f'timestamp not received from target')
         raise SystemExit
     read_value = int(params[BUILD_TIMESTAMP_VARNAME])
+    if BUILD_TIMESTAMP_VARNAME not in elf_variables:
+        logger.error(f'Timestamp variable not in ELF file. Did you add a pre-build step to generate it?')
+        raise SystemExit
+    elf_var = elf_variables[BUILD_TIMESTAMP_VARNAME]
+    elf_value = elf_var['init_value']
+    if elf_value is None or elf_var['address'] == 0:
+        logger.error(f'Bad timestamp variable in ELF: init value = {elf_value}, address = {elf_var["address"]}')
+        raise SystemExit
     elf_value = int(elf_variables[BUILD_TIMESTAMP_VARNAME]['init_value'])
     if read_value != elf_value:
         if read_value < elf_value:
