@@ -128,7 +128,7 @@ def variable_to_decoder(v, type_name, size):
     raise VariableNotSupported(v, size)
 
 
-def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variables, skip_not_supported):
+def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variables, skip_unsupported_vars):
     variables = []
     for name in names:
         v = dwarf_variables[name]
@@ -136,10 +136,10 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
         try:
             decoder = variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)
         except VariableNotSupported:
-            if skip_not_supported:
+            if skip_unsupported_vars:
                 print(f"debug: unsupported by our DWARF DIE parser (dwarf package): {name}")
-                raise
-            continue
+                continue
+            raise
         variables.append(dict(
             name=name,
             phase_ticks=phase_ticks,
@@ -207,7 +207,7 @@ def fake_dwarf(build_timestamp, names):
     return {name: fake_variable(name=name) for name in names}
 
 
-def read_elf_variables(elf, defs, skip_not_supported=False, fake_build_timestamp=None):
+def read_elf_variables(elf, defs, skip_unsupported_vars=False, fake_build_timestamp=None):
     """
     defs - list of (name, ticks, phase)
     """
@@ -224,7 +224,7 @@ def read_elf_variables(elf, defs, skip_not_supported=False, fake_build_timestamp
         names=names,
         name_to_ticks_and_phase=name_to_ticks_and_phase,
         dwarf_variables=dwarf_variables,
-        skip_not_supported=skip_not_supported)
+        skip_unsupported_vars=skip_unsupported_vars)
 
 
 def read_all_elf_variables(elf):
@@ -232,7 +232,7 @@ def read_all_elf_variables(elf):
     names = list(sorted(dwarf_variables.keys()))
     name_to_ticks_and_phase = {k: (1, 0) for k in names}
     return names, variables_from_dwarf_variables(
-        names, name_to_ticks_and_phase, dwarf_variables, skip_not_supported=True)
+        names, name_to_ticks_and_phase, dwarf_variables, skip_unsupported_vars=True)
 
 
 def main_dump():
