@@ -19,15 +19,17 @@ void emolog_handle_message(emo_header* header, uint32_t ticks);
 void queue_ack(uint8_t reply_to_seq, emo_error_t error);
 
 
-// This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
-const char emolog_timestamp[] __attribute__((used)) = __DATE__ " " __TIME__;
+// TODO replace this with a file generated in a pre-build step:
+volatile uint64_t __attribute__((used)) build_timestamp = 12345678;
 #ifdef __TI_ARM__
-#pragma RETAIN(emolog_timestamp)
+#pragma RETAIN(build_timestamp)
 #endif
 
 void emolog_init(void)
 {
     debug_printf("emolog_init\n");
+    volatile uint64_t __attribute__((unused)) dummy = build_timestamp;
+
     crc_init();
 	comm_setup();
 }
