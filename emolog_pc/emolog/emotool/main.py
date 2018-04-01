@@ -478,12 +478,12 @@ def check_timestamp(params, elf_variables):
         if not reasonable_timestamp_ms(read_value):
             logger.error(f"Build timestamp mismatch: the embedded target probably doesn't contain a timestamp variable")
             raise SystemExit
-
         if read_value < elf_value:
-            logger.error('target build timestamp is older than ELF')
+            logger.error('Build timestamp mismatch: target build timestamp is older than ELF')
         else:
-            logger.error('target build timestamp is newer than ELF')
+            logger.error('Build timestamp mismatch: target build timestamp is newer than ELF')
         raise SystemExit
+    print("Timestamp verified: ELF file and embedded target match")
 
 
 async def amain(client, args):
