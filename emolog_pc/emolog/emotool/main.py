@@ -510,7 +510,7 @@ async def amain(client, args):
             csv_filename=snapshot_output_filename,
             varsfile=args.snapshotfile,
             # TODO: why do we use 20000 in snapshot_vars.csv? ask Guy
-            extra_vars = [f'{BUILD_TIMESTAMP_VARNAME},20000,1'] if args.check_timestamp else [])
+            extra_vars = [f'{BUILD_TIMESTAMP_VARNAME},100,50'] if args.check_timestamp else [])
         print("parameters saved to: {}".format(snapshot_output_filename))
 
         if args.check_timestamp:
