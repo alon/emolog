@@ -124,8 +124,6 @@ def variable_to_decoder(v, type_name, size):
         # TODO should handle signed/unsigned correctly
         unpack_str = unpack_str_from_size(size)
         return Decoder(name=name_bytes, unpack_str=unpack_str)
-    else:
-        return None
 
     raise VariableNotSupported(v, size)
 
