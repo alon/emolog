@@ -119,7 +119,8 @@ def load_and_clean(input_csv_filename, prefixes_to_remove, suffixes_to_remove):
     data = data.set_index('Ticks')
     data = interpolate_missing_data(data)
     params = process_params_snapshot(input_csv_filename, prefixes_to_remove, suffixes_to_remove)
-    params.columns = [clean_col_name(c, prefixes_to_remove, suffixes_to_remove) for c in params.columns]
+    if params is not None:
+        params.columns = [clean_col_name(c, prefixes_to_remove, suffixes_to_remove) for c in params.columns]
     return data, params
 
 
