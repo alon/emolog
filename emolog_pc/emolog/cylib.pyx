@@ -141,7 +141,7 @@ cdef class Message:
         return s
 
     def handle_by(self, handler):
-        #logger.debug(f"ignoring a {self}")
+        #logger.debug("ignoring a {self}".format(self=self))
         pass
 
     def __str__(self):
@@ -163,7 +163,7 @@ cdef class Version(Message):
         return emo_encode_version(self.buf, self.reply_to_seq if self.reply_to_seq is not None else self.seq)
 
     def handle_by(self, handler):
-        #logger.debug(f"Got Version: {self.version}")
+        #logger.debug("Got Version: {self.version}".format(self=self))
         handler.ack_received()
 
 
@@ -185,7 +185,7 @@ class Ack(Message):
 
     def handle_by(self, handler):
         if self.error != 0:
-            logger.error(f"embedded responded to {self.reply_to_seq} with ERROR: {self.error}")
+            logger.error("embedded responded to {reply_to_seq} with ERROR: {error}".format(**self.__dict__))
         handler.ack_received()
 
     def __str__(self):
@@ -268,7 +268,7 @@ cdef class SamplerSample(Message):
         if handler.sampler.running:
             now = utc() * 1000
             handler.pending_samples.append((now, self.seq, self.ticks, self.payload))
-            #logger.debug(f"Got Sample: {self}")
+            #logger.debug("Got Sample: {self}".format(self=self))
         else:
             #logger.debug("ignoring sample since PC sampler is not primed")
             pass
@@ -386,10 +386,10 @@ cdef class RegisteredVariable:
         self._type = _type
 
     def __str__(self):
-        return f'<RegisteredVariable {self.name} {self.address}/{self.size} {self.period_ticks}/{self.phase_ticks} _type={self._type}>'
+        return '<RegisteredVariable {name} {address}/{size} {period_ticks}/{phase_ticks} _type={_type}>'.format(**self.__dict__)
 
     def __repr__(self):
-        return f'<RegisteredVariable {self.name} {self.address}/{self.size} {self.period_ticks}/{self.phase_ticks} _type={self._type}>'
+        return '<RegisteredVariable {name} {address}/{size} {period_ticks}/{phase_ticks} _type={_type}>'.format(**self.__dict__)
 
 
 class Once:
@@ -466,7 +466,7 @@ cdef class VariableSampler:
             self._use_unpack = self._single_sample = False
             return
         if not self._use_unpack:
-            logger.info(f"sample decoding mode: mixed unpack and decoder")
+            logger.info("sample decoding mode: mixed unpack and decoder")
             self._single_sample = False
         else:
             self._single_sample = all(x == 0 for x in self.phase_ticks) and all (x == 1 for x in self.period_ticks)
@@ -511,14 +511,14 @@ cdef class VariableSampler:
                         types[ind] = t
                     except:
                         try:
-                            logger.info(f'{i}')
-                            logger.info(f'{self.name[i]}')
-                            logger.info(f'{name_to_index[self.name[i]]}')
+                            logger.info(str(i))
+                            logger.info(str(self.name[i]))
+                            logger.info(str(name_to_index[self.name[i]]))
                         finally:
                             raise SystemExit
                     offset += size
                 if offset != len(payload):
-                    logger.error(f"payload {len(payload)} but only unpacked {offset}")
+                    logger.error("payload {len_payload} but only unpacked {offset}".format(len_payload=len(payload), offset=offset))
         return types, values
 
 

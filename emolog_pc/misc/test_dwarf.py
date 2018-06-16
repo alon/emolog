@@ -23,7 +23,7 @@ for filename, vars_defs in data:
     variables = dwarf_get_variables_by_name(filename, vars_names)
     timestamp = parsed.get_value_by_name('emolog_timestamp')
     for name, var in variables.items():
-        print(f"=== {name} ===")
+        print("=== {name} ===".format(name=name))
         for attr in ['type', 'size', 'get_array_sizes', 'get_enum_dict', 'get_full_name', 'get_type_str', 'visit_type_chain']:
             v = getattr(var, attr)
             if callable(v):
@@ -31,7 +31,7 @@ for filename, vars_defs in data:
                     v = v()
                 except:
                     continue
-            print(f'  {str(attr):20} = {str(v).strip():20}')
+            print('  {attr:20} = {v:20}'.format(attr=str(attr), v=str(v).strip()))
         print()
     #var = {v['name']: v for v in variables}['controller.state.required_dir']
     #v = var['v']

@@ -53,7 +53,7 @@ cdef class NamedDecoder(Decoder):
         try:
             return self.val_to_name[v_mod]
         except:
-            raise NamedDecoderException(f'{self.name} missing value {v} ({v_mod})')
+            raise NamedDecoderException('{name} missing value {v} ({v_mod})'.format(name=self.name, v=v, v_mod=v_mod))
 
 
 def unpack_str_from_size(size):
@@ -66,5 +66,5 @@ def unpack_str_from_size(size):
     elif size == 1:
         s = b'b'
     else:
-        raise Exception(f"unhandled size in unpack_str_from_size: {size}")
+        raise Exception("unhandled size in unpack_str_from_size: {size}".format(size=size))
     return s

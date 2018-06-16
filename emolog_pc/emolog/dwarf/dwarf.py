@@ -164,7 +164,7 @@ class DwarfTypeMissingRequiredAttribute(Exception):
     def __init__(self, var, name):
         self.var = var
         self.name = name
-        super().__init__(f'DWARF var {var.name} missing attribute {name}')
+        super().__init__('DWARF var {var_name} missing attribute {name}'.format(var_name=var.name, name=name))
 
 
 int_unpack_from_size = {
@@ -374,7 +374,7 @@ class VarDescriptor:
         with_tag = [x for x in all_but_last + [last_cur_type] if x.tag == tag]
         if not required and len(with_tag) == 0:
             return None
-        assert len(with_tag) == 1, f'more than a single tag {tag} in {v}'
+        assert len(with_tag) == 1, 'more than a single tag {tag} in {v}'.format(tag=tag, v=v)
         return with_tag[0]
 
     def get_enum_type(self) -> None:
@@ -410,7 +410,7 @@ class VarDescriptor:
     def get_array_sizes(self) -> List[int]:
         res = []
         array_type = self.get_array_type()
-        assert array_type is not None, f"cannot find array type in type chain: {self}"
+        assert array_type is not None, "cannot find array type in type chain: {self}".format(self=self)
         for child in array_type.iter_children():
             if self.DW_AT_upper_bound not in child.attributes:
                 return None  # better be safe - we don't know the meaning in this case.

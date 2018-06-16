@@ -22,7 +22,7 @@ def ppxl_formula_power_out(flow_rate_cell, pump_head_cell, **unused):
     :param unused:
     :return:
     """
-    return f'={flow_rate_cell} / 60 * 9.80665 * {pump_head_cell}'
+    return '={flow_rate_cell} / 60 * 9.80665 * {pump_head_cell}'.format(**locals())
 
 
 def ppxl_formula_cruising_power_out(cruising_flow_rate_cell, pump_head_cell, **unused):
@@ -30,7 +30,7 @@ def ppxl_formula_cruising_power_out(cruising_flow_rate_cell, pump_head_cell, **u
 
 
 def ppxl_formula_efficiency(power_out_cell, power_in_cell, **unused):
-    return f'={power_out_cell} / {power_in_cell}'
+    return '={power_out_cell} / {power_in_cell}'.format(**locals())
 
 
 def ppxl_formula_cruising_efficiency(cruising_power_out_cell, cruising_power_in_cell, **unused):

@@ -62,7 +62,7 @@ async def _test_client_and_sine_socket_pair(loop, stop_after=None):
 def get_event_loop_with_exception_handler():
     loop = asyncio.get_event_loop()
     def exception_handler(loop, context):
-        print(f"caught exception in test: {context}")
+        print("caught exception in test: {context}".format(context=context))
         raise Exception(str(context))
     loop.set_exception_handler(exception_handler)
     return loop
@@ -136,7 +136,8 @@ def test_emotool_with_gen():
             else:
                 elf_timestamp, gen_timestamp = 8822, 2288
             system('emotool --fake gen --runtime 0.1' +
-                   (f' --check-timestamp --fake-elf-build-timestamp-value {elf_timestamp} --fake-gen-build-timestamp-value {gen_timestamp}' if check_timestamp else ''))
+                   (' --check-timestamp --fake-elf-build-timestamp-value {elf_timestamp} --fake-gen-build-timestamp-value {gen_timestamp}'.format(
+                        elf_timestamp=elf_timestamp, gen_timestamp=gen_timestamp) if check_timestamp else ''))
             newfiles = list(sorted(getcsv() - original))
             contents = [getlines(f) for f in newfiles]
             expect_params_file = check_timestamp

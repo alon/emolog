@@ -8,7 +8,7 @@ import sys
 def create_c_file(target):
     ts = int(datetime.utcnow().timestamp() * 1000)
     with open(target, 'w+') as fd:
-        fd.write(f"""// This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
+        fd.write("""// This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
 const long long emolog_timestamp __attribute__((used)) = {ts};
 #ifdef __TI_ARM__
 #pragma RETAIN(emolog_timestamp)
@@ -18,12 +18,12 @@ int main(void)
 {{
 }}
 
-""")
+""".format(ts=ts))
     return ts
 
 
 def create_executable(source, target):
-    system(f'gcc -ggdb -O3 -o {target} {source}')
+    system('gcc -ggdb -O3 -o {target} {source}'.format(**locals()))
     assert(path.exists(target))
 
 

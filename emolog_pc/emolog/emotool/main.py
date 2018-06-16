@@ -56,7 +56,7 @@ def start_fake_sine(ticks_per_second, port, build_timestamp_value):
     # force usage of python if the first parameter is a python script; use extension as predicate
     if cmdline[0].endswith('.py'):
         cmdline = [get_python_executable()] + cmdline
-    #print(f"{sys.argv!r} ; which said {which(sys.argv[0])}")
+    #print("{sys_argv} ; which said {which}".format(sys_argv=repr(sys.argv), which=which(sys.argv[0]))
     return create_process(cmdline + ['--embedded', '--ticks-per-second', str(ticks_per_second), '--port', str(port),
                                      '--build-timestamp-value', str(build_timestamp_value)])
 
@@ -65,10 +65,10 @@ def start_pc(port, exe, debug):
     exe = os.path.realpath(exe)
     cmdline = [exe, str(port)]
     cmdline_str = ' '.join(cmdline)
-    debug_cmdline = f'EMOLOG_PC_PORT={port} cgdb --args {cmdline_str}'
+    debug_cmdline = 'EMOLOG_PC_PORT={port} cgdb --args {cmdline_str}'.format(port=port, cmdline_str=cmdline_str)
     os.environ['EMOLOG_PC_PORT'] = str(port)
     if debug:
-        input(f"press enter once you ran pc with: {debug_cmdline}")
+        input("press enter once you ran pc with: {debug_cmdline}".format(debug_cmdline=debug_cmdline))
         return
     return create_process(cmdline)
 
@@ -188,7 +188,7 @@ async def start_transport(client, args):
             exe = pc_executable if args.fake == 'pc' else args.fake
             start_pc(port=port, exe=exe, debug=args.debug)
         else:
-            print(f"error: unfinished support for fake {args.fake}")
+            print("error: unfinished support for fake {fake}".format(fake=args.fake))
             raise SystemExit
     else:
         start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
@@ -301,7 +301,7 @@ def parse_args(args=None):
         if not ret.elf and not ret.embedded:
             # elf required unless fake_sine in effect
             parser.print_usage()
-            print(f"{sys.argv[0]}: error: the following missing argument is required: --elf")
+            print("{e}: error: the following missing argument is required: --elf".format(e=sys.argv[0]))
             raise SystemExit
     else:
         if ret.fake == 'gen':
@@ -321,7 +321,7 @@ def parse_args(args=None):
             if ret.elf is None:
                 if ret.fake == 'pc':
                     if not os.path.exists(pc_executable):
-                        print(f"missing pc ELF file: {pc_executable}")
+                        print("missing pc ELF file: {e}".format(e=pc_executable))
                         raise SystemExit
                     ret.elf = pc_executable
                 else:
@@ -429,7 +429,7 @@ class SamplePassOn(Protocol):
 async def start_tcp_listener(client, port):
     loop = get_event_loop()
     await loop.create_server(lambda: SamplePassOn(client), host='localhost', port=port)
-    print(f"waiting on {port}")
+    print("waiting on {port}".format(port=port))
 
 
 async def amain_startup(args):
@@ -462,21 +462,21 @@ def reasonable_timestamp_ms(timestamp):
 
 def check_timestamp(params, elf_variables):
     if BUILD_TIMESTAMP_VARNAME not in params:
-        logger.error(f'timestamp not received from target')
+        logger.error('timestamp not received from target')
         raise SystemExit
     read_value = int(params[BUILD_TIMESTAMP_VARNAME])
     if BUILD_TIMESTAMP_VARNAME not in elf_variables:
-        logger.error(f'Timestamp variable not in ELF file. Did you add a pre-build step to generate it?')
+        logger.error('Timestamp variable not in ELF file. Did you add a pre-build step to generate it?')
         raise SystemExit
     elf_var = elf_variables[BUILD_TIMESTAMP_VARNAME]
     elf_value = elf_var['init_value']
     if elf_value is None or elf_var['address'] == 0:
-        logger.error(f'Bad timestamp variable in ELF: init value = {elf_value}, address = {elf_var["address"]}')
+        logger.error('Bad timestamp variable in ELF: init value = {value}, address = {address}'.format(value=elf_value, address=elf_var["address"]))
         raise SystemExit
     elf_value = int(elf_variables[BUILD_TIMESTAMP_VARNAME]['init_value'])
     if read_value != elf_value:
         if not reasonable_timestamp_ms(read_value):
-            logger.error(f"Build timestamp mismatch: the embedded target probably doesn't contain a timestamp variable")
+            logger.error("Build timestamp mismatch: the embedded target probably doesn't contain a timestamp variable")
             raise SystemExit
         if read_value < elf_value:
             logger.error('Build timestamp mismatch: target build timestamp is older than ELF')
@@ -510,7 +510,7 @@ async def amain(client, args):
             csv_filename=snapshot_output_filename,
             varsfile=args.snapshotfile,
             # TODO: why do we use 20000 in snapshot_vars.csv? ask Guy
-            extra_vars = [f'{BUILD_TIMESTAMP_VARNAME},100,50'] if args.check_timestamp else [])
+            extra_vars = ['{var_name},100,50'.format(var_name=BUILD_TIMESTAMP_VARNAME)] if args.check_timestamp else [])
         print("parameters saved to: {}".format(snapshot_output_filename))
 
         if args.check_timestamp:
@@ -540,7 +540,13 @@ async def amain(client, args):
     setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
     total_clock = clock() - start_clock
-    print(f"samples received: {client.samples_received}\nticks lost: {client.ticks_lost}\ntime run {total_time:#3.6} cpu %{int(total_clock * 100 /total_time)} (setup time {setup_time:#3.6})")
+    print("samples received: {samples_received}\nticks lost: {ticks_lost}\ntime run {total_time:#3.6} cpu %{percent} (setup time {setup_time:#3.6})".format(
+            samples_received=client.samples_received,
+            ticks_lost=client.ticks_lost,
+            total_time=total_time,
+            percent=int(total_clock * 100 / total_time),
+            setup_time=setup_time,
+        ))
     return client
 
 
@@ -574,7 +580,7 @@ def main(cmdline=None):
     else:
         loop = get_event_loop()
         def exception_handler(loop, context):
-            print(f"Async Exception caught: {context}")
+            print("Async Exception caught: {context}".format(context=context))
             raise SystemExit
         loop.set_exception_handler(exception_handler)
         client = start_callback(args, loop)

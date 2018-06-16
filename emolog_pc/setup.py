@@ -91,7 +91,7 @@ cython_extensions = [cylib, fakeembedded, cython_util, decoders]
 setup(
     name='emolog',
     description='Command & Control side for emolog protocol',
-    version=f'{VERSION[0]}.{VERSION[1]}.{VERSION[2]}',
+    version='.'.join(map(str, VERSION)),
     setup_requires=[
         'setuptools>=18.0', # cython extensions
         'numpy'

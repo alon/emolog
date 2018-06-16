@@ -76,7 +76,7 @@ def dwarf_get_variables_by_name(filename, names):
 
 class VariableNotSupported(Exception):
     def __init__(self, v, size):
-        super().__init__(f'{v}: {size}')
+        super().__init__('{v}: {size}'.format(v=v, size=size))
 
 
 unpack_str_from_type_name = dict(
@@ -137,7 +137,7 @@ def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variabl
             decoder = variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)
         except VariableNotSupported:
             if skip_unsupported_vars:
-                print(f"debug: unsupported by our DWARF DIE parser (dwarf package): {name}")
+                print("debug: unsupported by our DWARF DIE parser (dwarf package): {name}".format(name=name))
                 continue
             raise
         variables.append(dict(
@@ -180,7 +180,7 @@ class DwarfFakeVariable:
             address = fake_elf.build_timestamp_address
             size = 8
             init_value = fake_elf.build_timestamp
-            logger.error(f"DwarfFakeVariable: {address}, {init_value}")
+            logger.error("DwarfFakeVariable: {address}, {init_value}".format(address=address, init_value=init_value))
             type = int
             type_str = 'long long'
         else:
@@ -243,7 +243,7 @@ def main_dump():
     parser.add_argument('-e', '--elf', required=True, type=str, help='ELF file')
     args = parser.parse_args()
     if not os.path.exists(args.elf):
-        print(f"error: missing file {args.elf}")
+        print("error: missing file {elf}".format(elf=args.elf))
         raise SystemExit
     out = read_all_elf_variables(args.elf)
     pprint(out)
@@ -260,10 +260,10 @@ def main():
     # slight logic duplication with emotool.main, but at least in one project
     args = parser.parse_args()
     if not os.path.exists(args.elf):
-        print(f"error: missing file {args.elf}")
+        print("error: missing file {elf}".format(elf=args.elf))
         raise SystemExit
     if args.vars is not None and not os.path.exists(args.vars):
-        print(f"error: missing file {args.vars}")
+        print("error: missing file {vars}".format(vars=args.vars))
         raise SystemExit
     if args.vars is None:
         out = read_all_elf_variables(elf=args.elf)
