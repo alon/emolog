@@ -166,14 +166,14 @@ class ClientProtocolMixin(Protocol):
         is_timeout = result == self.ACK_TIMEOUT
         self.reset_ack()
         if is_timeout:
-            print(f"timeout {self.futures._futures!r}")
+            print("timeout {}".format(repr(self.futures._futures)))
             raise AckTimeout()
 
     async def send_set_variables(self, variables):
         await self.send_sampler_clear()
         self.cylib.sampler.clear()
         for d in variables:
-            logger.info(f"Sending 'Register variable': {d!r}")
+            logger.info("Sending 'Register variable': {}".format(repr(d)))
             await self._send_sampler_register_variable(
                 phase_ticks=d['phase_ticks'],
                 period_ticks=d['period_ticks'],
@@ -216,14 +216,15 @@ class ClientProtocolMixin(Protocol):
             dt = (self.MISSED_MESSAGES_BEFORE_REREGISTRATION *
                 float(self.cylib.sampler.max_ticks_between_messages()) / self._ticks_per_second)
             dt = max(dt, 0.1)
-            #print(f"DEBUG {time()}: check_progress: new/old/dt {self.samples_received}/{last_samples_received} {dt}")
+            #print("DEBUG {time()}: check_progress: new/old/dt {self.samples_received}/{last_samples_received} {dt}")
             redo_registration = self.samples_received == self.last_samples_received
             self.last_samples_received = self.samples_received
             if redo_registration:
-                print(f"DEBUG {time()}: redoing registration, samples {self.samples_received}")
+                print("DEBUG {now}: redoing registration, samples {received}".format(
+                    now=time(), received=self.samples_received))
                 await self.redo_registration_and_start()
             # regardless of redo, we continue to monitor (until stopped)
-            #print(f"DEBUG: check_progress: sleeping {time()}")
+            #print("DEBUG: check_progress: sleeping {time()}")
             await sleep(dt)
 
     async def redo_registration_and_start(self):

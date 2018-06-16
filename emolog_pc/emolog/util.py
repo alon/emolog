@@ -57,7 +57,7 @@ processes = []
 
 
 def create_process(cmdline):
-    print(f"starting subprocess: {cmdline}")
+    print("starting subprocess: {}".format(cmdline))
     process = Popen(cmdline)
     processes.append(process)
     return process
@@ -65,7 +65,7 @@ def create_process(cmdline):
 
 def kill_all_processes():
     for process in processes:
-        #print(f"killing {process.pid}")
+        #print("killing {}".format(process.pid}))
         if hasattr(process, 'send_ctrl_c'):
             process.send_ctrl_c()
         else:
@@ -81,7 +81,7 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
     children = parent.children(recursive=True)
     for child in children:
         if verbose.kill:
-            print(f"killing {child.pid}")
+            print("killing {}".format(child.pid))
         try:
             child.kill()
             child.terminate()
@@ -91,13 +91,13 @@ def kill_proc_tree(pid, including_parent=True, timeout=5):
     if including_parent:
         try:
             if verbose.kill:
-                print(f"killing {parent.pid}")
+                print("killing {}".format(parent.pid))
             parent.kill()
             parent.terminate()
             try:
                 parent.wait(timeout)
             except TimeoutExpired:
-                print(f"timeout expired, process may still be around: {parent.pid}")
+                print("timeout expired, process may still be around: {}".format(parent.pid))
         except NoSuchProcess:
             pass
 

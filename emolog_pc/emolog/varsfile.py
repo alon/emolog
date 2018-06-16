@@ -1,6 +1,8 @@
 import logging
 
+
 logger = logging.getLogger('varsfile')
+
 
 class VarsFileError(Exception):
     def __init__(self, linenumber, linecontents, problem):
@@ -9,10 +11,10 @@ class VarsFileError(Exception):
         self.problem = problem
 
     def __str__(self):
-        return f'{self.linenumber}: {self.problem}\n==> {self.linecontents}'
+        return '{linenumber}: {problem}\n==> {linecontents}'.format(**locals())
 
     def __repr__(self):
-        return f'VarsFileError({self.linenumber}, "{self.linecontents}", "{self.problem}")'
+        return 'VarsFileError({linenumber}, "{linecontents}", "{problem}")'.format(**locals())
 
 
 def read_vars_file(filename, check_errors):

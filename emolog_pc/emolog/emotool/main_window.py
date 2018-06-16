@@ -34,7 +34,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.socket.connectToHost('localhost', args.port)
         self.socket.readyRead.connect(self.readFromEmotool)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle(f"EmoTool - {version()}")
+        self.setWindowTitle("EmoTool - {}".format(version()))
         self.main_widget = QtWidgets.QTabWidget(self)
         plot_tab = QtWidgets.QWidget(self.main_widget)
         self.main_widget.addTab(plot_tab, "plot")
@@ -53,7 +53,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ticks = defaultdict(list)
         self.vals = defaultdict(list)
         self.data_items = defaultdict(pg.PlotDataItem)
-        
+
         self.incoming = b''
         self.next_message_size = None
 
@@ -93,7 +93,7 @@ class MainWindow(QtWidgets.QMainWindow):
         We have
          serial2tcp process <-> emotool <-> app
         Just to avoid rewriting the emotool parts to drop asyncio support so they can be reused for app and emotool.
-        
+
         Quick transport costs calculation (copy cost):
         20000 msg/second
         msg size < 100 bytes
