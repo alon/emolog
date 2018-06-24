@@ -24,7 +24,7 @@ install:
 
   # Upgrade to the latest version of pip to avoid it displaying warnings
   # about it being out of date.
-  - "pip install --disable-pip-version-check --user --upgrade pip"
+  - c:\python36-x64\python.exe -m pip install --disable-pip-version-check --user --upgrade pip
 
   # Should this be done here or via setup some how? it should not be part of the build/install requirements, just development
   - "pip install pytest"
