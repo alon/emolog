@@ -523,11 +523,12 @@ async def amain(client, args):
         bandwidth_bps / 1e6,
         args.baud / 1e6,
         100 * bandwidth_bps / args.baud))
+    min_ticks = gcd(*(var['period_ticks'] for var in variables))
     max_samples = args.ticks_per_second * args.runtime if args.runtime else 0 # TODO - off by a factor of at least min_ticks_between_samples
+    # TODO this corrects run-time if all vars are sampled at a low rate, but still incorrect in some cases e.g. (10, 13)
+    max_samples = max_samples / min_ticks
     if max_samples > 0:
         print("running for {} seconds = {} samples".format(args.runtime, int(max_samples)))
-    min_ticks = gcd(*(var['period_ticks'] for var in variables))
-
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_samples=max_samples)
     if args.listen:
         await start_tcp_listener(client, args.listen)
