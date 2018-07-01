@@ -125,7 +125,7 @@ def TemporaryDirectoryWithChdir():
 
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
-    start = datetime.utcnow().timestamp() * 1000
+    start = datetime.now().timestamp() * 1000
     for check_timestamp, same_timestamp in [(False, False), (True, False), (True, True)]:
         with TemporaryDirectoryWithChdir() as d:
             original = getcsv()

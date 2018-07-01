@@ -6,7 +6,7 @@ import sys
 
 
 def create_c_file(target):
-    ts = int(datetime.utcnow().timestamp() * 1000)
+    ts = int(datetime.now().timestamp() * 1000)
     with open(target, 'w+') as fd:
         fd.write("""// This is used to verify the binary file read by the PC matches the binary file burned into the hardware it's talking to:
 const long long emolog_timestamp __attribute__((used)) = {ts};

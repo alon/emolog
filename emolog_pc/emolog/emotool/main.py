@@ -254,7 +254,7 @@ def parse_args(args=None):
         description='Emolog protocol capture tool. Implements emolog client side, captures a given set of variables to a csv file')
     parser.add_argument('--fake', # TODO: can I have a hook for choices? i.e. choices=ChoicesOrExecutable['gen', 'pc', 'bench'],
                         help='debug only - fake a client - either generated or pc controller')
-    now_timestamp = int(datetime.utcnow().timestamp() * 1000)
+    now_timestamp = int(datetime.now().timestamp() * 1000)
     parser.add_argument('--fake-elf-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
     parser.add_argument('--fake-gen-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
     parser.add_argument('--serial', default='auto', help='serial URL or device name') # see http://pythonhosted.org/pyserial/pyserial_api.html#serial.serial_for_url
