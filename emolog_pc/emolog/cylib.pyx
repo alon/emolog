@@ -47,7 +47,7 @@ logger = getLogger('emolog')
 
 
 def utc():
-    return datetime.utcnow().timestamp()
+    return datetime.now().timestamp()
 
 
 ### Wrap emolog_protocol.cpp
