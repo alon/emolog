@@ -45,10 +45,7 @@ void sampler_sample(uint32_t ticks)
 	unsigned index;
 	uint32_t relative_ticks = ticks - start_ticks;
 
-	//set_red_led(ON); // TEMP
-
 	if (!sampler_running) {
-		//set_red_led(OFF); // TEMP
 		return;
 	}
 
@@ -67,8 +64,6 @@ void sampler_sample(uint32_t ticks)
 		encoded_len = emo_encode_sampler_sample_end(buf, relative_ticks);
 		comm_queue_message(buf, encoded_len);
 	}
-
-	// set_red_led(OFF); // TEMP
 }
 
 
