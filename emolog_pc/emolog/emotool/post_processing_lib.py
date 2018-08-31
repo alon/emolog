@@ -17,7 +17,7 @@ def get_args():
     parser.add_argument('--overwrite', action="store_true", help='If a matching .xlsx file exists, overwrite it.')
     parser.add_argument('--verbose', default=False, action="store_true",
                         help='prints all processing messages for every file')
-    parser.add_argument('--newest', default=False, action="store_true",
+    parser.add_argument('--newest', '--latest', default=False, action="store_true",
                         help='Process only the file with the most recent timestamp')
     parser.add_argument('--open-output', default=False, action="store_true", help='Open the resulting Excel file(s).')
     args = parser.parse_args()
