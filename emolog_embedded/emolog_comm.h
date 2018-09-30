@@ -42,6 +42,16 @@ void comm_consume_message(void);
 bool comm_queue_message(const uint8_t *src, size_t len);
 
 
+/**
+ * for communications protocols that are implemented with polling,
+ * this is called once per tick from emolog_run_step()
+ *
+ * protocols that are purely interrupt-based and don't need anything done per-tick,
+ * can leave this function empty.
+ *
+ */
+void comm_run_step();
+
 #ifdef __cplusplus
 }
 #endif

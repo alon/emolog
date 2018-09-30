@@ -43,6 +43,7 @@ void emolog_run_step(uint32_t ticks)
 		emolog_handle_message(header, ticks);
 		comm_consume_message();
 	}
+	comm_run_step();
 }
 
 
