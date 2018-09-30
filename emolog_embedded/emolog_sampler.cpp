@@ -54,7 +54,7 @@ void sampler_sample(uint32_t ticks)
 //    set_aux_pins(4);
 	for (index = 0 ; index < sampler_table_size ; ++index) {
 		row_t *row = &sampler_table[index];
-		if (relative_ticks % row->period_ticks == row->phase_ticks) {
+		if ((row->period_ticks == 1) || (relative_ticks % row->period_ticks == row->phase_ticks)) {
 			num_encoded_vars++;
 			emo_encode_sampler_sample_add_var(buf, (const uint8_t*)row->address, row->size);
 		}
