@@ -19,7 +19,7 @@ extern "C" {
 #include "emolog_protocol.h"
 
 
-void comm_setup(void);
+void comm_init(void);
 
 /**
  * @return:

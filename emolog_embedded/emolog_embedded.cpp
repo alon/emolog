@@ -30,7 +30,7 @@ void emolog_init(void)
     debug_printf("emolog_init\n");
     dummy_use_timestamp();  // prevent the linker from optimizing-out the timestamp variable, if it is used.
     crc_init();
-	comm_setup();
+	comm_init();
 }
 
 
