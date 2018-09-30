@@ -12,7 +12,7 @@
 #if defined(HOST_DEBUG) || (defined(CLIENT_DEBUG) && defined(EMOLOG_PLATFORM_STM32) )
     #include <stdio.h>
     #define debug_printf printf
-#elif defined(CLIENT_DEBUG) && defined(EMOLOG_PLATFORM_TIVA_C)
+#elif defined(EMOLOG_CLIENT_DEBUG) && defined(EMOLOG_PLATFORM_TIVA_C)
     #include "utils/uartstdio.h"
     #define debug_printf UARTprintf
 #else
