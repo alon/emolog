@@ -74,6 +74,7 @@ void crc_init(void)
 
 crc crc8(uint8_t const message[], int nBytes)
 {
+    set_red_led(ON); // TEMP
     uint8_t data;
     crc remainder = 0;
     int byte;
@@ -90,6 +91,7 @@ crc crc8(uint8_t const message[], int nBytes)
     /*
      * The final remainder is the CRC.
      */
+    set_red_led(OFF); // TEMP
     return (remainder);
 
 }   /* crc8() */
