@@ -295,4 +295,5 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
     sheet.set_chart(chart)
     sheet.set_zoom(145)
     sheet.name = chart_sheet_name
+    return sheet
 
