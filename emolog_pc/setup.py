@@ -101,7 +101,7 @@ setup(
         'xlrd(==1.1.0)',
         'XlsxWriter(==1.0.2)',
         'pandas(==0.23.4)',
-        'pyserial(==3.2.1)',
+        'pyserial(>=3.2.1)',
         'pyserial-asyncio(>=0.4)',
         'psutil(==5.4.1)',
         'colorama>=0.3.7',
