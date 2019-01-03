@@ -7,6 +7,7 @@ from socket import socketpair
 from tempfile import TemporaryDirectory
 from linecache import getlines
 from contextlib import contextmanager
+from subprocess import check_output
 
 
 from emolog.consts import BUILD_TIMESTAMP_VARNAME
@@ -162,7 +163,11 @@ def test_emotool_with_gen():
 
 
 def test_read_elf_variables():
-    read_elf_variables(path.join(module_path, 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
+    names, vars = read_elf_variables(path.join(module_path, 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
+    d = {k['name']: k['address'] for k in vars}
+    got_address = d['var_unsigned_char']
+    expected_address = int([x for x in check_output('objdump -x tests/example.out'.split()).decode().split('\n') if 'var_unsigned_char' in x][0].split()[0], 16)
+    assert expected_address == got_address
 
 
 def test_array_decoder():
