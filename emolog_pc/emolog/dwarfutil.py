@@ -125,7 +125,7 @@ def variable_to_decoder(v, type_name, size):
     elif type_name.endswith('bool'):
         return NamedDecoder(name=name_bytes, max_unsigned_val=2, unpack_str=b'b', val_to_name={1: 'True', 0: 'False'})
 
-    elif type_name.endswith(('int', 'short', 'long')):
+    elif type_name.endswith(('char', 'int', 'short', 'long')):
         # TODO should handle signed/unsigned correctly
         unpack_str = unpack_str_from_size(size)
         return Decoder(name=name_bytes, unpack_str=unpack_str)
