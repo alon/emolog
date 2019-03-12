@@ -99,7 +99,7 @@ setup(
     install_requires=[
         'pyelftools(==0.24)',
         'xlrd(==1.1.0)',
-        'XlsxWriter(==1.0.2)',
+        'XlsxWriter(==1.1.5)',
         'pandas(==0.23.4)',
         'pyserial(>=3.2.1)',
         'pyserial-asyncio(>=0.4)',
