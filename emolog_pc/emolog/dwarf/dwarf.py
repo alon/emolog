@@ -438,10 +438,11 @@ class VarDescriptor:
         type_chain, last_type = self.visit_type_chain()
         type_chain.append(last_type)
 
-        # if there is no size to the final element return None. Seen for example
-        # on an external pointer type:
-        # DW_AT_external - __TI_Handler_Table_Base
-        elem_size = self._get_byte_size_from_die(last_type)
+        # get the element size from the last type-die in the chain that does have a size:
+        for type_die in reversed(type_chain):
+            elem_size = self._get_byte_size_from_die(type_die)
+            if elem_size is not None:
+                break
 
         # if this is an array of anything (including array of arrays etc) take the size from the *first* array die
         # otherwise from the last die in the type-chain
