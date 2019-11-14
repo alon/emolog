@@ -7,17 +7,17 @@ Steps to add emolog to existing embedded project
 - copy emolog_comm.c from another project.(TODO should be in examples)
 - modify #define huart_emolog    huart2 to correct uart
 - in CubeMX: enable interrupt for this UART, but in NVIC settings make sure interrupt handler code is NOT generated (emolog_comm.c has an ISR)
-- make sure UART ISR in emolog_comm.c has the correct name for the specific UART
+- make sure UART ISR in emolog_comm.c has the correct name for the specific UART. Especially note the difference between UART and USART! TODO: somehow make it an error to write an invalid name.
 - in main_loop.cpp:
 	- include emolog_embedded.h
 	- call emolog_init() call in main_init()
 	- call emolog_run_step() in main_loop()
 	- add handle_app_specific_message() callback
 - modify emotool.bat with proper parameters: COM port, path to ELF, main loop frequency, flow control, etc
-- modify process.bat (at least path to run logs)
-- open a console in emolog_work folder:
-	- run create_venv.bat (takes a while)
-	- 
-
-
-
+- modify local_machine_config.ini with the correct logs target folder. Create the folder it is referencing.
+- modify vars.csv with variables that exist in your project.
+- add venv to .gitignore (there's going to be thousands of files there)
+- open an *elevated* console in emolog_work folder ('run as administrator') and run create_venv.bat (takes a while). Close the elevated console.
+- load new firmware to device. make sure the emolog UART is connected to the PC.
+- open a (regular) console in emolog_work folder. Run activate.bat
+- run emotool.bat - emolog should work.
