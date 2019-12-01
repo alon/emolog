@@ -15,7 +15,7 @@ import sys
 import logging
 from struct import pack
 import random
-from time import time, sleep, clock
+from time import time, sleep, perf_counter
 from socket import socket
 from configparser import ConfigParser
 from shutil import which
@@ -124,19 +124,13 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     return serial_subprocess
 
 
-def get_python_executable():
-    if 'win' in sys.platform:
-        return 'python'
-    return 'python3'
-
-
 def create_python_process_cmdline(script):
     script_path = os.path.join(module_dir, script)
-    return [get_python_executable(), script_path]
+    return [sys.executable, script_path]
 
 
 def create_python_process_cmdline_command(command):
-    return [get_python_executable(), '-c', command]
+    return [sys.executable, '-c', command]
 
 
 class EmoToolClient(ClientProtocolMixin):
@@ -534,13 +528,13 @@ async def amain(client, args):
         await start_tcp_listener(client, args.listen)
 
     start_time = time()
-    start_clock = clock()
+    start_clock = perf_counter()
     await run_client(args=args, client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} samples={}".format(time(), client.samples_received))
     setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
-    total_clock = clock() - start_clock
+    total_clock = perf_counter() - start_clock
     print("samples received: {samples_received}\nticks lost: {ticks_lost}\ntime run {total_time:#3.6} cpu %{percent} (setup time {setup_time:#3.6})".format(
             samples_received=client.samples_received,
             ticks_lost=client.ticks_lost,

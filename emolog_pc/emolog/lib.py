@@ -19,7 +19,7 @@
 
 import asyncio
 from asyncio import Future, Protocol, sleep, get_event_loop
-from asyncio.futures import InvalidStateError
+# from asyncio.futures import InvalidStateError
 from time import time
 from struct import pack
 import sys
