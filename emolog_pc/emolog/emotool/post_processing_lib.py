@@ -199,6 +199,7 @@ def add_workbook_formats(wb):
     formats = \
         {
             'frac': wb.add_format({'num_format': '0.000', 'align': 'left'}),
+            'frac_extra_digits': wb.add_format({'num_format': '0.000000', 'align': 'left'}),
             'time': wb.add_format({'num_format': '0.00', 'align': 'left'}),
             'percent': wb.add_format({'num_format': '0.00%', 'align': 'left'}),
             'general': wb.add_format({'align': 'left'}),
