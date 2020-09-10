@@ -417,6 +417,8 @@ class VarDescriptor:
             # special case: zero length array with gcc gets this value:
             if child.attributes[self.DW_AT_upper_bound].value == 0xFFFFFFFF:
                 return [0]
+            if child.attributes[self.DW_AT_upper_bound].form == 'DW_FORM_exprloc':
+                return None     # we don't know how to handle these right now
             res.append(child.attributes[self.DW_AT_upper_bound].value + 1)
         return res
 
