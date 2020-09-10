@@ -242,7 +242,7 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
         row += 1
         for field in section['fields']:
             sheet.write(row, 0, field['name'], wb_formats['header'])
-            if np.isnan(field['value']):
+            if np.isreal(field['value']) and np.isnan(field['value']):
                 field['value'] = 'N/A'
             sheet.write(row, 1, field['value'], wb_formats[field['format']])
             row += 1
