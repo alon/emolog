@@ -199,6 +199,7 @@ def add_workbook_formats(wb):
     formats = \
         {
             'frac': wb.add_format({'num_format': '0.000', 'align': 'left'}),
+            'frac_extra_digits': wb.add_format({'num_format': '0.000000', 'align': 'left'}),
             'time': wb.add_format({'num_format': '0.00', 'align': 'left'}),
             'percent': wb.add_format({'num_format': '0.00%', 'align': 'left'}),
             'general': wb.add_format({'align': 'left'}),
@@ -241,7 +242,7 @@ def add_summary_sheet(wb, summary_stats, wb_formats):
         row += 1
         for field in section['fields']:
             sheet.write(row, 0, field['name'], wb_formats['header'])
-            if isnan(field['value']):
+            if np.isreal(field['value']) and np.isnan(field['value']):
                 field['value'] = 'N/A'
             sheet.write(row, 1, field['value'], wb_formats[field['format']])
             row += 1

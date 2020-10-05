@@ -1,7 +1,7 @@
 /*
  * emolog_embedded.c
  *
- *  Created on: 12 бребЧ 2016
+ *  Created on: 12 пїЅпїЅпїЅпїЅпїЅ 2016
  *      Author: Guy Ovadia
  */
 #include <stdint.h>
@@ -113,4 +113,12 @@ void queue_ack(uint8_t reply_to_seq, emo_error_t error)
     comm_queue_message(buf_out, encoded_len);
 }
 
+
+// override this empty handler in user code (not here) if you want to handle an app-specific message
+// the 'weak' attribute makes it possible to override this function in the user's code without modifying anything here.
+emo_error_t __attribute__((weak)) handle_app_specific_message(emo_header* message)
+{
+	// empty handler
+	return EMO_ERROR_NONE;
+}
 
