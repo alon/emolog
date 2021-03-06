@@ -58,7 +58,12 @@ from itertools import chain
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection, Symbol
-from elftools.dwarf.structs import _ULEB128
+try:
+    # pyelftools 0.24
+    from elftools.dwarf.structs import _ULEB128
+except ImportError:
+    # pyelftools 0.27
+    from elftools.common.construct_utils import ULEB128 as _ULEB128
 
 from elftools.dwarf.die import AttributeValue, DIE
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Generator
