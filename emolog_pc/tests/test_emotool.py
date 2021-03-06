@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from datetime import datetime
 import csv
 from os import listdir, system, getcwd, chdir, path
@@ -162,12 +163,18 @@ def test_emotool_with_gen():
                 assert (same_timestamp and val == elf_timestamp) or val != elf_timestamp
 
 
+example_out = Path(__file__).parent / 'example.out'
+assert (example_out.exists(),
+        f"programming error: expected example.out to be in directory of test, {str(example_out.resolve())}")
+
+
 def test_read_elf_variables():
-    names, vars = read_elf_variables(path.join(module_path, 'example.out'), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
+    names, vars = read_elf_variables(path.join(module_path, str(example_out)), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
     d = {k['name']: k['address'] for k in vars}
     got_address = d['var_unsigned_char']
-    expected_address = int([x for x in check_output('objdump -x tests/example.out'.split()).decode().split('\n') if 'var_unsigned_char' in x][0].split()[0], 16)
+    expected_address = int([x for x in check_output(f'objdump -x {str(example_out)}'.split()).decode().split('\n') if 'var_unsigned_char' in x][0].split()[0], 16)
     assert expected_address == got_address
+    breakpoint()
 
 
 def test_array_decoder():
