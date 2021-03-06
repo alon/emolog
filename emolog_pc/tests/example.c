@@ -10,8 +10,33 @@ const float var_float_arr_2[] [2] = {
     { 1.3, 1.4 },
 };
 
+typedef struct {
+    int x;
+    float y;
+    int z[3];
+} S;
+
+S s;
+
+S s_array[3];
+
 int main(void)
 {
     float bla = (1000.0) * (var_float8[3] + var_float8[2] + var_float8[1] + var_float8[0] + var_float_arr_2[0][0]);
     return var_int + var_float + var_unsigned_char + bla;
 }
+
+
+// Make gcc-none happy (no _exit symbol error otherwise)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void _exit(int status)
+{
+}
+
+#ifdef __cplusplus
+}
+#endif
+
