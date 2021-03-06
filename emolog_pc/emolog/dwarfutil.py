@@ -1,9 +1,11 @@
+from typing import Dict
 import logging
 from string import ascii_lowercase
 import sys
+import re
 
 from .consts import BUILD_TIMESTAMP_VARNAME
-from .dwarf import FileParser
+from .dwarf import FileParser, VarDescriptor
 from .decoders import Decoder, ArrayDecoder, NamedDecoder, unpack_str_from_size
 from .varsfile import (read_vars_file, parse_vars_definition, VarsFileError,
     merge_vars_from_file_and_list)
@@ -29,18 +31,35 @@ def with_errors(s):
             yield s[:i] + other + s[i + 1:]
 
 
-def dwarf_get_variables_by_name(filename, names):
+cached_file_parsers = {}
+
+
+array_rexp = re.compile('\[[^[]*\]')
+def remove_array_expressions(s):
+    """
+    >>> remove_array_expressions('a[0].b[2]') == 'a.b'
+    """
+    ret = []
+    current = 0
+    for start, end in [x.span() for x in list(array_rexp.finditer(s))]:
+        # TODO? add the arrays
+        ret.append(s[current:start])
+        current = end
+    return ''.join(ret + [s[current:]])
+
+
+def dwarf_get_variables_by_name(filename, names) -> Dict[str, VarDescriptor]:
     regular_mode = names is not None and len(names) > 0
     if names is None:
         names = []
     name_filter = (lambda v_name: v_name in names) if regular_mode else (lambda v_name: True)
     missing_check = (lambda found, given: given != found) if regular_mode else (lambda found, given: False)
-    if not hasattr(dwarf_get_variables_by_name, 'file_parser') or dwarf_get_variables_by_name.prev_filename != filename:
-        dwarf_get_variables_by_name.file_parser = FileParser(filename=filename)
-        dwarf_get_variables_by_name.prev_filename = filename
+    if not filename in cached_file_parsers:
+        cached_file_parsers[filename] = FileParser(filename=filename)
+    file_parser = cached_file_parsers[filename]
     sampled_vars = {}
     found = set()
-    elf_vars = list(dwarf_get_variables_by_name.file_parser.visit_interesting_vars_tree_leafs())
+    elf_vars = list(file_parser.visit_interesting_vars_tree_leafs())
     elf_var_names = [v.get_full_name() for v in elf_vars]
     lower_to_actual = {name.lower(): name for name in elf_var_names}
     elf_var_names_set_lower = set(lower_to_actual.keys())
@@ -133,10 +152,10 @@ def variable_to_decoder(v, type_name, size):
     raise VariableNotSupported(v, size)
 
 
-def variables_from_dwarf_variables(names, name_to_ticks_and_phase, dwarf_variables, skip_unsupported_vars):
+def variables_from_vardescriptors(names, name_to_ticks_and_phase, var_descriptors, skip_unsupported_vars):
     variables = []
     for name in names:
-        v = dwarf_variables[name]
+        v = var_descriptors[name]
         period_ticks, phase_ticks = name_to_ticks_and_phase[name]
         try:
             decoder = variable_to_decoder(v=v, type_name=v.get_type_str(), size=v.size)
@@ -216,19 +235,20 @@ def read_elf_variables(elf, defs, skip_unsupported_vars=False, fake_build_timest
     """
     defs - list of (name, ticks, phase)
     """
-    names = [name for name, ticks, phase in defs]
+    names_with_arrays = [name for name, ticks, phase in defs]
+    names = [dwarf_get_variables_by_name(n) for n in names]
     if elf is None:
-        dwarf_variables = fake_dwarf(build_timestamp=fake_build_timestamp, names=names)
+        var_descriptors = fake_dwarf(build_timestamp=fake_build_timestamp, names=names)
     else:
-        dwarf_variables = dwarf_get_variables_by_name(elf, names)
-    if len(dwarf_variables) == 0:
+        var_descriptors = dwarf_get_variables_by_name(elf, names)
+    if len(var_descriptors) == 0:
         logger.error("no variables set for sampling")
         raise SystemExit
     name_to_ticks_and_phase = {name: (ticks, phase) for name, ticks, phase in defs}
-    return names, variables_from_dwarf_variables(
+    return names, variables_from_vardescriptors(
         names=names,
         name_to_ticks_and_phase=name_to_ticks_and_phase,
-        dwarf_variables=dwarf_variables,
+        var_descriptors=var_descriptors,
         skip_unsupported_vars=skip_unsupported_vars)
 
 
@@ -236,7 +256,7 @@ def read_all_elf_variables(elf):
     dwarf_variables = dwarf_get_variables_by_name(elf, None)
     names = list(sorted(dwarf_variables.keys()))
     name_to_ticks_and_phase = {k: (1, 0) for k in names}
-    return names, variables_from_dwarf_variables(
+    return names, variables_from_vardescriptors(
         names, name_to_ticks_and_phase, dwarf_variables, skip_unsupported_vars=True)
 
 

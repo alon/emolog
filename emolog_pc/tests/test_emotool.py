@@ -168,7 +168,27 @@ assert (example_out.exists(),
 
 
 def test_read_elf_variables():
-    defs = [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)]
+    # Each defintion is a tuple of: name, ticks, phase
+    defs = [
+        # PODs
+        # ('var_int', 1, 0),
+        # ('var_float', 1, 0),
+        # ('var_unsigned_char', 1, 0),
+        # ('var_float8', 1, 0),
+        # structs
+        # ('var_s.z', 1, 0),
+        # ('var_s.z[1]', 1, 0),
+        # ('var_s.ss.h', 1, 0),
+        ('var_s_array[1].x', 1, 0),
+        # ('var_s_array[1].z[1]', 1, 0),
+        # ('var_s_array[1].ss_array[1].h', 1, 0),
+        # internal node address: addresses that have internal structure beyond PODs.
+        #('var_s.ss', 1, 0),
+        #('var_s_array[1]', 1, 0),
+        #('var_s_array[1].ss', 1, 0),
+        #('var_s_array[1].ss_array[1]', 1, 0),
+        #('var_s.ss_array[1]', 1, 0),
+    ]
     names, vars = read_elf_variables(elf=str(example_out), defs=defs)
     d = {k['name']: k['address'] for k in vars}
     got_address = d['var_unsigned_char']

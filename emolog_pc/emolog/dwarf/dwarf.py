@@ -306,7 +306,6 @@ class VarDescriptor:
             return ("Unsupported form of the type attribute: %s" % attr.form)
         return self.all_dies[die_offset]
 
-
     def get_type_die(self, die: DIE) -> DIE:
         if 'DW_AT_type' not in die.attributes:
             return "No type die"
@@ -493,6 +492,14 @@ class VarDescriptor:
 
     def get_decl_line(self):
         return self.get_attribute_value(self.DW_AT_decl_line, 'unknown')
+
+    def address_of_index(self, index):
+        """
+        Return address of indexed offset from the base self.address
+        i.e.
+        >>> self.address_of_index(2) == self.address + 2 * self.size
+        """
+        return self.address + self.size * index
 
     def __str__(self):
         if isinstance(self.address, int):

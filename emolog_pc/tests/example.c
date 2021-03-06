@@ -11,14 +11,21 @@ const float var_float_arr_2[] [2] = {
 };
 
 typedef struct {
+    int h;
+    int j;
+} SubStruct;
+
+typedef struct {
     int x;
     float y;
     int z[3];
+    SubStruct ss;
+    SubStruct ss_array[3];
 } S;
 
-S s;
+S var_s;
 
-S s_array[3];
+S var_s_array[3];
 
 int main(void)
 {

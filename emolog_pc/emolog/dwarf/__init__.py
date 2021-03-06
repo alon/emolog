@@ -1,1 +1,1 @@
-from .dwarf import FileParser
+from .dwarf import FileParser, VarDescriptor
