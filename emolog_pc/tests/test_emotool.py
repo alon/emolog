@@ -174,7 +174,6 @@ def test_read_elf_variables():
     got_address = d['var_unsigned_char']
     expected_address = int([x for x in check_output(f'objdump -x {str(example_out)}'.split()).decode().split('\n') if 'var_unsigned_char' in x][0].split()[0], 16)
     assert expected_address == got_address
-    breakpoint()
 
 
 def test_array_decoder():
