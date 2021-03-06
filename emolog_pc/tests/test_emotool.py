@@ -124,7 +124,6 @@ def TemporaryDirectoryWithChdir():
             chdir(cwd)
 
 
-
 def test_emotool_with_gen():
     getcsv = lambda: {x for x in listdir('.') if x.endswith('.csv')}
     start = datetime.now().timestamp() * 1000
@@ -169,7 +168,8 @@ assert (example_out.exists(),
 
 
 def test_read_elf_variables():
-    names, vars = read_elf_variables(path.join(module_path, str(example_out)), [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)], None)
+    defs = [('var_int', 1, 0), ('var_float',1,0), ('var_unsigned_char',1,0), ('var_float8',1,0)]
+    names, vars = read_elf_variables(elf=str(example_out), defs=defs)
     d = {k['name']: k['address'] for k in vars}
     got_address = d['var_unsigned_char']
     expected_address = int([x for x in check_output(f'objdump -x {str(example_out)}'.split()).decode().split('\n') if 'var_unsigned_char' in x][0].split()[0], 16)
