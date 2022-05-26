@@ -219,7 +219,8 @@ class VarDescriptor:
         self.parent = parent
         self.all_dies = all_dies
         self.var_die = var_die
-        self.name = self.get_attribute_value(self.DW_AT_name, required=True).decode('utf-8')
+        die_name = self.get_attribute_value(self.DW_AT_name, required=False)
+        self.name = die_name.decode('utf-8') if die_name is not None else None
         self.address = self.parse_location()
         self.type = self.get_type_die(var_die)
         self.size = self._get_size()
