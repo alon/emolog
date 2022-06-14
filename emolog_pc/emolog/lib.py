@@ -217,12 +217,12 @@ class ClientProtocolMixin(Protocol):
                 float(self.cylib.sampler.max_ticks_between_messages()) / self._ticks_per_second)
             dt = max(dt, 0.1)
             #print("DEBUG {time()}: check_progress: new/old/dt {self.samples_received}/{last_samples_received} {dt}")
-            redo_registration = self.samples_received == self.last_samples_received
-            self.last_samples_received = self.samples_received
-            if redo_registration:
-                print("DEBUG {now}: redoing registration, samples {received}".format(
-                    now=time(), received=self.samples_received))
-                await self.redo_registration_and_start()
+            # redo_registration = self.samples_received == self.last_samples_received
+            # self.last_samples_received = self.samples_received
+            # if redo_registration:
+            #     print("DEBUG {now}: redoing registration, samples {received}".format(
+            #         now=time(), received=self.samples_received))
+            #     await self.redo_registration_and_start()
             # regardless of redo, we continue to monitor (until stopped)
             #print("DEBUG: check_progress: sleeping {time()}")
             await sleep(dt)
