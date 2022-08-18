@@ -25,6 +25,8 @@ cdef class ArrayDecoder(Decoder):
 
     def decode(self, array):
         data = unpack(b'<' + self.unpack_str, array)
+        if isinstance(data[0], bytes):  # a C char string
+            return (b''.join(data)).decode()
         res = ['{ ']
         for i, elem in enumerate(data):
             if isinstance(elem, float):
