@@ -316,6 +316,8 @@ class VarDescriptor:
 
     def is_interesting(self) -> bool:
         # TODO: better criteria than the address?
+        if self.name is None:
+            return False
         return (
             isinstance(self.address, int)       # either an address was not specified or is not a fixed address in RAM (local var, const in flash memory, etc)
             and not self.name.startswith('_')   # various system variables
