@@ -576,6 +576,7 @@ def main(cmdline=None):
         loop = get_event_loop()
         def exception_handler(loop, context):
             print("Async Exception caught: {context}".format(context=context))
+            traceback.print_exception(context['exception'])
             raise SystemExit
         loop.set_exception_handler(exception_handler)
         client = start_callback(args, loop)
