@@ -167,7 +167,7 @@ class EmoToolClient(ClientProtocolMixin):
         self.cylib.csv_handler.register_listener(*args, **kw)
 
     def data_received(self, data):
-        self.cylib.data_received(data)
+        self.cylib.data_received(bytes(data))
 
 
 async def start_transport(client, args):
