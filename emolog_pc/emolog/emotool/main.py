@@ -32,6 +32,7 @@ from ..dwarfutil import read_elf_variables
 from multiprocessing import Process, freeze_support
 from emolog import serial2tcp
 
+BQ_HARDCODED_RUNTIME = 10.0  # intentionally hardcoded with no configurability
 
 logger = logging.getLogger()
 
@@ -260,7 +261,6 @@ def parse_args(args=None):
                         help='turn on verbose logging; affects performance under windows')
     parser.add_argument('--verbose-kill', default=False, action='store_true')
     parser.add_argument('--log', default=None, help='log messages and other debug/info logs to this file')
-    parser.add_argument('--runtime', type=float, default=3.0, help='quit after given seconds. use 0 for endless run.')
     parser.add_argument('--no-cleanup', default=False, action='store_true', help='do not stop sampler on exit')
     parser.add_argument('--dump')
     parser.add_argument('--ticks-per-second', default=1000000 / 50, type=float,
@@ -310,6 +310,7 @@ def parse_args(args=None):
             if ret.varfile is None:
                 ret.varfile = os.path.join(module_dir, '..', '..', 'vars.csv')
                 ret.snapshotfile = os.path.join(module_dir, '..', '..', 'snapshot_vars.csv')
+    ret.runtime = BQ_HARDCODED_RUNTIME
     return ret
 
 
