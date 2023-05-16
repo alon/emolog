@@ -29,7 +29,7 @@ from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import merge_vars_from_file_and_list
 from ..dwarfutil import read_elf_variables
-from multiprocessing import Process
+from multiprocessing import Process, freeze_support
 from emolog import serial2tcp
 
 
@@ -117,15 +117,6 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port))
     proc.start()
     return proc
-
-
-def create_python_process_cmdline(script):
-    script_path = os.path.join(module_dir, script)
-    return [sys.executable, script_path]
-
-
-def create_python_process_cmdline_command(command):
-    return [sys.executable, '-c', command]
 
 
 class EmoToolClient(ClientProtocolMixin):
@@ -560,6 +551,7 @@ def start_callback(args, loop):
 
 
 def main(cmdline=None):
+    freeze_support()
     atexit.register(kill_all_processes)
     parse_args_args = [] if cmdline is None else [cmdline]
     args = parse_args(*parse_args_args)
