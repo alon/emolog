@@ -8,7 +8,7 @@ a = Analysis(
     ['emotool.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('../../../emolog_work/local_machine_config.ini', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
