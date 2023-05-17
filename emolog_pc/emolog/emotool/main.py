@@ -29,6 +29,8 @@ from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import merge_vars_from_file_and_list
 from ..dwarfutil import read_elf_variables
+from multiprocessing import Process
+from emolog import serial2tcp
 
 
 logger = logging.getLogger()
@@ -112,16 +114,9 @@ def setup_logging(filename, silent):
 
 
 def start_serial_process(serialurl, baudrate, hw_flow_control, port):
-    """
-    Block until serial2tcp is ready to accept a connection
-    """
-    serial2tcp_cmd = create_python_process_cmdline('serial2tcp.py')
-    if hw_flow_control is True:
-        serial2tcp_cmd += ['-r']
-    serial2tcp_cmd += ' -b {} -p {} -P {}'.format(baudrate, serialurl, port).split()
-
-    serial_subprocess = create_process(serial2tcp_cmd)
-    return serial_subprocess
+    proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port))
+    proc.start()
+    return proc
 
 
 def create_python_process_cmdline(script):

@@ -116,6 +116,63 @@ class Redirector:
             self.thread_read.join()
 
 
+def start(serial_port, baudrate, rtscts, port):
+
+    if serial_port == 'auto':
+        serial_port = find_serial()
+
+    access_list = ["127.0.0.1"]
+
+    log.info("TCP/IP to Serial redirector (Ctrl-C to quit)")
+
+    try:
+        ser = serial.serial_for_url(
+            serial_port,
+            baudrate=baudrate,
+            rtscts=rtscts,
+            xonxoff=False,
+            #required so that the reader thread can exit
+            timeout=1
+            )
+    except serial.SerialException as e:
+        log.fatal("Could not open serial port %s: %s" % (serial_port, e))
+        sys.exit(1)
+
+    # TODO: necessary?
+    ser.flushInput()
+    ser.flushOutput()
+
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.bind(('127.0.0.1', port))
+    srv.listen(1)
+
+    def signal_handler(signal, frame):
+        pass
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    try:
+        connection, addr = srv.accept()
+        address, port = addr
+        log.info('Connecting with tcp://{0}:{1}'.format(address, port))
+        if address in access_list:
+            #enter console->serial loop
+            r = Redirector(ser, connection)
+            r.shortcut()
+        else:
+            log.error('Address {0} not in access list.'.format(address))
+    except socket.error as msg:
+        log.error(msg)
+    finally:
+        try:
+            connection.close()
+            log.info('Disconnecting')
+        except NameError:
+            pass
+        except Exception as e:
+            log.warning(repr(e))
+
+
 if __name__ == '__main__':
     descr = 'WARNING: You have to allow connections only from the addresses' \
             'in the "--allow-list" option. e.g.' \
@@ -144,57 +201,5 @@ if __name__ == '__main__':
         help="List of IP addresses e.g '127.0.0.1, 192.168.0.2'")
 
     options = parser.parse_args()
+    start(options.serial, options.baudrate, options.rtscts, options.port)
 
-    if options.serial == 'auto':
-        options.serial = find_serial()
-
-    access_list = set([ip.strip(" ") for ip in options.acl.split(',')])
-
-    log.info("TCP/IP to Serial redirector (Ctrl-C to quit)")
-
-    try:
-        ser = serial.serial_for_url(
-            options.serial,
-            baudrate=options.baudrate,
-            rtscts=options.rtscts,
-            xonxoff=options.xonxoff,
-            #required so that the reader thread can exit
-            timeout=1
-            )
-    except serial.SerialException as e:
-        log.fatal("Could not open serial port %s: %s" % (options.serial, e))
-        sys.exit(1)
-
-    # TODO: necessary?
-    ser.flushInput()
-    ser.flushOutput()
-
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.bind((options.listen, options.port))
-    srv.listen(1)
-
-    def signal_handler(signal, frame):
-        pass
-
-    signal.signal(signal.SIGINT, signal_handler)
-
-    try:
-        connection, addr = srv.accept()
-        address, port = addr
-        log.info('Connecting with tcp://{0}:{1}'.format(address, port))
-        if address in access_list:
-            #enter console->serial loop
-            r = Redirector(ser, connection)
-            r.shortcut()
-        else:
-            log.error('Address {0} not in access list.'.format(address))
-    except socket.error as msg:
-        log.error(msg)
-    finally:
-        try:
-            connection.close()
-            log.info('Disconnecting')
-        except NameError:
-            pass
-        except Exception as e:
-            log.warning(repr(e))
