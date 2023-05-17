@@ -105,12 +105,8 @@ setup(
         'pyserial-asyncio(>=0.4)',
         'psutil(==5.4.1)',
         'colorama>=0.3.7',
+        'pyinstaller>=5.11.0'
     ] + cython_install_requires,
-    extras_require={
-        'pyinstaller': [
-            'PyInstaller(==3.3)',
-        ]
-    },
     packages=['emolog', 'emolog.dwarf', 'emolog.emotool'],
     ext_modules = cythonize(cython_extensions, gdb_debug=gdb_debug),
     data_files=[
