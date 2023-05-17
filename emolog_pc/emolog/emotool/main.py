@@ -24,7 +24,7 @@ from pickle import dumps
 import csv
 
 from ..consts import BUILD_TIMESTAMP_VARNAME
-from ..util import version, resolve, create_process, kill_all_processes, gcd
+from ..util import version, resolve, create_process, kill_all_processes, processes, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import merge_vars_from_file_and_list
@@ -116,6 +116,7 @@ def setup_logging(filename, silent):
 def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port))
     proc.start()
+    processes.append(proc)
     return proc
 
 
