@@ -440,7 +440,7 @@ class VarDescriptor:
     def _get_byte_size_from_die(self, die: DIE) -> int:
         byte_size = die.attributes.get(self.DW_AT_byte_size, None)
         if byte_size is not None:
-            assert(byte_size.form in ['DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4'])
+            assert(byte_size.form in ['DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4', 'DW_FORM_implicit_const'])
             return byte_size.value
         return None
 
