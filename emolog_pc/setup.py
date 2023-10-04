@@ -97,13 +97,13 @@ setup(
         'numpy'
     ] + cython_setup_requires,
     install_requires=[
-        'pyelftools(==0.27)',
-        'xlrd(==1.1.0)',
+        'pyelftools(>=0.27)',
+        'xlrd(>=1.1.0)',
         'XlsxWriter(>=1.1.5)',
         'pandas(>=0.23.4)',
         'pyserial(>=3.2.1)',
         'pyserial-asyncio(>=0.4)',
-        'psutil(==5.4.1)',
+        'psutil(>=5.4.1)',
         'colorama>=0.3.7',
         'pyinstaller>=5.11.0'
     ] + cython_install_requires,
