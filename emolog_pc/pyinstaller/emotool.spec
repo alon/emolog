@@ -8,10 +8,7 @@ a = Analysis(
     ['emotool.py'],
     pathex=[],
     binaries=[],
-    datas=[
-           ('../../../emolog_work/vars.csv', 'data'),
-           ('../../../emolog_work/snapshot_vars.csv', 'data'),
-          ],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
