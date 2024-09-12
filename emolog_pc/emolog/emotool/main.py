@@ -14,7 +14,7 @@ import sys
 import logging
 from struct import pack
 import random
-from time import time, sleep, perf_counter
+from time import time, perf_counter
 from socket import socket
 from configparser import ConfigParser
 from shutil import which
