@@ -59,6 +59,7 @@ class Redirector:
     def __init__(self, serial, s):
         self.serial = serial
         self.socket = s
+        self.alive = False
         s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 20 * 1024 * 1024)
 
     def shortcut(self):
