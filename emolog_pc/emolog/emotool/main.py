@@ -172,7 +172,7 @@ async def start_transport(client, args):
             raise SystemExit
     else:
         serial_process = start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
-    await loop.create_task(monitor_subprocess(serial_process))
+    loop.create_task(monitor_subprocess(serial_process))
     attempt = 0
     while attempt < 10:
         attempt += 1
@@ -189,7 +189,11 @@ async def start_transport(client, args):
 
 
 async def monitor_subprocess(process: Process):
-    process.join()
+    # I wish there was an async process.join()
+    while True:
+        if not process.is_alive():
+            break
+        await sleep(0.1)
     print('exiting via monitor subprocess')
     sys.exit(0)
 
