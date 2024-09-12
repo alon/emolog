@@ -7,7 +7,6 @@
 
 from datetime import datetime
 import traceback
-import atexit
 import argparse
 import os
 from os import path
