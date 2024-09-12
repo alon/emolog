@@ -172,7 +172,8 @@ async def start_transport(client, args):
             print("error: unfinished support for fake {fake}".format(fake=args.fake))
             raise SystemExit
     else:
-        start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
+        serial_process = start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
+    await loop.create_task(monitor_subprocess(serial_process))
     attempt = 0
     while attempt < 10:
         attempt += 1
@@ -186,6 +187,12 @@ async def start_transport(client, args):
             break
     client_transport, client2 = await loop.create_connection(lambda: client, sock=s)
     assert client2 is client
+
+
+async def monitor_subprocess(process: Process):
+    process.join()
+    print('exiting via monitor subprocess')
+    sys.exit(0)
 
 
 args = None
@@ -535,7 +542,10 @@ def start_callback(args, loop):
 
     try:
         client = loop.run_until_complete(amain_startup(args))
-    except:
+    except SystemExit:
+        # this is fine, but please exit
+        raise SystemExit
+    except Exception:
         traceback.print_exc()
         raise SystemExit
     try:
