@@ -114,7 +114,8 @@ def setup_logging(filename, silent):
 
 
 def start_serial_process(serialurl, baudrate, hw_flow_control, port):
-    proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port))
+    proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port),
+                   daemon=True, name='emolog-serial2tcp')
     proc.start()
     processes.append(proc)
     return proc
