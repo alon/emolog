@@ -65,8 +65,7 @@ class Redirector:
         """connect the serial port to the tcp port by copying everything
            from one side to the other"""
         self.alive = True
-        self.thread_read = threading.Thread(target=self.reader)
-        self.thread_read.setDaemon(1)
+        self.thread_read = threading.Thread(target=self.reader, daemon=True)
         self.thread_read.start()
         self.writer()
 
