@@ -53,53 +53,11 @@ def resolve(module_attr):
         return None
 
 
-processes = []
-
-
 def create_process(cmdline):
     print("starting subprocess: {}".format(cmdline))
     process = Popen(cmdline)
-    processes.append(process)
     return process
 
-
-def kill_all_processes():
-    for process in processes:
-        #print("killing {}".format(process.pid}))
-        if hasattr(process, 'send_ctrl_c'):
-            process.send_ctrl_c()
-        else:
-            kill_proc_tree(process.pid)
-    del processes[:]
-
-
-def kill_proc_tree(pid, including_parent=True, timeout=5):
-    try:
-        parent = Process(pid)
-    except NoSuchProcess:
-        return
-    children = parent.children(recursive=True)
-    for child in children:
-        if verbose.kill:
-            print("killing {}".format(child.pid))
-        try:
-            child.kill()
-            child.terminate()
-        except NoSuchProcess:
-            pass
-    gone, still_alive = wait_procs(children, timeout=timeout)
-    if including_parent:
-        try:
-            if verbose.kill:
-                print("killing {}".format(parent.pid))
-            parent.kill()
-            parent.terminate()
-            try:
-                parent.wait(timeout)
-            except TimeoutExpired:
-                print("timeout expired, process may still be around: {}".format(parent.pid))
-        except NoSuchProcess:
-            pass
 
 class verbose:
     kill = False

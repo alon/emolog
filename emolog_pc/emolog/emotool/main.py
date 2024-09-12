@@ -24,7 +24,7 @@ from pickle import dumps
 import csv
 
 from ..consts import BUILD_TIMESTAMP_VARNAME
-from ..util import version, resolve, create_process, kill_all_processes, processes, gcd
+from ..util import version, resolve, create_process, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import merge_vars_from_file_and_list
@@ -117,7 +117,6 @@ def start_serial_process(serialurl, baudrate, hw_flow_control, port):
     proc = Process(target=serial2tcp.start, args=(serialurl, baudrate, hw_flow_control, port),
                    daemon=True, name='emolog-serial2tcp')
     proc.start()
-    processes.append(proc)
     return proc
 
 
@@ -227,8 +226,6 @@ async def cleanup(args, client):
     client.exit_gracefully()
     if client.transport is not None:
         client.transport.close()
-    kill_all_processes()
-
 
 
 def parse_args(args=None):
@@ -554,7 +551,6 @@ def start_callback(args, loop):
 
 def main(cmdline=None):
     freeze_support()
-    atexit.register(kill_all_processes)
     parse_args_args = [] if cmdline is None else [cmdline]
     args = parse_args(*parse_args_args)
     util_verbose.kill = args.verbose_kill
