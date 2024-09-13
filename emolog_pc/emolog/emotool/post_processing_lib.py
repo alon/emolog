@@ -104,7 +104,8 @@ def post_processing_main(process_func):
                 print('Excel file already exists, skipping file.')
                 summary['skipped'] += 1
 
-    print_summary(summary)
+    if len(files) > 1:
+        print_summary(summary)
 
 
 # ---------------   Generic Post-Processing Library Functions  ---------------
@@ -175,7 +176,7 @@ def reorder_columns(data, first_cols):
 
 
 def interpolate_missing_data(data):
-    data = data.fillna(method='ffill')
+    data = data.ffill()
     return data
 
 
