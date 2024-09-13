@@ -68,9 +68,7 @@ def process_file(args, config, input_filename, output_filename, summary, truncat
         if args.open_output:
             os.startfile(output_filename)
     except Exception as ex:
-        print('Post-processing failed.')
-        if verbose:
-            raise ex
+        print(f'Post-processing failed: {ex}')
         summary['failed'] += 1
 
 
@@ -89,7 +87,6 @@ def post_processing_main(process_func):
     config = read_config('local_machine_config.ini')
     files = calc_file_list(args, config)
 
-    verbose = True if len(files) == 1 else args.verbose
     truncate = config.getboolean('post_processor', 'truncate_data', fallback=False)
 
     summary = {'processed': 0, 'failed': 0, 'skipped': 0}
@@ -97,11 +94,11 @@ def post_processing_main(process_func):
         print(os.path.basename(filename) + ':  ', end='')
         output_filename = filename[:-4] + '.xlsx'
         if not os.path.exists(output_filename):
-            process_file(args, config, filename, output_filename, summary, truncate, verbose,
+            process_file(args, config, filename, output_filename, summary, truncate, args.verbose,
                          'Finished post-processing.', process_func)
         else:  # output file exists, only run if overwrite is requested
             if args.overwrite:
-                process_file(args, config, filename, output_filename, summary, truncate, verbose,
+                process_file(args, config, filename, output_filename, summary, truncate, args.verbose,
                              'Overwritten existing Excel file.', process_func)
             else:
                 print('Excel file already exists, skipping file.')
