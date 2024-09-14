@@ -98,7 +98,6 @@ setup(
     ] + cython_setup_requires,
     install_requires=[
         'pyelftools(>=0.27)',
-        'xlrd(>=1.1.0)',
         'XlsxWriter(>=1.1.5)',
         'pandas(>=0.23.4)',
         'pyserial(>=3.2.1)',
