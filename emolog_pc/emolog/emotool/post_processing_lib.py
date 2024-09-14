@@ -93,7 +93,7 @@ def post_processing_main(process_func):
     for filename in files:
         print(os.path.basename(filename) + ':  ', end='')
         output_filename = filename[:-4] + '.xlsx'
-        if not os.path.exists(output_filename):
+        if not output_exists(output_filename):
             process_file(args, config, filename, output_filename, summary, truncate, args.verbose,
                          'Finished post-processing.', process_func)
         else:  # output file exists, only run if overwrite is requested
@@ -106,6 +106,22 @@ def post_processing_main(process_func):
 
     if len(files) > 1:
         print_summary(summary)
+
+
+def output_exists(output_filename):
+    """
+    returns true if output filename exists as-is, but also if it was renamed with the same prefix of emo_xxx
+    but with added text. so, if output_filename is emo_042.xlsx, it will return true if it finds a file
+    named 'emo_042 - testing good motor with 12V.xlsx'
+    """
+    base_name = os.path.basename(output_filename)
+    if os.path.exists(output_filename):
+        return True
+    elif base_name.startswith('emo_') and base_name[4:7].isdigit() and len(base_name) > 7:
+        pattern = base_name[0:7] + '*.' + base_name.split('.')[-1]
+        matching_files = glob.glob(os.path.join(os.path.dirname(output_filename), pattern))
+        return len(matching_files) > 0
+    return False
 
 
 # ---------------   Generic Post-Processing Library Functions  ---------------
