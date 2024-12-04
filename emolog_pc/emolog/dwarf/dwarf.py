@@ -462,7 +462,7 @@ class VarDescriptor:
                 byte_size = self._get_byte_size_from_die(array_type)
             else:
                 flat_length = self.get_array_flat_length()
-                if flat_length is None:
+                if flat_length is None or elem_size is None:
                     # NOTE: we did not have to support these variables until
                     # now. For instance, sys_errlist when compiling on gcc with
                     # x86_64 the pc_platform example
