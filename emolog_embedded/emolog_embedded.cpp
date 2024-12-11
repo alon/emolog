@@ -39,12 +39,10 @@ void emolog_run_step(uint32_t ticks)
 	emo_header *header;
 
 	sampler_sample(ticks);
-//    set_aux_pins(12);
 	if ((header = comm_peek_message()) != NULL) {
 		emolog_handle_message(header, ticks);
 		comm_consume_message();
 	}
-//    set_aux_pins(13);
 	comm_run_step();
 }
 
