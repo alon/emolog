@@ -36,14 +36,14 @@ void emolog_init(void)
 
 void emolog_run_step(uint32_t ticks)
 {
-	emo_header *header;
-
-	sampler_sample(ticks);
+    emo_header *header;
+    comm_run_step();
 	if ((header = comm_peek_message()) != NULL) {
 		emolog_handle_message(header, ticks);
 		comm_consume_message();
 	}
-	comm_run_step();
+	// order is important: send sample after handling messages - if ack was sent it will take priority
+	sampler_sample(ticks);
 }
 
 

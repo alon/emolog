@@ -1,7 +1,7 @@
 /*
  * emolog_comm.h
  *
- *  Created on: 22 боай 2016
+ *  Created on: 22 пїЅпїЅпїЅпїЅ 2016
  *      Author: Guy Ovadia
  */
 
@@ -51,6 +51,15 @@ bool comm_queue_message(const uint8_t *src, size_t len);
  *
  */
 void comm_run_step();
+
+
+// check if there are new bytes in the DMA circular RX buffer
+bool is_rx_buf_empty();
+
+// pop a byte from the DMA circular RX buffer.
+// It is the caller's responsibility to check if the buffer is empty before calling this function.
+uint8_t pop_rx_buf();
+
 
 #ifdef __cplusplus
 }

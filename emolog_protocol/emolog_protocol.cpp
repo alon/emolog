@@ -243,7 +243,6 @@ int16_t emo_decode(const uint8_t *src, uint16_t size)
 
     /* check header integrity, if fail skip a byte */
     header_crc = crc8(src, EMO_HEADER_NO_CRC_SIZE);
-    //debug("EMO_HEADER_NO_CRC_SIZE = %d\n", EMO_HEADER_NO_CRC_SIZE);
     if (header_crc != hdr->header_crc) {
         debug_printf("EMOLOG: header crc failed %d expected, %d received.\n", header_crc, hdr->header_crc);
         return -1;
