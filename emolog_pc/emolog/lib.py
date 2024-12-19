@@ -166,7 +166,7 @@ class ClientProtocolMixin(Protocol):
         is_timeout = result == self.ACK_TIMEOUT
         self.reset_ack()
         if is_timeout:
-            print("timeout {}".format(repr(self.futures._futures)))
+            print("Timeout")
             raise AckTimeout()
 
     async def send_set_variables(self, variables):

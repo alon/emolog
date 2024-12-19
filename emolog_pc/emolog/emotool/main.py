@@ -335,8 +335,10 @@ def bandwidth_calc(args, variables):
 async def initialize_board(client, variables):
     logger.debug("about to send version")
     await client.send_version()
-    retries = max_retries = 3
-    while retries > 0:
+
+    retry_count = 0
+    max_retries = 3
+    while retry_count < max_retries:
         try:
             logger.debug("about to send sampler stop")
             await client.send_sampler_stop()
@@ -347,9 +349,9 @@ async def initialize_board(client, variables):
             logger.debug("client initiated, starting to log data at rate TBD")
             break
         except AckTimeout:
-            retries -= 1
-            logger.info("Ack Timeout. Retry {}".format(max_retries - retries))
-    return retries != 0
+            retry_count += 1
+            logger.info(f"Ack Timeout. Retry {retry_count}")
+    return retry_count < max_retries
 
 
 def banner(s):
@@ -373,7 +375,17 @@ async def run_client(args, client, variables, allow_kb_stop):
         if allow_kb_stop and try_getch():
             break
         await sleep(dt)
-    await client.send_sampler_stop()
+
+    retry_count = 0
+    max_retries = 3
+    while retry_count < max_retries:
+        try:
+            logger.debug("about to send sampler stop")
+            await client.send_sampler_stop()
+            break
+        except AckTimeout:
+            retry_count += 1
+            logger.info(f"Ack Timeout. Retry {retry_count}")
 
 
 async def record_snapshot(args, client, csv_filename, varsfile, extra_vars=None):
