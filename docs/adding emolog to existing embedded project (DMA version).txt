@@ -1,0 +1,23 @@
+Steps to add emolog to existing embedded project
+
+- add emolog submodule
+- copy emolog_work folder from another project (TODO should be in examples). Delete venv, delete other irrelevant stuff that exists there.
+- add emolog_protocol and emolog_embedded as source folders in IDE
+- include folders: add emolog_protocol and emolog_embedded
+- copy emolog_comm.c from another project.(TODO should be in examples).
+- add the uart_dma tinkerlib module to the project.
+- modify "#define huart_emolog    huart2" to correct uart
+- in CubeMX: see requirements in emolog_comm_dma.h. basically, enable circular DMA for RX and normal DMA for TX, and disable all ISRs (DMA and UART)
+- in main_loop.cpp:
+	- include emolog_embedded.h
+	- call emolog_init() call in main_init()
+	- call emolog_run_step() in main_loop()
+	- add handle_app_specific_message() callback
+- modify emotool.bat with proper parameters: COM port, path to ELF, main loop frequency, flow control, etc
+- modify local_machine_config.ini with the correct logs target folder. Create the folder it is referencing.
+- modify vars.csv with variables that exist in your project.
+- add venv to .gitignore (there's going to be thousands of files there)
+- open an *elevated* console in emolog_work folder ('run as administrator') and run create_venv.bat (takes a while). Close the elevated console.
+- load new firmware to device. make sure the emolog UART is connected to the PC.
+- open a (regular) console in emolog_work folder. Run activate.bat
+- run emotool.bat - emolog should work.

@@ -144,6 +144,7 @@ uint16_t emo_encode_sampler_register_variable(uint8_t *dest, uint32_t phase_tick
 	payload.period_ticks = period_ticks;
 	payload.address = address;
 	payload.size = size;
+	payload.reserved = 0;
 
     write_message(dest, EMO_MESSAGE_TYPE_SAMPLER_REGISTER_VARIABLE, sizeof(payload), (const uint8_t *)&payload);
     return sizeof(emo_sampler_register_variable);
