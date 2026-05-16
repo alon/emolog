@@ -295,15 +295,16 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
         chart.add_series(col_params)
 
     chart.set_x_axis({'label_position': 'low',
+                      'major_gridlines': {'visible': True},
                       'min': axes_ranges['x']['min'],
                       'max': axes_ranges['x']['max'],
                       'line': {'none': True},
                       })
-    chart.set_y_axis({'major_gridlines': {'visible': False},
+    chart.set_y_axis({'major_gridlines': {'visible': True},
                       'min': axes_ranges['y']['min'],
                       'max': axes_ranges['y']['max'],
                       })
-    chart.set_y2_axis({'major_gridlines': {'visible': True},
+    chart.set_y2_axis({'major_gridlines': {'visible': False},
                        'min': axes_ranges['y2']['min'],
                        'max': axes_ranges['y2']['max'],
                        })
