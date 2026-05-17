@@ -20,6 +20,10 @@ def get_args():
     parser.add_argument('--newest', '--latest', default=False, action="store_true",
                         help='Process only the file with the most recent timestamp')
     parser.add_argument('--open-output', default=False, action="store_true", help='Open the resulting Excel file(s).')
+    parser.add_argument('--ticks-per-second', type=float, default=None,
+                        help='Sample rate of the recording in Hz. Forwarded to the project-specific callback via args.')
+    parser.add_argument('--analysis', default=None,
+                        help='Identifier for the analysis type to use. Interpreted by the project-specific callback.')
     args = parser.parse_args()
     return args
 
@@ -60,9 +64,9 @@ def find_newest_file(files):
     return files[latest_index]
 
 
-def process_file(args, config, input_filename, output_filename, summary, truncate, verbose, success_msg, process_func):
+def process_file(args, input_filename, output_filename, summary, success_msg, process_func):
     try:
-        process_func(input_filename, output_filename, config, truncate_data=truncate, verbose=verbose)
+        process_func(input_filename, output_filename, args)
         print(success_msg)
         summary['processed'] += 1
         if args.open_output:
@@ -87,18 +91,16 @@ def post_processing_main(process_func):
     config = read_config('local_machine_config.ini')
     files = calc_file_list(args, config)
 
-    truncate = config.getboolean('post_processor', 'truncate_data', fallback=False)
-
     summary = {'processed': 0, 'failed': 0, 'skipped': 0}
     for filename in files:
         print(os.path.basename(filename) + ':  ', end='')
         output_filename = filename[:-4] + '.xlsx'
         if not output_exists(output_filename):
-            process_file(args, config, filename, output_filename, summary, truncate, args.verbose,
+            process_file(args, filename, output_filename, summary,
                          'Finished post-processing.', process_func)
         else:  # output file exists, only run if overwrite is requested
             if args.overwrite:
-                process_file(args, config, filename, output_filename, summary, truncate, args.verbose,
+                process_file(args, filename, output_filename, summary,
                              'Overwritten existing Excel file.', process_func)
             else:
                 print('Excel file already exists, skipping file.')
