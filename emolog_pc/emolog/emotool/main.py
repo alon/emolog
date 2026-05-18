@@ -30,7 +30,7 @@ from ..varsfile import merge_vars_from_file_and_list
 from ..dwarfutil import read_elf_variables
 from multiprocessing import Process, freeze_support
 from emolog import serial2tcp
-from .serial_autodetect import resolve_serial, AutodetectError
+from .serial_autodetect import resolve_serial, AutodetectError, format_autodetect_detail
 
 
 logger = logging.getLogger()
@@ -527,6 +527,9 @@ async def amain(client, args):
     print("")
     print("Output file: {}".format(os.path.basename(csv_filename)))
     print("Output folder: {}".format(os.path.dirname(os.path.abspath(csv_filename))))
+    if getattr(args, 'serial_autodetect_info', None):
+        print(f"Auto-detected {args.serial_autodetect_info['device']}")
+        logger.info(format_autodetect_detail(args.serial_autodetect_info))
     bandwidth_bps = bandwidth_calc(args=args, variables=variables)
     print("Estimated bandwidth usage: {} Mbps out of {} ({:.3f}%)".format(
         bandwidth_bps / 1e6,
@@ -597,10 +600,12 @@ def main(cmdline=None):
     else:
         if args.fake is None:
             try:
-                args.serial = resolve_serial(args.serial, args.serial_autodetect)
+                args.serial, args.serial_autodetect_info = resolve_serial(args.serial, args.serial_autodetect)
             except AutodetectError as e:
                 print(str(e), file=sys.stderr)
                 raise SystemExit(1)
+        else:
+            args.serial_autodetect_info = None
         loop = get_event_loop()
         def exception_handler(loop, context):
             print("Async Exception caught: {context}".format(context=context))

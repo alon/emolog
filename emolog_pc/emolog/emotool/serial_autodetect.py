@@ -83,16 +83,14 @@ def _resolve_ini_path(explicit):
     """Returns (path, source_label). Raises AutodetectError if not found."""
     if explicit:
         if not os.path.isfile(explicit):
-            raise AutodetectError(
-                "--serial-autodetect file not found: {p}".format(p=explicit))
+            raise AutodetectError(f"--serial-autodetect file not found: {explicit}")
         return explicit, 'specified via --serial-autodetect'
     cwd_path = os.path.join(os.getcwd(), DEFAULT_INI_NAME)
     if os.path.isfile(cwd_path):
         return cwd_path, 'CWD'
     default = _default_ini_path()
     if not os.path.isfile(default):
-        raise AutodetectError(
-            "built-in default {n} not found at {p}".format(n=DEFAULT_INI_NAME, p=default))
+        raise AutodetectError(f"built-in default {DEFAULT_INI_NAME} not found at {default}")
     return default, 'built-in default'
 
 
@@ -116,32 +114,34 @@ def load_candidates(path):
             elif key == 'serial_number':
                 c.serial_number = re.compile(val)
             elif key not in _KNOWN_KEYS:
-                print("warning: unknown key '{k}' in section [{s}] of {p}; ignoring".format(
-                    k=key, s=section, p=path))
+                print(f"warning: unknown key '{key}' in section [{section}] of {path}; ignoring")
         out.append(c)
     return out
 
 
 def _format_port(p):
-    vid = '{:04X}'.format(p.vid) if p.vid is not None else '----'
-    pid = '{:04X}'.format(p.pid) if p.pid is not None else '----'
+    vid = f'{p.vid:04X}' if p.vid is not None else '----'
+    pid = f'{p.pid:04X}' if p.pid is not None else '----'
     sn = p.serial_number if p.serial_number else '-'
     desc = p.description if p.description else '-'
-    return '{dev}  VID={vid} PID={pid}  SN={sn}  "{desc}"'.format(
-        dev=p.device, vid=vid, pid=pid, sn=sn, desc=desc)
+    return f'{p.device}  VID={vid} PID={pid}  SN={sn}  "{desc}"'
 
 
 def resolve_serial(args_serial, autodetect_path=None):
     """
-    If args_serial is 'auto', enumerate available ports and match against the
-    auto-detect INI. Returns the resolved device name (e.g. 'COM4'). Otherwise
-    returns args_serial unchanged.
+    Returns (device, autodetect_info).
+
+    If args_serial is 'auto', enumerates ports and matches against the
+    auto-detect INI; returns (resolved_device, info_dict).
+    Otherwise returns (args_serial, None) - no autodetect was performed.
+
+    info_dict keys: section, device, vid, pid, serial_number, ini_source, ini_path.
 
     Raises AutodetectError on zero matches or ambiguous matches within a single
     section.
     """
     if args_serial != 'auto':
-        return args_serial
+        return args_serial, None
 
     ini_path, ini_source = _resolve_ini_path(autodetect_path)
     candidates = load_candidates(ini_path)
@@ -154,32 +154,36 @@ def resolve_serial(args_serial, autodetect_path=None):
         if not matches:
             continue
         if len(matches) > 1:
-            lines = [
-                "--serial auto matched multiple ports for section [{n}]:".format(n=cand.name),
-            ]
+            lines = [f"--serial auto matched multiple ports for section [{cand.name}]:"]
             lines += ['  ' + _format_port(p) for p in matches]
-            lines.append(
-                "Specify --serial COMx, or add a serial_number filter to [{n}] in {p}".format(
-                    n=cand.name, p=ini_path))
+            lines.append(f"Specify --serial COMx, or add a serial_number filter to [{cand.name}] in {ini_path}")
             raise AutodetectError('\n'.join(lines))
         port = matches[0]
-        vid = port.vid if port.vid is not None else 0
-        pid = port.pid if port.pid is not None else 0
-        print(
-            "auto-detected {dev} (section [{name}], VID={vid:04X} PID={pid:04X}, SN={sn}) "
-            "[from {src}: {path}]".format(
-                dev=port.device, name=cand.name, vid=vid, pid=pid,
-                sn=port.serial_number or '-', src=ini_source, path=ini_path))
-        return port.device
+        info = {
+            'section': cand.name,
+            'device': port.device,
+            'vid': port.vid,
+            'pid': port.pid,
+            'serial_number': port.serial_number,
+            'ini_source': ini_source,
+            'ini_path': ini_path,
+        }
+        return port.device, info
 
-    lines = [
-        "--serial auto found no matching ports (using {src}: {path})".format(
-            src=ini_source, path=ini_path),
-    ]
+    lines = [f"--serial auto found no matching ports (using {ini_source}: {ini_path})"]
     if all_ports:
         lines.append("Detected ports:")
         lines += ['  ' + _format_port(p) for p in all_ports]
     else:
         lines.append("No serial ports detected.")
-    lines.append("Specify --serial COMx, or add a section to {p}".format(p=ini_path))
+    lines.append(f"Specify --serial COMx, or add a section to {ini_path}")
     raise AutodetectError('\n'.join(lines))
+
+
+def format_autodetect_detail(info):
+    """Returns a one-line summary suitable for logger.info()."""
+    vid = info['vid'] if info['vid'] is not None else 0
+    pid = info['pid'] if info['pid'] is not None else 0
+    sn = info['serial_number'] or '-'
+    return (f"    section [{info['section']}], VID={vid:04X} PID={pid:04X}, "
+            f"SN={sn}, from {info['ini_source']}: {info['ini_path']}")
