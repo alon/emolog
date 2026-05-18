@@ -14,7 +14,7 @@ import sys
 import logging
 from struct import pack
 import random
-from time import time, perf_counter
+from time import time
 from socket import socket
 from configparser import ConfigParser
 from shutil import which
@@ -370,7 +370,6 @@ async def run_client(args, client, variables, allow_kb_stop):
     dt = 0.1 if args.runtime is not None else 1.0
     if allow_kb_stop and try_getch_message:
         print(try_getch_message)
-    client.start_logging_time = time()
     while client.running:
         if allow_kb_stop and try_getch():
             break
@@ -518,9 +517,10 @@ async def amain(client, args):
             check_timestamp(params, snapshot_elf_variables)
 
     print("")
-    print("output file: {}".format(csv_filename))
+    print("Output File: {}".format(os.path.basename(csv_filename)))
+    print("Output Folder: {}".format(os.path.dirname(os.path.abspath(csv_filename))))
     bandwidth_bps = bandwidth_calc(args=args, variables=variables)
-    print("upper bound on bandwidth: {} Mbps out of {} ({:.3f}%)".format(
+    print("Estimated bandwidth usage: {} Mbps out of {} ({:.3f}%)".format(
         bandwidth_bps / 1e6,
         args.baud / 1e6,
         100 * bandwidth_bps / args.baud))
@@ -529,25 +529,23 @@ async def amain(client, args):
     # TODO this corrects run-time if all vars are sampled at a low rate, but still incorrect in some cases e.g. (10, 13)
     max_samples = max_samples / min_ticks
     if max_samples > 0:
-        print("running for {} seconds = {} samples".format(args.runtime, int(max_samples)))
+        print("Running for {} seconds = {} samples".format(args.runtime, int(max_samples)))
     client.reset(csv_filename=csv_filename, names=names, min_ticks=min_ticks, max_samples=max_samples)
     if args.listen:
         await start_tcp_listener(client, args.listen)
 
+    print("")
+    print("========== Recording started ==========")
+
     start_time = time()
-    start_clock = perf_counter()
     await run_client(args=args, client=client, variables=variables, allow_kb_stop=True)
 
     logger.debug("stopped at time={} samples={}".format(time(), client.samples_received))
-    setup_time = client.start_logging_time - start_time
     total_time = time() - start_time
-    total_clock = perf_counter() - start_clock
-    print("samples received: {samples_received}\nticks lost: {ticks_lost}\ntime run {total_time:#3.6} cpu %{percent} (setup time {setup_time:#3.6})".format(
+    print("samples received: {samples_received}\nticks lost: {ticks_lost}\ntime run {total_time:.3f}s".format(
             samples_received=client.samples_received,
             ticks_lost=client.ticks_lost,
             total_time=total_time,
-            percent=int(total_clock * 100 / total_time),
-            setup_time=setup_time,
         ))
     return client
 
