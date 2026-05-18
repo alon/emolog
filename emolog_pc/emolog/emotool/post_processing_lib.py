@@ -45,15 +45,12 @@ def calc_file_list(args, config):
         args.input_csv = os.path.join(output_folder, '*.csv')
     elif os.path.isdir(args.input_csv):
         args.input_csv = os.path.join(args.input_csv, '*.csv')
-    print("Looking at: {}".format(args.input_csv))
     files = glob.glob(args.input_csv)
     files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
     if len(files) == 0:
         print('No CSV files found. Exiting.')
         raise SystemExit
-    print('Found {} CSV files:'.format(len(files)))
     if args.newest:
-        print("--newest specified, processing the most recent .csv file:")
         files = [find_newest_file(files)]
     return files
 
@@ -91,22 +88,36 @@ def post_processing_main(process_func):
     config = read_config('local_machine_config.ini')
     files = calc_file_list(args, config)
 
+    multi = len(files) > 1
+    if multi:
+        print("Looking at: {}".format(args.input_csv))
+        print('Found {} CSV files:'.format(len(files)))
+
     summary = {'processed': 0, 'failed': 0, 'skipped': 0}
     for filename in files:
-        print(os.path.basename(filename) + ':  ', end='')
         output_filename = filename[:-4] + '.xlsx'
+        output_base = os.path.basename(output_filename)
+        if multi:
+            print(os.path.basename(filename) + ':  ', end='')
         if not output_exists(output_filename):
-            process_file(args, filename, output_filename, summary,
-                         'Finished post-processing.', process_func)
-        else:  # output file exists, only run if overwrite is requested
-            if args.overwrite:
-                process_file(args, filename, output_filename, summary,
-                             'Overwritten existing Excel file.', process_func)
-            else:
-                print('Excel file already exists, skipping file.')
-                summary['skipped'] += 1
+            success_msg = ('Finished post-processing.' if multi
+                           else 'Post-processing complete: {} created.'.format(output_base))
+            if not multi:
+                print('Post-processing, please wait...', flush=True)
+            process_file(args, filename, output_filename, summary, success_msg, process_func)
+        elif args.overwrite:
+            success_msg = ('Overwritten existing Excel file.' if multi
+                           else 'Post-processing complete: {} overwritten.'.format(output_base))
+            if not multi:
+                print('Post-processing, please wait...', flush=True)
+            process_file(args, filename, output_filename, summary, success_msg, process_func)
+        else:
+            skip_msg = ('Excel file already exists, skipping file.' if multi
+                        else 'Post-processing *SKIPPED*: {} already exists. Use --overwrite to replace.'.format(output_base))
+            print(skip_msg)
+            summary['skipped'] += 1
 
-    if len(files) > 1:
+    if multi:
         print_summary(summary)
 
 
