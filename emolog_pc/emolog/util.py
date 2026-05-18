@@ -1,4 +1,4 @@
-from subprocess import check_output, Popen
+from subprocess import Popen
 import os
 from importlib import import_module
 from psutil import Process, NoSuchProcess, wait_procs, TimeoutExpired
@@ -16,26 +16,6 @@ def which(filename):
         if os.path.exists(os.path.join(d, filename)):
             return os.path.join(d, filename)
     return None
-
-
-def version():
-    """
-    get git defined version. later: return version of program encoded in a install
-    produced variable.
-    :return:
-    """
-    gitroot = os.path.realpath(os.path.join(os.path.split(__file__)[0], '..', '..', '.git'))
-    if not os.path.exists(gitroot):
-        return "unknown version"
-    try:
-        orig_path = os.getcwd()
-        os.chdir(gitroot)
-        output = check_output("git describe --tags".split()).strip()
-    except:
-        return "unknown version"
-    finally:
-        os.chdir(orig_path)
-    return output.strip().decode('utf-8')
 
 
 def resolve(module_attr):

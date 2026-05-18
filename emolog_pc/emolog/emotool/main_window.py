@@ -14,8 +14,6 @@ import pyqtgraph.console
 
 from numpy import zeros, nan
 
-from ..util import version
-
 from ..cython_util import to_dicts, coalesce_meth
 
 # for kernprof
@@ -34,7 +32,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.socket.connectToHost('localhost', args.port)
         self.socket.readyRead.connect(self.readFromEmotool)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle("EmoTool - {}".format(version()))
+        self.setWindowTitle("EmoTool")
         self.main_widget = QtWidgets.QTabWidget(self)
         plot_tab = QtWidgets.QWidget(self.main_widget)
         self.main_widget.addTab(plot_tab, "plot")

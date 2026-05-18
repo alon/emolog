@@ -23,7 +23,7 @@ from pickle import dumps
 import csv
 
 from ..consts import BUILD_TIMESTAMP_VARNAME
-from ..util import version, resolve, create_process, gcd
+from ..util import resolve, create_process, gcd
 from ..util import verbose as util_verbose
 from ..lib import AckTimeout, ClientProtocolMixin, SamplerSample
 from ..varsfile import merge_vars_from_file_and_list
@@ -444,7 +444,7 @@ async def amain_startup(args):
     setup_logging(args.log, args.silent)
 
     # TODO - fold this into window, make it the general IO object, so it decided to spew to stdout or to the GUI
-    banner("Emotool {}".format(version()))
+    banner("Emolog: Embedded Monitor and Logger")
 
     client = EmoToolClient(ticks_per_second=args.ticks_per_second,
         verbose=not args.silent, dump=args.dump, debug=args.debug,
