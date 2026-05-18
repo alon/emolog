@@ -43,12 +43,12 @@ def calc_file_list(args, config):
         if not os.path.isfile(CONFIG_FILE_NAME):
             print(f"No input was provided and configuration file {CONFIG_FILE_NAME} is not "
                   f"present, I don't know what to process. Exiting.")
-            raise SystemExit
+            raise SystemExit(1)
         output_folder = config.get('folders', 'output_folder', fallback=None)
         if output_folder is None:
             print(f"No input was provided and configuration file {CONFIG_FILE_NAME} does not "
                   f"specify [folders] output_folder, I don't know what to process. Exiting.")
-            raise SystemExit
+            raise SystemExit(1)
         args.input_csv = os.path.join(output_folder, '*.csv')
     elif os.path.isdir(args.input_csv):
         args.input_csv = os.path.join(args.input_csv, '*.csv')
@@ -64,7 +64,7 @@ def calc_file_list(args, config):
     files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
     if len(files) == 0:
         print('No CSV files found. Exiting.')
-        raise SystemExit
+        raise SystemExit(1)
     if args.newest:
         files = [find_newest_file(files)]
     return files

@@ -169,7 +169,7 @@ async def start_transport(client, args):
             start_pc(port=port, exe=exe, debug=args.debug)
         else:
             print("error: unfinished support for fake {fake}".format(fake=args.fake))
-            raise SystemExit
+            raise SystemExit(1)
     else:
         serial_process = start_serial_process(serialurl=args.serial, baudrate=args.baud, hw_flow_control=args.hw_flow_control, port=port)
     loop.create_task(monitor_subprocess(serial_process))
@@ -291,7 +291,7 @@ def parse_args(args=None):
             # elf required unless fake_sine in effect
             parser.print_usage()
             print("{e}: error: the following missing argument is required: --elf".format(e=sys.argv[0]))
-            raise SystemExit
+            raise SystemExit(1)
     else:
         if ret.fake == 'gen':
             # fill in fake vars
@@ -311,7 +311,7 @@ def parse_args(args=None):
                 if ret.fake == 'pc':
                     if not os.path.exists(pc_executable):
                         print("missing pc ELF file: {e}".format(e=pc_executable))
-                        raise SystemExit
+                        raise SystemExit(1)
                     ret.elf = pc_executable
                 else:
                     ret.elf = ret.fake
@@ -363,7 +363,7 @@ def banner(s):
 async def run_client(args, client, variables, allow_kb_stop):
     if not await initialize_board(client=client, variables=variables):
         logger.error("Failed to initialize board, exiting.")
-        raise SystemExit
+        raise SystemExit(1)
     sys.stdout.flush()
     logger.info('initialized board')
 
@@ -438,7 +438,7 @@ async def amain_startup(args):
               "This file is required for specifying local machine configuration such as the output folder.\n"
               "Please start from the example {}.example.\n"
               "Exiting.".format(CONFIG_FILE_NAME, CONFIG_FILE_NAME))
-        raise SystemExit
+        raise SystemExit(1)
 
     setup_logging(args.log, args.silent)
 
@@ -463,26 +463,26 @@ def reasonable_timestamp_ms(timestamp):
 def check_timestamp(params, elf_variables):
     if BUILD_TIMESTAMP_VARNAME not in params:
         logger.error('timestamp not received from target')
-        raise SystemExit
+        raise SystemExit(1)
     read_value = int(params[BUILD_TIMESTAMP_VARNAME])
     if BUILD_TIMESTAMP_VARNAME not in elf_variables:
         logger.error('Timestamp variable not in ELF file. Did you add a pre-build step to generate it?')
-        raise SystemExit
+        raise SystemExit(1)
     elf_var = elf_variables[BUILD_TIMESTAMP_VARNAME]
     elf_value = elf_var['init_value']
     if elf_value is None or elf_var['address'] == 0:
         logger.error('Bad timestamp variable in ELF: init value = {value}, address = {address}'.format(value=elf_value, address=elf_var["address"]))
-        raise SystemExit
+        raise SystemExit(1)
     elf_value = int(elf_variables[BUILD_TIMESTAMP_VARNAME]['init_value'])
     if read_value != elf_value:
         if not reasonable_timestamp_ms(read_value):
             logger.error("Build timestamp mismatch: the embedded target probably doesn't contain a timestamp variable")
-            raise SystemExit
+            raise SystemExit(1)
         if read_value < elf_value:
             logger.error('Build timestamp mismatch: target build timestamp is older than ELF')
         else:
             logger.error('Build timestamp mismatch: target build timestamp is newer than ELF')
-        raise SystemExit
+        raise SystemExit(1)
     print("Timestamp verified: ELF file and embedded target match")
 
 
@@ -556,19 +556,25 @@ def start_callback(args, loop):
     try:
         client = loop.run_until_complete(amain_startup(args))
     except SystemExit:
-        # this is fine, but please exit
-        raise SystemExit
+        # this is fine, but please exit — preserve the original exit code
+        raise
     except Exception:
         traceback.print_exc()
-        raise SystemExit
+        raise SystemExit(1)
+    ctrl_c = False
     try:
         client = loop.run_until_complete(amain(client=client, args=args))
     except KeyboardInterrupt:
         print("exiting on user ctrl-c")
+        ctrl_c = True
     except Exception as e:
         logger.error("got exception {!r}".format(e))
         raise
     loop.run_until_complete(cleanup(args=args, client=client))
+    if ctrl_c:
+        # Treat ctrl-c as an error exit so wrapper .bat files skip post-processing.
+        # The graceful "press any key to stop" path returns normally instead.
+        raise SystemExit(1)
     return client
 
 
@@ -585,7 +591,7 @@ def main(cmdline=None):
         def exception_handler(loop, context):
             print("Async Exception caught: {context}".format(context=context))
             traceback.print_exception(context['exception'])
-            raise SystemExit
+            raise SystemExit(1)
         loop.set_exception_handler(exception_handler)
         client = start_callback(args, loop)
         if client.csv_filename is None or not os.path.exists(client.csv_filename):
