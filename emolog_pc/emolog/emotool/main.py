@@ -30,6 +30,7 @@ from ..varsfile import merge_vars_from_file_and_list
 from ..dwarfutil import read_elf_variables
 from multiprocessing import Process, freeze_support
 from emolog import serial2tcp
+from .serial_autodetect import resolve_serial, AutodetectError
 
 
 logger = logging.getLogger()
@@ -246,7 +247,14 @@ def parse_args(args=None):
     now_timestamp = int(datetime.now().timestamp() * 1000)
     parser.add_argument('--fake-elf-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
     parser.add_argument('--fake-gen-build-timestamp-value', type=int, default=now_timestamp, help='debug only - fake build timestamp value (address is fixed)')
-    parser.add_argument('--serial', default='auto', help='serial URL or device name') # see http://pythonhosted.org/pyserial/pyserial_api.html#serial.serial_for_url
+    parser.add_argument('--serial', default='auto',
+                        help='serial URL, device name (e.g. COM4), or "auto" (default) '
+                             'to auto-detect via serial_autodetect.ini. '
+                             'See http://pythonhosted.org/pyserial/pyserial_api.html#serial.serial_for_url')
+    parser.add_argument('--serial-autodetect', default=None,
+                        help='path to a serial_autodetect.ini overriding the default. '
+                             'If omitted, a serial_autodetect.ini in the CWD is used if present, '
+                             'otherwise the built-in default shipped with emolog.')
     parser.add_argument('--baud', default=8000000, help='baudrate, using RS422 up to 12000000 theoretically', type=int)
     parser.add_argument('--hw_flow_control', default=False, action='store_true', help='use CTS/RTS signals for flow control')
     parser.add_argument('--elf', default=None, help='elf executable running on embedded side')
@@ -587,6 +595,12 @@ def main(cmdline=None):
         from .embedded import main as embmain
         embmain()
     else:
+        if args.fake is None:
+            try:
+                args.serial = resolve_serial(args.serial, args.serial_autodetect)
+            except AutodetectError as e:
+                print(str(e), file=sys.stderr)
+                raise SystemExit(1)
         loop = get_event_loop()
         def exception_handler(loop, context):
             print("Async Exception caught: {context}".format(context=context))

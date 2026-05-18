@@ -8,7 +8,7 @@ a = Analysis(
     ['emotool.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('../emolog/emotool/serial_autodetect.ini', 'emolog/emotool')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
