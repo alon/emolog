@@ -511,14 +511,14 @@ async def amain(client, args):
             varsfile=args.snapshotfile,
             # TODO: why do we use 20000 in snapshot_vars.csv? ask Guy
             extra_vars = ['{var_name},100,50'.format(var_name=BUILD_TIMESTAMP_VARNAME)] if args.check_timestamp else [])
-        print("parameters saved to: {}".format(snapshot_output_filename))
+        print("Parameters saved to: {}".format(snapshot_output_filename))
 
         if args.check_timestamp:
             check_timestamp(params, snapshot_elf_variables)
 
     print("")
-    print("Output File: {}".format(os.path.basename(csv_filename)))
-    print("Output Folder: {}".format(os.path.dirname(os.path.abspath(csv_filename))))
+    print("Output file: {}".format(os.path.basename(csv_filename)))
+    print("Output folder: {}".format(os.path.dirname(os.path.abspath(csv_filename))))
     bandwidth_bps = bandwidth_calc(args=args, variables=variables)
     print("Estimated bandwidth usage: {} Mbps out of {} ({:.3f}%)".format(
         bandwidth_bps / 1e6,
@@ -542,7 +542,7 @@ async def amain(client, args):
 
     logger.debug("stopped at time={} samples={}".format(time(), client.samples_received))
     total_time = time() - start_time
-    print("samples received: {samples_received}\nticks lost: {ticks_lost}\ntime run {total_time:.3f}s".format(
+    print("Samples received: {samples_received}\nTicks lost: {ticks_lost}\nTime run {total_time:.3f}s".format(
             samples_received=client.samples_received,
             ticks_lost=client.ticks_lost,
             total_time=total_time,
