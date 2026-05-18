@@ -85,21 +85,6 @@ class Futures:
             pass # silently swallow error, means a double set_result
 
 
-def test_futures():
-    el = get_event_loop()
-    futures = Futures()
-    f1 = futures.add_future(timeout=3.0, timeout_result='Busted')
-    f2 = futures.add_future(timeout=0.1, timeout_result='Busted')
-    async def dosleep():
-        while not f1.done() or not f2.done():
-            await sleep(0.5)
-            if not f1.done():
-                f1.set_result(None)
-    get_event_loop().run_until_complete(dosleep())
-    print(f1.result())
-    print(f2.result())
-
-
 class AckTimeout(Exception):
     pass
 
