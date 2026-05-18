@@ -46,6 +46,14 @@ def calc_file_list(args, config):
     elif os.path.isdir(args.input_csv):
         args.input_csv = os.path.join(args.input_csv, '*.csv')
     files = glob.glob(args.input_csv)
+    # Fallback: if the user passed a bare filename (no path component) and nothing matched
+    # in cwd, retry under the configured output folder. A path with any directory component
+    # (absolute or relative) is taken as-is — the user picked a location, don't second-guess.
+    if not files and not os.path.dirname(args.input_csv):
+        output_folder = config.get('folders', 'output_folder', fallback=None)
+        if output_folder:
+            args.input_csv = os.path.join(output_folder, args.input_csv)
+            files = glob.glob(args.input_csv)
     files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
     if len(files) == 0:
         print('No CSV files found. Exiting.')
