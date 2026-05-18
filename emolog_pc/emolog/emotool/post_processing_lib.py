@@ -49,18 +49,26 @@ def calc_file_list(args, config):
             print(f"No input was provided and configuration file {CONFIG_FILE_NAME} does not "
                   f"specify [folders] output_folder, I don't know what to process. Exiting.")
             raise SystemExit(1)
-        args.input_csv = os.path.join(output_folder, '*.csv')
+        args.input_csv = os.path.join(output_folder, '**', '*.csv')
     elif os.path.isdir(args.input_csv):
-        args.input_csv = os.path.join(args.input_csv, '*.csv')
-    files = glob.glob(args.input_csv)
-    # Fallback: if the user passed a bare filename (no path component) and nothing matched
-    # in cwd, retry under the configured output folder. A path with any directory component
-    # (absolute or relative) is taken as-is — the user picked a location, don't second-guess.
-    if not files and not os.path.dirname(args.input_csv):
+        args.input_csv = os.path.join(args.input_csv, '**', '*.csv')
+    files = glob.glob(args.input_csv, recursive=True)
+    # Fallback for relative paths with no match in cwd: retry under the configured output folder.
+    # A bare filename (no directory component) is searched recursively, so subfolder grouping
+    # doesn't get in the way of `process.bat emo_142.csv`. A relative path WITH a directory
+    # component (e.g. `my_group\emo_142.csv`) is taken literally under the output folder.
+    # Absolute paths are taken as-is.
+    if not files and not os.path.isabs(args.input_csv):
         output_folder = config.get('folders', 'output_folder', fallback=None)
         if output_folder:
-            args.input_csv = os.path.join(output_folder, args.input_csv)
-            files = glob.glob(args.input_csv)
+            if not os.path.dirname(args.input_csv):
+                candidate = os.path.join(output_folder, '**', args.input_csv)
+            else:
+                candidate = os.path.join(output_folder, args.input_csv)
+            retry = glob.glob(candidate, recursive=True)
+            if retry:
+                args.input_csv = candidate
+                files = retry
     files = [f for f in files if f[-4:].lower() == '.csv' and f[-11:-4] != '_params']
     if len(files) == 0:
         print('No CSV files found. Exiting.')

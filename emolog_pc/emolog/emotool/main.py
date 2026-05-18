@@ -14,6 +14,7 @@ import sys
 import logging
 from struct import pack
 import random
+import re
 from time import time
 from socket import socket
 from configparser import ConfigParser
@@ -75,18 +76,62 @@ def start_pc(port, exe, debug):
     return create_process(cmdline)
 
 
-def iterate(prefix, initial):
-    while True:
-        yield '{}_{:03}.csv'.format(prefix, initial)
-        initial += 1
+_WINDOWS_ILLEGAL_FILENAME_CHARS = set('<>:"/\\|?*')
 
 
-def next_available(folder, prefix):
-    filenames = iterate(prefix, 1)
-    for filename in filenames:
-        candidate = os.path.join(folder, filename)
-        if not os.path.exists(candidate):
-            return candidate
+def validate_filename_component(value, flag_name):
+    """Reject values that aren't safe as a single filename component (Windows rules).
+    Exits with a clear error message naming the offending issue.
+    """
+    if not value:
+        return
+    illegal = sorted({c for c in value if c in _WINDOWS_ILLEGAL_FILENAME_CHARS or ord(c) < 32})
+    if illegal:
+        chars = ', '.join(repr(c) for c in illegal)
+        print(f"error: {flag_name} contains illegal character(s): {chars}", file=sys.stderr)
+        raise SystemExit(1)
+    if value != value.strip():
+        print(f"error: {flag_name} has leading or trailing whitespace", file=sys.stderr)
+        raise SystemExit(1)
+    if value.endswith('.'):
+        print(f"error: {flag_name} ends with '.' (Windows silently strips trailing dots)", file=sys.stderr)
+        raise SystemExit(1)
+
+
+def max_existing_recording_number(root_folder, prefix):
+    """Largest NNN found in <prefix>_NNN[ <label>|_<label>].(csv|xlsx) across root_folder
+    and any subfolders, or 0 if none exist. Keeps the recording counter global across
+    --group subfolders so emo_NNN remains a unique identifier across the whole tree.
+    """
+    pattern = re.compile(r'^' + re.escape(prefix) + r'_(\d+)(?:[\s_].*)?\.(?:csv|xlsx)$')
+    if not os.path.isdir(root_folder):
+        return 0
+    max_n = 0
+    for dirpath, _, filenames in os.walk(root_folder):
+        for f in filenames:
+            m = pattern.match(f)
+            if m:
+                n = int(m.group(1))
+                if n > max_n:
+                    max_n = n
+    return max_n
+
+
+def next_available(folder, prefix, group=None, label=None):
+    """Path for the next recording. Numbering is global across subfolders of `folder`
+    (max found + 1). Placed in `<folder>/<group>/` if `group` is set (created if needed),
+    with ` <label>` appended to the bare numbered name when `label` is non-empty.
+    """
+    next_n = max_existing_recording_number(folder, prefix) + 1
+    base = '{}_{:03}'.format(prefix, next_n)
+    if label:
+        base = base + ' ' + label
+    if group:
+        out_dir = os.path.join(folder, group)
+        os.makedirs(out_dir, exist_ok=True)
+    else:
+        out_dir = folder
+    return os.path.join(out_dir, base + '.csv')
 
 
 def setup_logging(filename, silent):
@@ -269,6 +314,13 @@ def parse_args(args=None):
     group.add_argument('--out_prefix', default='emo', help='Output file prefix. Output is saved to the first free '
                                                            '(not already existing) file of the format "prefix_xxx.csv", '
                                                            'where xxx is a sequential number starting from "001"')
+    parser.add_argument('--label', default=None,
+                        help='Free-text label appended to the auto-numbered filename, '
+                             'e.g. --label "2V open loop" -> "emo_NNN 2V open loop.csv". '
+                             'Not compatible with --out.')
+    parser.add_argument('--group', default=None,
+                        help='Subfolder under the output folder for this recording. Auto-created. '
+                             'Recording number stays global across groups. Not compatible with --out.')
 
     parser.add_argument('--csv-factory', help='advanced: module[.module]*.function to use as factory for csv file writing', default=None)
 
@@ -503,11 +555,17 @@ async def amain(client, args):
 
     output_folder = config['folders']['output_folder']
     if args.out:
+        if args.label or args.group:
+            print("error: --out cannot be combined with --label or --group", file=sys.stderr)
+            raise SystemExit(1)
         if args.out[-4:] != '.csv':
             args.out = args.out + '.csv'
         csv_filename = os.path.join(output_folder, args.out)
     else:   # either --out or --out_prefix must be specified
-        csv_filename = next_available(output_folder, args.out_prefix)
+        validate_filename_component(args.label, '--label')
+        validate_filename_component(args.group, '--group')
+        csv_filename = next_available(output_folder, args.out_prefix,
+                                      group=args.group, label=args.label)
 
     take_snapshot = args.check_timestamp or args.snapshotfile
     if take_snapshot:
