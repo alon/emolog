@@ -6,6 +6,9 @@ import configparser
 import numpy as np
 
 
+CONFIG_FILE_NAME = 'local_machine_config.ini'
+
+
 # ---------------   main() Related Logic   ---------------
 
 def get_args():
@@ -37,10 +40,14 @@ def read_config(filename):
 
 def calc_file_list(args, config):
     if args.input_csv is None:
-        output_folder = config.get('folders', 'output_folder')
+        if not os.path.isfile(CONFIG_FILE_NAME):
+            print(f"No input was provided and configuration file {CONFIG_FILE_NAME} is not "
+                  f"present, I don't know what to process. Exiting.")
+            raise SystemExit
+        output_folder = config.get('folders', 'output_folder', fallback=None)
         if output_folder is None:
-            print("No input was provided and configuration file {} is missing,"
-                  " I don't know what to process. Exiting.".format(CONFIG_FILE_NAME))
+            print(f"No input was provided and configuration file {CONFIG_FILE_NAME} does not "
+                  f"specify [folders] output_folder, I don't know what to process. Exiting.")
             raise SystemExit
         args.input_csv = os.path.join(output_folder, '*.csv')
     elif os.path.isdir(args.input_csv):
@@ -93,7 +100,7 @@ def print_summary(summary):
 
 def post_processing_main(process_func):
     args = get_args()
-    config = read_config('local_machine_config.ini')
+    config = read_config(CONFIG_FILE_NAME)
     files = calc_file_list(args, config)
 
     multi = len(files) > 1
