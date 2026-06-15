@@ -336,14 +336,21 @@ def add_scatter_graph(wb, data, data_sheet_name, chart_sheet_name, x_axis_col_na
                       'max': axes_ranges['x']['max'],
                       'line': {'none': True},
                       })
-    chart.set_y_axis({'major_gridlines': {'visible': True},
-                      'min': axes_ranges['y']['min'],
-                      'max': axes_ranges['y']['max'],
-                      })
-    chart.set_y2_axis({'major_gridlines': {'visible': False},
-                       'min': axes_ranges['y2']['min'],
-                       'max': axes_ranges['y2']['max'],
-                       })
+    y_axis = {'major_gridlines': {'visible': True},
+              'min': axes_ranges['y']['min'],
+              'max': axes_ranges['y']['max'],
+              }
+    if 'major_unit' in axes_ranges['y']:
+        y_axis['major_unit'] = axes_ranges['y']['major_unit']
+    chart.set_y_axis(y_axis)
+
+    y2_axis = {'major_gridlines': {'visible': False},
+               'min': axes_ranges['y2']['min'],
+               'max': axes_ranges['y2']['max'],
+               }
+    if 'major_unit' in axes_ranges['y2']:
+        y2_axis['major_unit'] = axes_ranges['y2']['major_unit']
+    chart.set_y2_axis(y2_axis)
     sheet.set_chart(chart)
     sheet.set_zoom(120)
     sheet.name = chart_sheet_name
